@@ -28,6 +28,7 @@ fn manifests_carry_publish_metadata_and_version_requirements() {
         &core,
         "sim-cli-core",
         "Core command entry API for the SIM bootloader.",
+        true, // published to crates.io
     );
     assert_contains(
         &core,
@@ -39,7 +40,7 @@ fn manifests_carry_publish_metadata_and_version_requirements() {
         "sim-kernel must not be a committed path dependency"
     );
 
-    assert_package_metadata(&binary, "sim-cli", "SIM bootloader command line.");
+    assert_package_metadata(&binary, "sim-run", "SIM bootloader command line.", false); // deferred CLI, not published
     assert_contains(&binary, "name = \"sim\"", "binary name");
     assert_contains(
         &binary,
@@ -130,7 +131,7 @@ fn publish_readiness_recipe_uses_meta_workspace_manifest() {
     );
 }
 
-fn assert_package_metadata(manifest: &str, package: &str, description: &str) {
+fn assert_package_metadata(manifest: &str, package: &str, description: &str, publish: bool) {
     assert_contains(manifest, &format!("name = \"{package}\""), package);
     assert_contains(manifest, "version = \"0.1.0\"", package);
     assert_contains(manifest, "license.workspace = true", package);
@@ -140,7 +141,7 @@ fn assert_package_metadata(manifest: &str, package: &str, description: &str) {
         package,
     );
     assert_contains(manifest, "readme = \"README.md\"", package);
-    assert_contains(manifest, "publish = false", package);
+    assert_contains(manifest, &format!("publish = {publish}"), package);
     assert_contains(
         manifest,
         "repository = \"https://github.com/sim-nest/sim-cli\"",
