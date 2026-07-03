@@ -1,0 +1,50 @@
+[package]
+name = "sim-run"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "SIM bootloader command line."
+readme = "README.md"
+publish = false
+repository = "https://github.com/sim-nest/sim-cli"
+homepage = "https://github.com/sim-nest/sim-cli"
+
+[[bin]]
+name = "sim"
+path = "src/main.rs"
+
+[features]
+# Compose the native dynamic-library loader into the `sim` build. The default
+# binary stays a thin bootloader (no loader but the in-process host loader); this
+# feature pulls in the low loader crate so `sim --load path:lib.so` works without
+# the SDK umbrella.
+dynamic-native = [
+  "dep:sim-cli-loaders",
+  "sim-cli-loaders/dynamic-native",
+  "dep:sim-codec",
+  "dep:sim-kernel",
+  "dep:sim-lib-numbers-arith",
+  "dep:sim-lib-repl",
+]
+registry = ["sim-cli-core/registry"]
+wasm = [
+  "dep:sim-cli-loaders",
+  "sim-cli-loaders/wasm",
+  "dep:sim-kernel",
+  "dep:sim-wasm-abi",
+]
+
+[dependencies]
+sim-cli-core = { version = "0.1.0", path = "../sim-cli-core" }
+sim-cli-loaders = { version = "0.1.0", path = "../sim-cli-loaders", optional = true, default-features = false }
+sim-codec = { version = "0.1.0", optional = true }
+sim-kernel = { version = "0.1.0", optional = true }
+sim-lib-numbers-arith = { version = "0.1.0", optional = true }
+sim-lib-repl = { version = "0.1.0", path = "../sim-lib-repl", optional = true }
+sim-wasm-abi = { version = "0.1.0", optional = true }
+
+[dev-dependencies]
+wat = "1.245.1"
+
+[lints]
+workspace = true

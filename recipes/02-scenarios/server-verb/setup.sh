@@ -1,0 +1,1 @@
+cargo test -p sim-cli-core scenario_server_verb_loads_from_catalog_without_baked_mode

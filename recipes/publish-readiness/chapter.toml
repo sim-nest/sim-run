@@ -1,0 +1,4 @@
+id = "publish-readiness"
+title = "Publish readiness"
+order = 30
+summary = "Check package metadata without publishing."

@@ -1,0 +1,9 @@
+id = "package-list"
+title = "Package list dry run"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 10
+tags = ["cli", "package", "crates-io", "dry-run"]
+requires = ["sim-cli", "sim-cli-core", "SIM_META_WORKSPACE_MANIFEST"]
+network = false

@@ -1,0 +1,9 @@
+id = "bytes-lib"
+title = "Bytes library verb"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 30
+tags = ["cli", "bytes", "verb", "offline", "deterministic"]
+requires = ["sim-cli-core", "bytes:fixture"]
+network = false

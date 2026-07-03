@@ -1,0 +1,478 @@
+use std::{collections::BTreeMap, sync::Arc};
+
+use sim_kernel::{
+    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, Lib,
+    LibBootDependency, LibId, LibLoader, LibManifest, LibSource as KernelLibSource,
+    LibSourceSpec as KernelLibSourceSpec, LoadedLib, LoaderRegistry, NoopEvalPolicy, Symbol,
+};
+use sim_lib_stream_host::native_audio_provider_capability;
+
+use crate::{
+    CliBoot, CliError, CratesIoResolver, CratesIoSpec, LibSourceSpec, LoadReceipt, LoadReceiptRole,
+    codec_boot::{boot_codec_name, codec_lib_symbol, explicit_codec_source_index},
+    crates_io::fallback_spec_for_symbol,
+    source::symbol_from_text,
+};
+
+/// Kernel-backed loader session used by the command entry API.
+pub struct LoadSession {
+    cx: Cx,
+    loaders: LoaderRegistry,
+    hosts: HostLibRegistry,
+    crates_io: CratesIoResolver,
+    catalog_sources: BTreeMap<Symbol, LibSourceSpec>,
+    default_verb_sources: BTreeMap<String, Vec<LibSourceSpec>>,
+    receipts: Vec<LoadReceipt>,
+}
+
+impl LoadSession {
+    /// Builds a loader session with an empty static host catalog.
+    pub fn new() -> Self {
+        let mut loaders = LoaderRegistry::new();
+        loaders.add_loader(HostSourceLoader);
+        Self {
+            cx: Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory)),
+            loaders,
+            hosts: HostLibRegistry::default(),
+            crates_io: CratesIoResolver::default(),
+            catalog_sources: BTreeMap::new(),
+            default_verb_sources: BTreeMap::new(),
+            receipts: Vec::new(),
+        }
+    }
+
+    /// Adds a kernel loader to the session.
+    pub fn add_loader(&mut self, loader: impl LibLoader + 'static) {
+        self.loaders.add_loader(loader);
+    }
+
+    /// Registers a catalog source for a library symbol.
+    pub fn add_catalog_source(&mut self, symbol: impl AsRef<str>, source: CatalogSource) {
+        let symbol = symbol_from_text(symbol.as_ref());
+        self.catalog_sources
+            .insert(symbol.clone(), catalog_source_spec(source.clone()));
+        self.loaders.add_source(symbol, source);
+    }
+
+    /// Registers a catalog source, builder-style.
+    pub fn with_catalog_source(mut self, symbol: impl AsRef<str>, source: CatalogSource) -> Self {
+        self.add_catalog_source(symbol, source);
+        self
+    }
+
+    /// Adds a kernel loader, builder-style.
+    pub fn with_loader(mut self, loader: impl LibLoader + 'static) -> Self {
+        self.add_loader(loader);
+        self
+    }
+
+    /// Adds a host library factory to the static host catalog.
+    pub fn add_host_factory(
+        &mut self,
+        name: impl Into<String>,
+        factory: impl Fn() -> Box<dyn Lib> + Send + Sync + 'static,
+    ) {
+        self.hosts.add(name, factory);
+    }
+
+    /// Adds a host library factory, builder-style.
+    pub fn with_host_factory(
+        mut self,
+        name: impl Into<String>,
+        factory: impl Fn() -> Box<dyn Lib> + Send + Sync + 'static,
+    ) -> Self {
+        self.add_host_factory(name, factory);
+        self
+    }
+
+    /// Replaces the crates.io resolver used for `crates.io:` sources.
+    pub fn with_crates_io_resolver(mut self, resolver: CratesIoResolver) -> Self {
+        self.crates_io = resolver;
+        self
+    }
+
+    /// Applies direct access to the session context, builder-style.
+    ///
+    /// Hosts use this to install context-level runtime support while keeping
+    /// concrete command behavior in loaded libraries.
+    pub fn with_context(mut self, configure: impl FnOnce(&mut Cx)) -> Self {
+        configure(&mut self.cx);
+        self
+    }
+
+    /// Grants a capability to the session's kernel context, builder-style.
+    ///
+    /// Loaders that require a capability (for example the native dynamic-library
+    /// loader requires `native_dynamic_load_capability()`) only succeed when the
+    /// host has granted it. This lets a composed `sim` build authorize the
+    /// loaders it registers.
+    pub fn with_capability(mut self, capability: CapabilityName) -> Self {
+        self.cx.grant(capability);
+        self
+    }
+
+    /// Registers sources used when `verb` is selected without explicit loads.
+    pub fn add_default_verb_sources(
+        &mut self,
+        verb: impl Into<String>,
+        sources: Vec<LibSourceSpec>,
+    ) {
+        self.default_verb_sources.insert(verb.into(), sources);
+    }
+
+    /// Registers sources used when `verb` is selected without explicit loads,
+    /// builder-style.
+    pub fn with_default_verb_sources(
+        mut self,
+        verb: impl Into<String>,
+        sources: Vec<LibSourceSpec>,
+    ) -> Self {
+        self.add_default_verb_sources(verb, sources);
+        self
+    }
+
+    /// Returns the active kernel context.
+    pub fn cx(&self) -> &Cx {
+        &self.cx
+    }
+
+    pub(crate) fn cx_mut(&mut self) -> &mut Cx {
+        &mut self.cx
+    }
+
+    pub(crate) fn crates_io(&self) -> &CratesIoResolver {
+        &self.crates_io
+    }
+
+    pub(crate) fn hosts(&self) -> &HostLibRegistry {
+        &self.hosts
+    }
+
+    pub(crate) fn catalog_sources(&self) -> &BTreeMap<Symbol, LibSourceSpec> {
+        &self.catalog_sources
+    }
+
+    pub(crate) fn resolve_data_source(&self, source: KernelLibSourceSpec) -> KernelLibSourceSpec {
+        self.loaders.resolve_source_spec(&source)
+    }
+
+    pub(crate) fn inspect_data_source_manifest(
+        &mut self,
+        source: KernelLibSourceSpec,
+    ) -> Result<LibManifest, CliError> {
+        self.loaders
+            .inspect_manifest(&mut self.cx, source.into())
+            .map_err(|err| CliError::new(format!("inspect source: {err}")))
+    }
+
+    /// Returns load receipts in boot order.
+    pub fn receipts(&self) -> &[LoadReceipt] {
+        &self.receipts
+    }
+
+    /// Loads every requested library in the parsed boot controls.
+    pub fn load_boot(&mut self, boot: &CliBoot) -> Result<&[LoadReceipt], CliError> {
+        let boot = self.boot_with_default_verb_sources(boot);
+        self.load_native_audio_provider(&boot);
+        let codec_name = boot_codec_name(&boot);
+        let codec_symbol = codec_lib_symbol(codec_name);
+        let codec_index = explicit_codec_source_index(&boot, &codec_symbol);
+        match codec_index {
+            Some(index) => {
+                self.load_boot_codec_source(codec_name, &codec_symbol, &boot.loads[index])?;
+            }
+            None => {
+                self.load_boot_codec_source(
+                    codec_name,
+                    &codec_symbol,
+                    &LibSourceSpec::Symbol(codec_symbol.clone()),
+                )?;
+            }
+        }
+        for (index, source) in boot.loads.iter().enumerate() {
+            if Some(index) != codec_index {
+                self.load_source(source)?;
+            }
+        }
+        Ok(&self.receipts)
+    }
+
+    fn load_native_audio_provider(&mut self, boot: &CliBoot) {
+        let Some(source) = boot.native_audio_provider.as_deref() else {
+            return;
+        };
+        self.cx.grant(native_audio_provider_capability());
+        if self
+            .load_source_with_role(source, LoadReceiptRole::Library)
+            .is_err()
+        {
+            // Placement resolution keeps the modeled site live when a native
+            // provider is absent or rejected.
+        }
+    }
+
+    fn boot_with_default_verb_sources(&self, boot: &CliBoot) -> CliBoot {
+        if !boot.loads.is_empty() {
+            return boot.clone();
+        }
+        let Some(verb) = boot
+            .payload
+            .args
+            .first()
+            .map(|arg| arg.to_string_lossy().into_owned())
+        else {
+            return boot.clone();
+        };
+        let Some(sources) = self.default_verb_sources.get(&verb) else {
+            return boot.clone();
+        };
+        let mut boot = boot.clone();
+        boot.loads.clone_from(sources);
+        boot
+    }
+
+    /// Loads one source through the kernel loader and records a receipt.
+    pub fn load_source(&mut self, source: &LibSourceSpec) -> Result<LoadReceipt, CliError> {
+        self.load_source_with_role(source, LoadReceiptRole::Library)
+    }
+
+    fn load_boot_codec_source(
+        &mut self,
+        codec_name: &str,
+        codec_symbol: &str,
+        source: &LibSourceSpec,
+    ) -> Result<LoadReceipt, CliError> {
+        let role = LoadReceiptRole::boot_codec(codec_name, codec_symbol);
+        match self.load_source_with_role(source, role.clone()) {
+            Ok(receipt) => Ok(receipt),
+            Err(_) if self.hosts.contains(codec_symbol) => {
+                self.load_source_with_role(&LibSourceSpec::Host(codec_symbol.to_owned()), role)
+            }
+            Err(err) => Err(no_codec_error(codec_name, err)),
+        }
+    }
+
+    fn load_source_with_role(
+        &mut self,
+        source: &LibSourceSpec,
+        role: LoadReceiptRole,
+    ) -> Result<LoadReceipt, CliError> {
+        if let LibSourceSpec::Host(name) = source {
+            return self.load_host_source(source, name, role);
+        }
+        if let LibSourceSpec::CratesIo(spec) = source {
+            return self.load_crates_io_source(source, spec, role);
+        }
+
+        let data_source = source
+            .to_kernel_data_source()
+            .expect("non-host sources have data forms");
+        ensure_loadable_path(&data_source, source)?;
+        let fallback = match source {
+            LibSourceSpec::Symbol(symbol) => fallback_spec_for_symbol(symbol),
+            _ => None,
+        };
+        match self.load_data_source(source, data_source, role.clone()) {
+            Ok(receipt) => Ok(receipt),
+            Err(err) => match fallback {
+                Some(spec) => {
+                    self.load_crates_io_source(&LibSourceSpec::CratesIo(spec.clone()), &spec, role)
+                }
+                None => Err(err),
+            },
+        }
+    }
+
+    fn load_data_source(
+        &mut self,
+        source: &LibSourceSpec,
+        data_source: KernelLibSourceSpec,
+        role: LoadReceiptRole,
+    ) -> Result<LoadReceipt, CliError> {
+        let receipt = self
+            .loaders
+            .load_and_register_with_receipt(&mut self.cx, data_source)
+            .map_err(|err| load_error(source, err))?;
+        let receipt = LoadReceipt {
+            lib_id: receipt.lib_id,
+            role,
+            requested_source: LibSourceSpec::from_kernel_data_source(receipt.requested_source),
+            resolved_source: LibSourceSpec::from_kernel_data_source(receipt.resolved_source),
+            manifest: receipt.manifest,
+            dependencies: receipt.dependencies,
+            exports: receipt.exports,
+        };
+        self.receipts.push(receipt.clone());
+        Ok(receipt)
+    }
+
+    fn load_crates_io_source(
+        &mut self,
+        source: &LibSourceSpec,
+        spec: &CratesIoSpec,
+        role: LoadReceiptRole,
+    ) -> Result<LoadReceipt, CliError> {
+        let resolved = self.crates_io.resolve(spec)?;
+        let data_source = KernelLibSourceSpec::Path(resolved.artifact);
+        ensure_loadable_path(&data_source, source)?;
+        let receipt = self
+            .loaders
+            .load_and_register_with_receipt(&mut self.cx, data_source)
+            .map_err(|err| load_error(source, err))?;
+        let receipt = LoadReceipt {
+            lib_id: receipt.lib_id,
+            role,
+            requested_source: source.clone(),
+            resolved_source: LibSourceSpec::from_kernel_data_source(receipt.resolved_source),
+            manifest: receipt.manifest,
+            dependencies: receipt.dependencies,
+            exports: receipt.exports,
+        };
+        self.receipts.push(receipt.clone());
+        Ok(receipt)
+    }
+
+    /// Unloads a receipt's library through the kernel lifecycle path.
+    pub fn unload_receipt(&mut self, receipt: &LoadReceipt) -> Result<Vec<LibId>, CliError> {
+        self.cx.unload_lib(receipt.lib_id).map_err(|err| {
+            CliError::new(format!("unload failed for {}: {err}", receipt.manifest.id))
+        })
+    }
+
+    fn load_host_source(
+        &mut self,
+        source: &LibSourceSpec,
+        name: &str,
+        role: LoadReceiptRole,
+    ) -> Result<LoadReceipt, CliError> {
+        let lib = self.hosts.instantiate(name)?;
+        let lib_id = self
+            .loaders
+            .load_and_register(&mut self.cx, KernelLibSource::Host(lib))
+            .map_err(|err| load_error(source, err))?;
+        let loaded = self
+            .cx
+            .registry()
+            .libs()
+            .iter()
+            .find(|loaded| loaded.id == lib_id)
+            .cloned()
+            .ok_or_else(|| CliError::new(format!("loaded lib id {lib_id:?} is not registered")))?;
+        let receipt = host_receipt(source.clone(), role, loaded, self.cx.registry().libs());
+        self.receipts.push(receipt.clone());
+        Ok(receipt)
+    }
+}
+
+fn catalog_source_spec(source: CatalogSource) -> LibSourceSpec {
+    match source {
+        CatalogSource::Path(path) => LibSourceSpec::Path(path),
+        CatalogSource::Url(url) => LibSourceSpec::Url(url),
+        CatalogSource::Bytes(bytes) => LibSourceSpec::Bytes(bytes),
+    }
+}
+
+impl Default for LoadSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct HostLibRegistry {
+    factories: BTreeMap<String, Box<dyn Fn() -> Box<dyn Lib> + Send + Sync>>,
+}
+
+impl HostLibRegistry {
+    fn add(
+        &mut self,
+        name: impl Into<String>,
+        factory: impl Fn() -> Box<dyn Lib> + Send + Sync + 'static,
+    ) {
+        self.factories.insert(name.into(), Box::new(factory));
+    }
+
+    pub(crate) fn instantiate(&self, name: &str) -> Result<Box<dyn Lib>, CliError> {
+        self.factories
+            .get(name)
+            .map(|factory| factory())
+            .ok_or_else(|| CliError::new(format!("unknown host library: {name}")))
+    }
+
+    fn contains(&self, name: &str) -> bool {
+        self.factories.contains_key(name)
+    }
+}
+
+struct HostSourceLoader;
+
+impl LibLoader for HostSourceLoader {
+    fn can_load(&self, source: &KernelLibSource) -> bool {
+        matches!(source, KernelLibSource::Host(_))
+    }
+
+    fn load(&self, _cx: &mut Cx, source: KernelLibSource) -> sim_kernel::Result<Box<dyn Lib>> {
+        match source {
+            KernelLibSource::Host(lib) => Ok(lib),
+            _ => Err(KernelError::Lib(
+                "host loader received a non-host source".to_owned(),
+            )),
+        }
+    }
+}
+
+fn host_receipt(
+    source: LibSourceSpec,
+    role: LoadReceiptRole,
+    loaded: LoadedLib,
+    loaded_libs: &[LoadedLib],
+) -> LoadReceipt {
+    let dependencies = loaded
+        .manifest
+        .requires
+        .iter()
+        .filter_map(|dependency| {
+            let loaded = loaded_libs
+                .iter()
+                .find(|candidate| candidate.manifest.id == dependency.id)?;
+            Some(LibBootDependency {
+                lib_id: loaded.id,
+                symbol: loaded.manifest.id.clone(),
+            })
+        })
+        .collect();
+    LoadReceipt {
+        lib_id: loaded.id,
+        role,
+        requested_source: source.clone(),
+        resolved_source: source,
+        manifest: loaded.manifest,
+        dependencies,
+        exports: loaded.exports,
+    }
+}
+
+fn ensure_loadable_path(
+    data_source: &KernelLibSourceSpec,
+    source: &LibSourceSpec,
+) -> Result<(), CliError> {
+    if let KernelLibSourceSpec::Path(path) = data_source
+        && !path.exists()
+    {
+        return Err(CliError::new(format!(
+            "path source not found for {source}: {}",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
+fn load_error(source: &LibSourceSpec, err: KernelError) -> CliError {
+    CliError::new(format!("load failed for {source}: {err}"))
+}
+
+fn no_codec_error(codec_name: &str, err: CliError) -> CliError {
+    CliError::new(format!(
+        "no codec '{codec_name}' available; provide one with --load ({err})"
+    ))
+}

@@ -1,0 +1,9 @@
+id = "loadable-site"
+title = "Loadable site placement"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 80
+tags = ["cli", "loader", "site", "placement", "offline", "deterministic"]
+requires = ["sim-lib-agent", "SIM_META_WORKSPACE_MANIFEST"]
+network = false

@@ -1,0 +1,9 @@
+id = "boot-lisp-eval"
+title = "Boot Lisp and carry eval"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 10
+tags = ["cli", "boot", "eval", "offline", "deterministic"]
+requires = ["sim-cli-core", "codec/lisp"]
+network = false

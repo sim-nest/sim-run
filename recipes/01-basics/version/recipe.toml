@@ -1,0 +1,8 @@
+id = "version"
+title = "Version"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 10
+tags = ["cli", "version"]
+requires = ["sim-cli"]

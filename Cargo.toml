@@ -1,0 +1,19 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/sim-cli",
+  "crates/sim-cli-core",
+  "crates/sim-cli-loaders",
+  "crates/sim-lib-repl",
+  "crates/sim-view-tty",
+  "xtask",
+]
+
+[workspace.package]
+edition = "2024"
+license = "MPL-2.0"
+repository = "https://github.com/sim-nest/sim-cli"
+homepage = "https://github.com/sim-nest/sim-cli"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

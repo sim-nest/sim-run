@@ -1,0 +1,9 @@
+id = "placement-report"
+title = "Placement report inspect"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 70
+tags = ["cli", "placement", "inspect", "offline", "deterministic"]
+requires = ["sim-cli-core", "bytes:placement-report"]
+network = false

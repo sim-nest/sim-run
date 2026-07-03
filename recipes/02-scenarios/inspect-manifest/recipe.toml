@@ -1,0 +1,9 @@
+id = "inspect-manifest"
+title = "Inspect manifest"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 40
+tags = ["cli", "inspect", "manifest", "offline", "deterministic"]
+requires = ["sim-cli-core", "bytes:manifest-fixture"]
+network = false

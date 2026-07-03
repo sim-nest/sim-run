@@ -1,0 +1,9 @@
+id = "server-verb"
+title = "Server verb from loaded library"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 60
+tags = ["cli", "server", "verb", "offline", "deterministic"]
+requires = ["sim-cli-core", "symbol:server"]
+network = false
