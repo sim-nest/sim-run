@@ -30,6 +30,7 @@ use std::{ffi::OsString, fmt};
 
 mod args;
 mod boot;
+mod bootloader;
 mod codec_boot;
 mod crates_io;
 mod envelope;
@@ -56,6 +57,7 @@ mod publish_tests;
 mod scenario_tests;
 
 pub use args::{CliCommand, parse_args};
+pub use bootloader::Bootloader;
 pub use boot::{CliBoot, CliEnvelope, Payload};
 pub use codec_boot::{DEFAULT_CODEC_NAME, boot_codec_name, codec_lib_symbol};
 pub use crates_io::{CratesIoResolver, CratesIoSpec, ResolvedCratesIoSource, VersionReq};
