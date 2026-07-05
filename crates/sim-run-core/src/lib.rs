@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn version_line_uses_package_version() {
-        assert_eq!(version_line(), "sim 0.1.0\n");
+        assert_eq!(version_line(), format!("sim {}\n", env!("CARGO_PKG_VERSION")));
     }
 
     #[test]
