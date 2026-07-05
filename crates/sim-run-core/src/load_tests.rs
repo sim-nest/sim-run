@@ -374,7 +374,7 @@ fn default_boot_does_not_grant_native_audio_provider_capability() {
 
 fn temp_artifact(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "sim-cli-core-{}-{label}.artifact",
+        "sim-run-core-{}-{label}.artifact",
         std::process::id()
     ))
 }
@@ -385,7 +385,7 @@ fn temp_cache(label: &str) -> PathBuf {
         .expect("system time should be after unix epoch")
         .as_nanos();
     std::env::temp_dir().join(format!(
-        "sim-cli-core-cache-{}-{label}-{nanos}",
+        "sim-run-core-cache-{}-{label}-{nanos}",
         std::process::id(),
     ))
 }

@@ -5,5 +5,5 @@ setup = "setup.sh"
 purpose = "purpose.md"
 order = 20
 tags = ["cli", "host", "verb", "offline", "deterministic"]
-requires = ["sim-cli-core", "host:scenario/host"]
+requires = ["sim-run-core", "host:scenario/host"]
 network = false

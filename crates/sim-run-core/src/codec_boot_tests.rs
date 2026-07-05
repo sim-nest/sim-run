@@ -350,14 +350,14 @@ fn bundled_host_codec_is_last_fallback() {
 
 fn temp_artifact(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "sim-cli-core-codec-{}-{label}.artifact",
+        "sim-run-core-codec-{}-{label}.artifact",
         std::process::id()
     ))
 }
 
 fn temp_cache(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "sim-cli-core-codec-cache-{}-{label}",
+        "sim-run-core-codec-cache-{}-{label}",
         std::process::id()
     ))
 }

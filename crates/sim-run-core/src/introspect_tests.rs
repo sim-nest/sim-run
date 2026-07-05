@@ -443,14 +443,14 @@ fn artifact_bytes_ref(source: &KernelLibSource) -> sim_kernel::Result<Vec<u8>> {
 
 fn temp_artifact(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "sim-cli-core-introspect-{}-{label}.artifact",
+        "sim-run-core-introspect-{}-{label}.artifact",
         std::process::id()
     ))
 }
 
 fn temp_cache(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "sim-cli-core-introspect-cache-{}-{label}",
+        "sim-run-core-introspect-cache-{}-{label}",
         std::process::id()
     ))
 }

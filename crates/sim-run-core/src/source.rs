@@ -10,7 +10,7 @@ use sim_kernel::{LibSourceSpec as KernelLibSourceSpec, Symbol};
 /// # Examples
 ///
 /// ```
-/// use sim_cli_core::LibSourceSpec;
+/// use sim_run_core::LibSourceSpec;
 ///
 /// assert_eq!(
 ///     "symbol:codec/lisp".parse::<LibSourceSpec>().unwrap(),

@@ -1,4 +1,4 @@
-# sim-cli-loaders
+# sim-run-loaders
 
 In one line: The pieces that let SIM pull in outside plug-ins from files or bundles.
 

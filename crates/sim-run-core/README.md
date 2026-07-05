@@ -1,6 +1,6 @@
-# sim-cli-core
+# sim-run-core
 
-`sim-cli-core` provides the command entry API used by the `sim` binary. It
+`sim-run-core` provides the command entry API used by the `sim` binary. It
 parses boot controls into `CliBoot`, preserves handoff payloads in `Payload`,
 projects `CliEnvelope`, and loads the selected boot codec as the first library.
 The default codec name is `lisp`, which maps to `codec/lisp`; `--codec NAME`

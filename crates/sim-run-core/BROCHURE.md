@@ -1,4 +1,4 @@
-# sim-cli-core
+# sim-run-core
 
 In one line: The part that reads your command line and sets up the SIM session.
 

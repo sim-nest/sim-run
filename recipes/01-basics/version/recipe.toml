@@ -5,4 +5,4 @@ setup = "setup.sh"
 purpose = "purpose.md"
 order = 10
 tags = ["cli", "version"]
-requires = ["sim-cli"]
+requires = ["sim-run"]

@@ -207,7 +207,7 @@ fn http_get(url: &str) -> Result<Vec<u8>, CliError> {
         .set_read_timeout(Some(Duration::from_secs(10)))
         .map_err(|err| CliError::new(format!("set git registry read timeout: {err}")))?;
     let request = format!(
-        "GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: sim-cli-core/{}\r\nConnection: close\r\n\r\n",
+        "GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: sim-run-core/{}\r\nConnection: close\r\n\r\n",
         parsed.path,
         parsed.host_header(),
         env!("CARGO_PKG_VERSION")
@@ -454,7 +454,7 @@ mod tests {
             .expect("system time should be after unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!(
-            "sim-cli-core-git-registry-cache-{}-{label}-{nanos}",
+            "sim-run-core-git-registry-cache-{}-{label}-{nanos}",
             std::process::id(),
         ))
     }

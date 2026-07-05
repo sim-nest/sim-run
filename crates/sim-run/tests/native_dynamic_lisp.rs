@@ -46,7 +46,7 @@ fn native_lisp_codec_loads_and_decodes_through_cli_loader() {
     let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
     cx.grant(native_dynamic_load_capability());
     LoaderRegistry::new()
-        .with_loader(sim_cli_loaders::NativeDylibLoader)
+        .with_loader(sim_run_loaders::NativeDylibLoader)
         .load_and_register(&mut cx, LibSource::Path(plugin_path.clone()))
         .expect("native loader should register codec/lisp");
 
@@ -114,7 +114,7 @@ fn native_lisp_codec_loads_from_git_registry_symbol() {
     let cache = unique_cache_dir("lisp-registry");
 
     let list = Command::new(env!("CARGO_BIN_EXE_sim"))
-        .env(sim_cli_core::GIT_REGISTRY_ENDPOINT_ENV, server.endpoint())
+        .env(sim_run_core::GIT_REGISTRY_ENDPOINT_ENV, server.endpoint())
         .env("SIM_CLI_CACHE_DIR", &cache)
         .arg("--load")
         .arg("symbol:codec/lisp")

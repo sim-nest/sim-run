@@ -5,7 +5,7 @@ fn manifests_carry_publish_metadata_and_version_requirements() {
     let root = source_root();
     let workspace = read(&root, "Cargo.toml");
     let binary = read(&root, "crates/sim-run/Cargo.toml");
-    let core = read(&root, "crates/sim-cli-core/Cargo.toml");
+    let core = read(&root, "crates/sim-run-core/Cargo.toml");
 
     assert_contains(
         &workspace,
@@ -26,7 +26,7 @@ fn manifests_carry_publish_metadata_and_version_requirements() {
 
     assert_package_metadata(
         &core,
-        "sim-cli-core",
+        "sim-run-core",
         "Core command entry API for the SIM bootloader.",
         true, // published to crates.io
     );
@@ -40,12 +40,12 @@ fn manifests_carry_publish_metadata_and_version_requirements() {
         "sim-kernel must not be a committed path dependency"
     );
 
-    assert_package_metadata(&binary, "sim-run", "SIM bootloader command line.", false); // deferred CLI, not published
+    assert_package_metadata(&binary, "sim-run", "SIM bootloader command line.", true); // published: `cargo install sim-run` -> the `sim` command
     assert_contains(&binary, "name = \"sim\"", "binary name");
     assert_contains(
         &binary,
-        "sim-cli-core = { version = \"0.1.0\", path = \"../sim-cli-core\" }",
-        "sim-cli-core versioned workspace dependency",
+        "sim-run-core = { version = \"0.1.0\", path = \"../sim-run-core\" }",
+        "sim-run-core versioned workspace dependency",
     );
 }
 
@@ -55,7 +55,7 @@ fn committed_manifests_do_not_use_absolute_local_paths() {
     for rel in [
         "Cargo.toml",
         "crates/sim-run/Cargo.toml",
-        "crates/sim-cli-core/Cargo.toml",
+        "crates/sim-run-core/Cargo.toml",
         "xtask/Cargo.toml",
     ] {
         let text = read(&root, rel);
@@ -84,12 +84,12 @@ fn local_source_override_config_stays_out_of_git() {
     let readme = read(&root, "README.md");
     assert_contains(
         &readme,
-        "cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-cli-core --allow-dirty --list",
+        "cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-run-core --allow-dirty --list",
         "core package-list command",
     );
     assert_contains(
         &readme,
-        "cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-cli --allow-dirty --list",
+        "cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-run --allow-dirty --list",
         "binary package-list command",
     );
     assert_contains(
@@ -114,19 +114,19 @@ fn publish_readiness_recipe_uses_meta_workspace_manifest() {
     assert_contains(&recipe, "network = false", "offline package-list recipe");
     assert_contains(
         &recipe,
-        "requires = [\"sim-cli\", \"sim-cli-core\", \"SIM_META_WORKSPACE_MANIFEST\"]",
+        "requires = [\"sim-run\", \"sim-run-core\", \"SIM_META_WORKSPACE_MANIFEST\"]",
         "recipe requirements",
     );
 
     let setup = read(&root, "recipes/publish-readiness/package-list/setup.sh");
     assert_contains(
         &setup,
-        "cargo package --manifest-path \"$SIM_META_WORKSPACE_MANIFEST\" -p sim-cli-core --allow-dirty --list",
+        "cargo package --manifest-path \"$SIM_META_WORKSPACE_MANIFEST\" -p sim-run-core --allow-dirty --list",
         "core package-list setup",
     );
     assert_contains(
         &setup,
-        "cargo package --manifest-path \"$SIM_META_WORKSPACE_MANIFEST\" -p sim-cli --allow-dirty --list",
+        "cargo package --manifest-path \"$SIM_META_WORKSPACE_MANIFEST\" -p sim-run --allow-dirty --list",
         "binary package-list setup",
     );
 }

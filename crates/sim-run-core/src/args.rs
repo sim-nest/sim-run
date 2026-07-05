@@ -21,7 +21,7 @@ pub enum CliCommand {
 /// # Examples
 ///
 /// ```
-/// use sim_cli_core::{parse_args, CliCommand};
+/// use sim_run_core::{parse_args, CliCommand};
 ///
 /// assert_eq!(parse_args(["sim", "--version"]).unwrap(), CliCommand::Version);
 ///

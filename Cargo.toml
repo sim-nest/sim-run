@@ -1,20 +1,16 @@
 [workspace]
 resolver = "3"
 members = [
-  "crates/sim-cli-core",
-  "crates/sim-cli-loaders",
+  "crates/sim-run-core",
+  "crates/sim-run-loaders",
+  "crates/sim-lib-repl",
+  "crates/sim-run",
   "crates/sim-view-tty",
   "xtask",
 ]
-# The CLI stack -- sim-run (crates/sim-run) and sim-lib-repl -- depends on the `sim`
-# facade, which is deferred (not yet on crates.io), so it cannot build in a
-# standalone checkout. Exclude it from this workspace until the facade is published;
-# the maintainer meta-workspace still builds it (via repos.toml source_paths), where
-# the facade resolves by path. Re-add these members when the facade publishes.
-exclude = [
-  "crates/sim-run",
-  "crates/sim-lib-repl",
-]
+# The CLI stack -- sim-run (crates/sim-run) and sim-lib-repl -- depends on the
+# `sim-nest` facade (imported as `sim`), which is now published on crates.io, so a
+# standalone checkout resolves it. Both are full workspace members again.
 
 [workspace.package]
 edition = "2024"

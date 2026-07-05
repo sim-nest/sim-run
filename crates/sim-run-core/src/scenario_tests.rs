@@ -386,37 +386,37 @@ fn recipe_commands_cover_deterministic_scenarios() {
     let recipes = [
         (
             "boot-lisp-eval",
-            "cargo test -p sim-cli-core ",
+            "cargo test -p sim-run-core ",
             "scenario_boot_lisp_eval_is_offline_and_stable",
         ),
         (
             "host-verb",
-            "cargo test -p sim-cli-core ",
+            "cargo test -p sim-run-core ",
             "scenario_load_host_lib_dispatches_verb",
         ),
         (
             "bytes-lib",
-            "cargo test -p sim-cli-core ",
+            "cargo test -p sim-run-core ",
             "scenario_load_bytes_lib_dispatches_verb",
         ),
         (
             "inspect-manifest",
-            "cargo test -p sim-cli-core ",
+            "cargo test -p sim-run-core ",
             "scenario_inspect_manifest_has_stable_output",
         ),
         (
             "fake-crates-io",
-            "cargo test -p sim-cli-core ",
+            "cargo test -p sim-run-core ",
             "scenario_fake_crates_io_loads_without_network",
         ),
         (
             "server-verb",
-            "cargo test -p sim-cli-core ",
+            "cargo test -p sim-run-core ",
             "scenario_server_verb_loads_from_catalog_without_baked_mode",
         ),
         (
             "placement-report",
-            "cargo test -p sim-cli-core ",
+            "cargo test -p sim-run-core ",
             "scenario_placement_report_is_observable_through_loaded_lib_inspect",
         ),
         (
@@ -565,14 +565,14 @@ fn loaded_manifest_ids(session: &LoadSession) -> Vec<String> {
 
 fn temp_artifact(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "sim-cli-core-scenario-{}-{label}.artifact",
+        "sim-run-core-scenario-{}-{label}.artifact",
         std::process::id()
     ))
 }
 
 fn temp_cache(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "sim-cli-core-scenario-cache-{}-{label}",
+        "sim-run-core-scenario-cache-{}-{label}",
         std::process::id()
     ))
 }

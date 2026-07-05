@@ -29,7 +29,7 @@ impl CratesIoSpec {
     /// # Examples
     ///
     /// ```
-    /// use sim_cli_core::CratesIoSpec;
+    /// use sim_run_core::CratesIoSpec;
     ///
     /// let spec = CratesIoSpec::new("sim-codec-lisp", "^0.1".parse().unwrap()).unwrap();
     /// assert_eq!(spec.package, "sim-codec-lisp");
@@ -77,7 +77,7 @@ impl VersionReq {
     /// # Examples
     ///
     /// ```
-    /// use sim_cli_core::VersionReq;
+    /// use sim_run_core::VersionReq;
     ///
     /// let caret: VersionReq = "^0.1".parse().unwrap();
     /// assert!(caret.matches("0.1.9"));
@@ -638,7 +638,7 @@ mod tests {
 
     fn temp_dir(label: &str) -> PathBuf {
         env::temp_dir().join(format!(
-            "sim-cli-core-crates-{}-{label}",
+            "sim-run-core-crates-{}-{label}",
             std::process::id()
         ))
     }

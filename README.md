@@ -5,7 +5,7 @@ sim-cli is the command-line bootloader repository for SIM.
 ## Crates
 
 - `sim-cli` provides the `sim` binary.
-- `sim-cli-core` provides the command entry API used by the binary.
+- `sim-run-core` provides the command entry API used by the binary.
 - `sim-lib-repl` provides the loadable `cli/main/repl` entry point and the
   read-eval-print core used by that entry point.
 - `sim-view-tty` is a loadable terminal (CLI/TUI) view/edit surface: it projects
@@ -42,7 +42,7 @@ explicit `--load` libraries take precedence over the boot codec entry point. The
 returned value maps to the process exit code by truthiness: truthy is `0`, false
 or nil is `1`.
 
-`crates.io:` resolution belongs to `sim-cli-core`, not the kernel. The resolver
+`crates.io:` resolution belongs to `sim-run-core`, not the kernel. The resolver
 checks a CLI-owned cache directory first: `SIM_CLI_CACHE_DIR` when set, then
 `$XDG_CACHE_HOME/sim/libs`, then `$HOME/.cache/sim/libs`. Cached package
 artifacts resolve to kernel `path:` sources. A local registry fixture can seed
@@ -67,8 +67,8 @@ generated meta-workspace from the control checkout:
 
 ```bash
 sh bin/simctl meta-build
-cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-cli-core --allow-dirty --list
-cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-cli --allow-dirty --list
+cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-run-core --allow-dirty --list
+cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-run --allow-dirty --list
 ```
 
 From this checkout, point cross-repo recipes at that generated manifest:

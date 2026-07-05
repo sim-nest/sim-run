@@ -5,5 +5,5 @@ setup = "setup.sh"
 purpose = "purpose.md"
 order = 10
 tags = ["cli", "boot", "eval", "offline", "deterministic"]
-requires = ["sim-cli-core", "codec/lisp"]
+requires = ["sim-run-core", "codec/lisp"]
 network = false

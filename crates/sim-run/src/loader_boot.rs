@@ -4,10 +4,10 @@ use std::{ffi::OsString, sync::Arc};
 use crate::repl_boot_codec::BootLispCodecLib;
 
 #[cfg(feature = "dynamic-native")]
-use sim_cli_core::{CliBoot, LibSourceSpec};
-use sim_cli_core::{CliCommand, CliError, LoadSession};
+use sim_run_core::{CliBoot, LibSourceSpec};
+use sim_run_core::{CliCommand, CliError, LoadSession};
 #[cfg(feature = "registry")]
-use sim_cli_core::{CratesIoResolver, GIT_REGISTRY_ENDPOINT_ENV};
+use sim_run_core::{CratesIoResolver, GIT_REGISTRY_ENDPOINT_ENV};
 
 #[cfg(feature = "dynamic-native")]
 use std::{env, path::PathBuf};
@@ -26,9 +26,9 @@ where
     I: IntoIterator<Item = S>,
     S: Into<OsString>,
 {
-    let command = sim_cli_core::parse_args(args)?;
+    let command = sim_run_core::parse_args(args)?;
     let mut session = loader_session(&command)?;
-    sim_cli_core::run_command_with_session(command, &mut session)
+    sim_run_core::run_command_with_session(command, &mut session)
 }
 
 fn loader_session(command: &CliCommand) -> Result<LoadSession, CliError> {
@@ -55,17 +55,17 @@ fn loader_session(command: &CliCommand) -> Result<LoadSession, CliError> {
 #[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
 fn with_native_loader(session: LoadSession) -> LoadSession {
     session
-        .with_loader(sim_cli_loaders::NativeDylibLoader)
+        .with_loader(sim_run_loaders::NativeDylibLoader)
         .with_capability(sim_kernel::native_dynamic_load_capability())
 }
 
 #[cfg(feature = "wasm")]
 fn with_wasm_loader(session: LoadSession) -> LoadSession {
     session
-        .with_loader(sim_cli_loaders::WasmLoader::new(Arc::new(
+        .with_loader(sim_run_loaders::WasmLoader::new(Arc::new(
             sim_wasm_abi::WasmiRuntime::new(),
         )))
-        .with_capability(sim_cli_loaders::wasm_load_capability())
+        .with_capability(sim_run_loaders::wasm_load_capability())
 }
 
 #[cfg(feature = "registry")]

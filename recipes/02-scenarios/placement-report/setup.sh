@@ -1,1 +1,1 @@
-cargo test -p sim-cli-core scenario_placement_report_is_observable_through_loaded_lib_inspect
+cargo test -p sim-run-core scenario_placement_report_is_observable_through_loaded_lib_inspect

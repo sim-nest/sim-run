@@ -1,7 +1,7 @@
 # sim-cli
 
 `sim-cli` provides the `sim` binary. The binary delegates command handling to
-`sim-cli-core` and keeps its entrypoint thin.
+`sim-run-core` and keeps its entrypoint thin.
 
 This is a pre-publish bootloader frame: it bakes in no codec. By default it
 never fetches code over the network and boots only libraries supplied via

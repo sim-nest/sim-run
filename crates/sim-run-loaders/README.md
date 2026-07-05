@@ -1,4 +1,4 @@
-# sim-cli-loaders
+# sim-run-loaders
 
 Low-level loader plugins for the `sim` bootloader.
 

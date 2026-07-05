@@ -3,7 +3,7 @@
 //! The `sim` bootloader binary.
 //!
 //! Parses the boot envelope and hands off to a loaded library via
-//! [`sim_cli_core::run`]; all other behavior is provided by loaded libs. The
+//! [`sim_run_core::run`]; all other behavior is provided by loaded libs. The
 //! default build registers only the in-process host loader. Built
 //! `--features dynamic-native`, it composes the native dynamic-library loader so
 //! `sim --load path:lib.so` loads a real `.so`/`.dylib`/`.dll` plugin. Built
@@ -28,11 +28,11 @@ fn main() {
 }
 
 #[cfg(not(any(feature = "dynamic-native", feature = "wasm")))]
-fn boot() -> Result<i32, sim_cli_core::CliError> {
-    sim_cli_core::run(std::env::args_os())
+fn boot() -> Result<i32, sim_run_core::CliError> {
+    sim_run_core::run(std::env::args_os())
 }
 
 #[cfg(any(feature = "dynamic-native", feature = "wasm"))]
-fn boot() -> Result<i32, sim_cli_core::CliError> {
+fn boot() -> Result<i32, sim_run_core::CliError> {
     loader_boot::run(std::env::args_os())
 }

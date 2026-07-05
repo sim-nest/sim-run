@@ -5,5 +5,5 @@ setup = "setup.sh"
 purpose = "purpose.md"
 order = 50
 tags = ["cli", "crates-io", "cache", "offline", "deterministic"]
-requires = ["sim-cli-core", "crates.io:sim-lib-scenario@0.1.0"]
+requires = ["sim-run-core", "crates.io:sim-lib-scenario@0.1.0"]
 network = false
