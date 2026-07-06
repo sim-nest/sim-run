@@ -7,7 +7,7 @@
 //! process. Both directions are pure and deterministic, so the whole surface is
 //! testable without a tty:
 //!
-//! - [`render_scene`] fits a scene to a [`SurfaceCaps`] (via the view crate's
+//! - [`render_scene`] fits a scene to a `SurfaceCaps` (via the view crate's
 //!   density projection) and walks it to stable ASCII.
 //! - [`intent_from_key`] turns a normalized [`KeyInput`] into a validated Intent.
 //!
