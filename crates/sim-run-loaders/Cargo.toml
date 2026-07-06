@@ -18,6 +18,7 @@ wasm = ["dep:sim-wasm-abi"]
 sim-codec = { version = "0.1.0", optional = true }
 sim-codec-binary = { version = "0.1.0", optional = true }
 sim-kernel = { version = "0.1.0" }
+sim-value = { version = "0.1.0" }
 sim-wasm-abi = { version = "0.1.0", optional = true }
 
 [dev-dependencies]

@@ -90,37 +90,13 @@ fn envelope_codec(cx: &mut Cx, envelope: &Value) -> Result<Symbol> {
         Expr::Nil => Ok(default_codec()),
         other => Err(Error::TypeMismatch {
             expected: "codec symbol",
-            found: expr_kind(&other),
+            found: sim_value::kind::expr_kind(&other),
         }),
     }
 }
 
 fn default_codec() -> Symbol {
     Symbol::qualified("codec", "lisp")
-}
-
-fn expr_kind(expr: &Expr) -> &'static str {
-    match expr {
-        Expr::Nil => "nil",
-        Expr::Bool(_) => "bool",
-        Expr::Number(_) => "number",
-        Expr::String(_) => "string",
-        Expr::Bytes(_) => "bytes",
-        Expr::Symbol(_) => "symbol",
-        Expr::Vector(_) => "vector",
-        Expr::List(_) => "list",
-        Expr::Map(_) => "map",
-        Expr::Set(_) => "set",
-        Expr::Call { .. } => "call",
-        Expr::Infix { .. } => "infix",
-        Expr::Prefix { .. } => "prefix",
-        Expr::Postfix { .. } => "postfix",
-        Expr::Block(_) => "block",
-        Expr::Quote { .. } => "quote",
-        Expr::Annotated { .. } => "annotated",
-        Expr::Local(_) => "local",
-        Expr::Extension { .. } => "extension",
-    }
 }
 
 #[cfg(test)]

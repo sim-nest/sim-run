@@ -13,6 +13,7 @@ homepage = "https://github.com/sim-nest/sim-run"
 sim-run-core = { version = "0.1.0", path = "../sim-run-core" }
 sim-codec = { version = "0.1.0" }
 sim-kernel = { version = "0.1.0" }
+sim-value = { version = "0.1.0" }
 
 [dev-dependencies]
 sim = { package = "sim-nest", version = "0.1.0", default-features = false, features = ["core", "shape", "codec-lisp", "numbers-prelude"] }

@@ -76,7 +76,7 @@ pub fn intent_from_key(
             origin,
             vec![
                 ("target", target_ref),
-                ("op", sym("activate")),
+                ("op", sim_value::build::sym("activate")),
                 ("args", Expr::List(Vec::new())),
             ],
         ),
@@ -89,7 +89,10 @@ pub fn intent_from_key(
             intent(
                 "select",
                 origin,
-                vec![("targets", Expr::List(vec![target_ref])), ("dir", sym(dir))],
+                vec![
+                    ("targets", Expr::List(vec![target_ref])),
+                    ("dir", sim_value::build::sym(dir)),
+                ],
             )
         }
         KeyInput::Left | KeyInput::Right => {
@@ -98,7 +101,11 @@ pub fn intent_from_key(
             } else {
                 "right"
             };
-            intent("move", origin, vec![("node", target_ref), ("at", sym(dir))])
+            intent(
+                "move",
+                origin,
+                vec![("node", target_ref), ("at", sim_value::build::sym(dir))],
+            )
         }
         KeyInput::Char(typed) => {
             if field.is_empty() {
@@ -121,7 +128,7 @@ pub fn intent_from_key(
             origin,
             vec![
                 ("target", target_ref),
-                ("op", sym("command")),
+                ("op", sim_value::build::sym("command")),
                 ("args", Expr::List(vec![Expr::String(command.clone())])),
             ],
         ),
@@ -134,11 +141,6 @@ pub fn intent_from_key(
         KeyInput::Backspace => return None,
     };
     validate_intent(&built).ok().map(|()| built)
-}
-
-/// Builds an unqualified symbol value.
-fn sym(name: &str) -> Expr {
-    sim_value::build::sym(name)
 }
 
 /// Builds the single-key edit path to the focused `field` within the target,
