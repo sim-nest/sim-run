@@ -204,18 +204,15 @@ fn copy_owned_bytes(what: &str, bytes: sim_kernel::NativeAbiOwnedBytes) -> Resul
     Ok(slice.to_vec())
 }
 
-/// Normalizes a native dylib manifest: its target must be
-/// [`LibTarget::Native`](sim_kernel::LibTarget::Native). A guest-supplied target
-/// of any other kind is refused (fail closed, surfacing the attempted label)
-/// so a `.so` cannot mint a trusted `host-registered` label from guest text.
+/// Normalizes a native dylib manifest: the loader FORCES the target to
+/// [`LibTarget::Native`](sim_kernel::LibTarget::Native), so trust is assigned by
+/// loader authority rather than derived from the guest manifest text. A `.so` can
+/// therefore never mint a trusted `host-registered` label to escalate its own
+/// trust, even though a standard lib compiled as a native dylib carries a
+/// `host-registered` target in its own manifest.
 #[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
-fn native_manifest(manifest: sim_kernel::LibManifest) -> Result<sim_kernel::LibManifest> {
-    if manifest.target != sim_kernel::LibTarget::Native {
-        return Err(sim_kernel::Error::HostError(format!(
-            "native dylib manifest target must be native, got {}",
-            manifest.target.to_symbol()
-        )));
-    }
+fn native_manifest(mut manifest: sim_kernel::LibManifest) -> Result<sim_kernel::LibManifest> {
+    manifest.target = sim_kernel::LibTarget::Native;
     Ok(manifest)
 }
 
@@ -615,10 +612,11 @@ mod native_abi_guard_tests {
     }
 
     #[test]
-    fn native_manifest_cannot_claim_host_registered_trust() {
-        let err = native_manifest(manifest_with_target(LibTarget::HostRegistered))
-            .expect_err("native guest manifest must not assign host trust");
-        assert!(matches!(err, Error::HostError(m) if m.contains("target must be native")));
+    fn native_manifest_forces_native_target_over_guest_host_registered() {
+        // A guest `.so` cannot keep a trusted `host-registered` label: the loader
+        // rewrites the target to Native so trust comes from loader authority.
+        let manifest = native_manifest(manifest_with_target(LibTarget::HostRegistered)).unwrap();
+        assert_eq!(manifest.target, LibTarget::Native);
     }
 
     #[test]
