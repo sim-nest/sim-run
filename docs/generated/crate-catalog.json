@@ -1,0 +1,79 @@
+{
+  "generator": "xtask crate-catalog v1",
+  "package_count": 6,
+  "packages": [
+    {
+      "description": "Loadable SIM command-line REPL library.",
+      "generated_readme": false,
+      "manifest": "crates/sim-lib-repl/Cargo.toml",
+      "name": "sim-lib-repl",
+      "publish": "true",
+      "readme": "crates/sim-lib-repl/README.md",
+      "root": "crates/sim-lib-repl",
+      "target_kinds": [
+        "lib"
+      ]
+    },
+    {
+      "description": "Core command entry API for the SIM bootloader.",
+      "generated_readme": false,
+      "manifest": "crates/sim-run-core/Cargo.toml",
+      "name": "sim-run-core",
+      "publish": "true",
+      "readme": "crates/sim-run-core/README.md",
+      "root": "crates/sim-run-core",
+      "target_kinds": [
+        "lib"
+      ]
+    },
+    {
+      "description": "Feature-composable SIM bootloader loaders.",
+      "generated_readme": false,
+      "manifest": "crates/sim-run-loaders/Cargo.toml",
+      "name": "sim-run-loaders",
+      "publish": "true",
+      "readme": "crates/sim-run-loaders/README.md",
+      "root": "crates/sim-run-loaders",
+      "target_kinds": [
+        "lib"
+      ]
+    },
+    {
+      "description": "SIM bootloader command line.",
+      "generated_readme": false,
+      "manifest": "crates/sim-run/Cargo.toml",
+      "name": "sim-run",
+      "publish": "true",
+      "readme": "crates/sim-run/README.md",
+      "root": "crates/sim-run",
+      "target_kinds": [
+        "bin",
+        "test"
+      ]
+    },
+    {
+      "description": "Loadable terminal (CLI/TUI) view/edit surface for SIM, projecting Scenes to text and reducing key input to Intents.",
+      "generated_readme": false,
+      "manifest": "crates/sim-view-tty/Cargo.toml",
+      "name": "sim-view-tty",
+      "publish": "true",
+      "readme": "crates/sim-view-tty/README.md",
+      "root": "crates/sim-view-tty",
+      "target_kinds": [
+        "lib"
+      ]
+    },
+    {
+      "description": "SIM workspace package for xtask.",
+      "generated_readme": true,
+      "manifest": "xtask/Cargo.toml",
+      "name": "xtask",
+      "publish": "false",
+      "readme": "xtask/README.md",
+      "root": "xtask",
+      "target_kinds": [
+        "bin"
+      ]
+    }
+  ]
+}
