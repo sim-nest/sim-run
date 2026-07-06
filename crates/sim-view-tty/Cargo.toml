@@ -1,6 +1,6 @@
 [package]
 name = "sim-view-tty"
-version = "0.1.1"
+version = "0.1.2"
 edition.workspace = true
 license.workspace = true
 description = "Loadable terminal (CLI/TUI) view/edit surface for SIM, projecting Scenes to text and reducing key input to Intents."
