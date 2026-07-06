@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use sim_kernel::{
-    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, Lib,
+    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, GrantSeat, Lib,
     LibBootDependency, LibId, LibLoader, LibManifest, LibSource as KernelLibSource,
     LibSourceSpec as KernelLibSourceSpec, LoadedLib, LoaderRegistry, NoopEvalPolicy, Symbol,
 };
@@ -17,6 +17,10 @@ use crate::{
 /// Kernel-backed loader session used by the command entry API.
 pub struct LoadSession {
     cx: Cx,
+    /// Host-only grant seat minted with `cx`; the only capability-grant authority
+    /// in this session. It is never handed to a loaded callable, so a loaded lib
+    /// cannot mint its own capabilities.
+    seat: GrantSeat,
     loaders: LoaderRegistry,
     hosts: HostLibRegistry,
     crates_io: CratesIoResolver,
@@ -30,8 +34,10 @@ impl LoadSession {
     pub fn new() -> Self {
         let mut loaders = LoaderRegistry::new();
         loaders.add_loader(HostSourceLoader);
+        let (cx, seat) = Cx::new_seated(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
         Self {
-            cx: Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory)),
+            cx,
+            seat,
             loaders,
             hosts: HostLibRegistry::default(),
             crates_io: CratesIoResolver::default(),
@@ -107,7 +113,7 @@ impl LoadSession {
     /// host has granted it. This lets a composed `sim` build authorize the
     /// loaders it registers.
     pub fn with_capability(mut self, capability: CapabilityName) -> Self {
-        self.cx.grant(capability);
+        self.seat.grant(&mut self.cx, capability);
         self
     }
 
@@ -201,7 +207,8 @@ impl LoadSession {
         let Some(source) = boot.native_audio_provider.as_deref() else {
             return;
         };
-        self.cx.grant(native_audio_provider_capability());
+        self.seat
+            .grant(&mut self.cx, native_audio_provider_capability());
         if self
             .load_source_with_role(source, LoadReceiptRole::Library)
             .is_err()
