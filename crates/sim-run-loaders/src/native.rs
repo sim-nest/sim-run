@@ -134,12 +134,26 @@ impl LibLoader for NativeDylibLoader {
             )));
         }
 
+        // Probe only the version header first: the entrypoint guarantees at
+        // least `HEADER_SIZE` bytes, so reading the header is in-bounds.
         let header =
             unsafe { std::ptr::read_unaligned(abi_ptr.cast::<sim_kernel::NativeLibAbiHeaderV1>()) };
         validate_native_abi_header(&header, &path)?;
 
+        // F1: the header only proves `HEADER_SIZE` bytes; refuse to read the
+        // full vtable (six function pointers) until `struct_size` proves the
+        // pointee is at least a whole `NativeLibAbiV1`. Reading it otherwise is
+        // an out-of-bounds `read_unaligned`.
+        if header.struct_size < std::mem::size_of::<sim_kernel::NativeLibAbiV1>() {
+            return Err(sim_kernel::Error::HostError(format!(
+                "native dylib {} reported ABI struct size {} smaller than host minimum {}",
+                path.display(),
+                header.struct_size,
+                std::mem::size_of::<sim_kernel::NativeLibAbiV1>()
+            )));
+        }
+
         let abi = unsafe { std::ptr::read_unaligned(abi_ptr) };
-        validate_native_abi_payload(&abi, &path)?;
 
         let instance = unsafe { (abi.instantiate)() };
         if instance.is_null() {
@@ -149,32 +163,60 @@ impl LibLoader for NativeDylibLoader {
             )));
         }
 
-        let response = unsafe { (abi.manifest)(instance) };
-        if !response.error.is_null() {
-            let message = unsafe {
-                let error = &*response.error;
-                if error.message.is_null() {
-                    "native ABI manifest call failed without an error message".to_owned()
-                } else {
-                    CStr::from_ptr(error.message).to_string_lossy().into_owned()
-                }
-            };
-            unsafe {
-                (abi.destroy_instance)(instance);
-                (abi.destroy_error)(response.error);
-            }
-            return Err(sim_kernel::Error::HostError(message));
-        }
-        let bytes = unsafe {
-            std::slice::from_raw_parts(response.bytes.ptr.cast_const(), response.bytes.len).to_vec()
-        };
-        unsafe { (abi.destroy_bytes)(response.bytes) };
+        // Own the instance immediately: from here every early return (`?`)
+        // drops `shared` and destroys the guest instance exactly once, so
+        // manifest-fetch, decode, and conversion failures cannot leak it.
+        let shared = Arc::new(NativeAbiShared::new(library, abi, instance));
+        let bytes = shared.manifest_bytes()?;
         let (_, manifest_expr) = sim_codec_binary::decode_frame(sim_kernel::CodecId(0), &bytes)?;
         let manifest = crate::manifest::expr_to_manifest(manifest_expr)?;
-
-        let shared = Arc::new(NativeAbiShared::new(library, abi, instance));
+        // F2: trust is assigned by the loader, not by guest text. A native
+        // dylib manifest that self-labels a non-native target (for example
+        // `host-registered`, which would escape the untrusted-source eval
+        // denial) is rejected outright rather than silently accepted.
+        let manifest = native_manifest(manifest)?;
         Ok(Box::new(LoadedNativeLib::new(shared, manifest)))
     }
+}
+
+/// Copies an ABI owned-byte buffer into an owned `Vec`, validating its shape
+/// first. An empty `(null, 0, 0)` descriptor yields an empty vector; a null
+/// pointer with a positive length, or a length past the reported capacity, is
+/// rejected before any slice is constructed (both would be undefined behavior).
+///
+/// The caller retains ownership of `bytes` and must destroy it exactly once
+/// through the guest's `destroy_bytes` entry after a successful copy.
+#[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
+#[allow(unsafe_code)]
+fn copy_owned_bytes(what: &str, bytes: sim_kernel::NativeAbiOwnedBytes) -> Result<Vec<u8>> {
+    if bytes.len == 0 {
+        return Ok(Vec::new());
+    }
+    if bytes.ptr.is_null() || bytes.len > bytes.cap {
+        return Err(sim_kernel::Error::HostError(format!(
+            "{what} returned an invalid native byte buffer (null: {}, len {}, cap {})",
+            bytes.ptr.is_null(),
+            bytes.len,
+            bytes.cap
+        )));
+    }
+    let slice = unsafe { std::slice::from_raw_parts(bytes.ptr.cast_const(), bytes.len) };
+    Ok(slice.to_vec())
+}
+
+/// Normalizes a native dylib manifest: its target must be
+/// [`LibTarget::Native`](sim_kernel::LibTarget::Native). A guest-supplied target
+/// of any other kind is refused (fail closed, surfacing the attempted label)
+/// so a `.so` cannot mint a trusted `host-registered` label from guest text.
+#[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
+fn native_manifest(manifest: sim_kernel::LibManifest) -> Result<sim_kernel::LibManifest> {
+    if manifest.target != sim_kernel::LibTarget::Native {
+        return Err(sim_kernel::Error::HostError(format!(
+            "native dylib manifest target must be native, got {}",
+            manifest.target.to_symbol()
+        )));
+    }
+    Ok(manifest)
 }
 
 #[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
@@ -211,24 +253,32 @@ pub fn validate_native_abi_header(
 }
 
 #[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
-fn validate_native_abi_payload(abi: &sim_kernel::NativeLibAbiV1, path: &Path) -> Result<()> {
-    if abi.struct_size < std::mem::size_of::<sim_kernel::NativeLibAbiV1>() {
-        return Err(sim_kernel::Error::HostError(format!(
-            "native dylib {} reported ABI struct size {} smaller than host minimum {}",
-            path.display(),
-            abi.struct_size,
-            std::mem::size_of::<sim_kernel::NativeLibAbiV1>()
-        )));
+impl NativeAbiShared {
+    /// Fetches and copies the guest's encoded manifest bytes, translating an ABI
+    /// error into a host error and freeing the guest allocation exactly once.
+    #[allow(unsafe_code)]
+    fn manifest_bytes(&self) -> Result<Vec<u8>> {
+        let response = unsafe { (self.abi.manifest)(self.instance as *mut c_void) };
+        if !response.error.is_null() {
+            let message = unsafe {
+                let error = &*response.error;
+                if error.message.is_null() {
+                    "native ABI manifest call failed without an error message".to_owned()
+                } else {
+                    CStr::from_ptr(error.message).to_string_lossy().into_owned()
+                }
+            };
+            unsafe {
+                (self.abi.destroy_error)(response.error);
+            }
+            return Err(sim_kernel::Error::HostError(message));
+        }
+        let bytes = copy_owned_bytes("native ABI manifest", response.bytes)?;
+        unsafe {
+            (self.abi.destroy_bytes)(response.bytes);
+        }
+        Ok(bytes)
     }
-    if abi.abi_major != sim_kernel::NATIVE_LIB_ABI_V1_MAJOR {
-        return Err(sim_kernel::Error::HostError(format!(
-            "native dylib {} reported unsupported native ABI {}.{}",
-            path.display(),
-            abi.abi_major,
-            abi.abi_minor
-        )));
-    }
-    Ok(())
 }
 
 #[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
@@ -322,9 +372,7 @@ impl NativeGuest for NativeAbiShared {
             }
             return Err(sim_kernel::Error::HostError(message));
         }
-        let bytes = unsafe {
-            std::slice::from_raw_parts(response.bytes.ptr.cast_const(), response.bytes.len).to_vec()
-        };
+        let bytes = copy_owned_bytes("native ABI call", response.bytes)?;
         unsafe {
             (self.abi.destroy_bytes)(response.bytes);
         }
@@ -512,6 +560,72 @@ fn register_native_manifest_exports(
         }
     }
     Ok(())
+}
+
+#[cfg(all(test, feature = "dynamic-native", not(target_arch = "wasm32")))]
+mod native_abi_guard_tests {
+    use super::{copy_owned_bytes, native_manifest};
+    use sim_kernel::{
+        AbiVersion, Error, LibManifest, LibTarget, NativeAbiOwnedBytes, Symbol, Version,
+    };
+
+    fn manifest_with_target(target: LibTarget) -> LibManifest {
+        LibManifest {
+            id: Symbol::new("demo"),
+            version: Version("0.1.0".to_owned()),
+            abi: AbiVersion { major: 1, minor: 0 },
+            target,
+            requires: Vec::new(),
+            capabilities: Vec::new(),
+            exports: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn empty_owned_bytes_do_not_build_null_slice() {
+        assert_eq!(
+            copy_owned_bytes("test", NativeAbiOwnedBytes::empty()).unwrap(),
+            Vec::<u8>::new()
+        );
+    }
+
+    #[test]
+    fn null_pointer_with_positive_length_is_rejected() {
+        let bogus = NativeAbiOwnedBytes {
+            ptr: std::ptr::null_mut(),
+            len: 8,
+            cap: 8,
+        };
+        let err = copy_owned_bytes("test", bogus).expect_err("null ptr with len must be rejected");
+        assert!(matches!(err, Error::HostError(m) if m.contains("invalid native byte buffer")));
+    }
+
+    #[test]
+    fn length_beyond_capacity_is_rejected() {
+        // A dangling non-null pointer: never dereferenced because len > cap
+        // fails the guard before any slice is constructed.
+        let mut byte = 0u8;
+        let bogus = NativeAbiOwnedBytes {
+            ptr: &mut byte,
+            len: 64,
+            cap: 1,
+        };
+        let err = copy_owned_bytes("test", bogus).expect_err("len past cap must be rejected");
+        assert!(matches!(err, Error::HostError(m) if m.contains("invalid native byte buffer")));
+    }
+
+    #[test]
+    fn native_manifest_cannot_claim_host_registered_trust() {
+        let err = native_manifest(manifest_with_target(LibTarget::HostRegistered))
+            .expect_err("native guest manifest must not assign host trust");
+        assert!(matches!(err, Error::HostError(m) if m.contains("target must be native")));
+    }
+
+    #[test]
+    fn native_manifest_accepts_native_target() {
+        let manifest = native_manifest(manifest_with_target(LibTarget::Native)).unwrap();
+        assert_eq!(manifest.target, LibTarget::Native);
+    }
 }
 
 #[cfg(all(test, feature = "dynamic-native", not(target_arch = "wasm32")))]

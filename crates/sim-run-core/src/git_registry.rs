@@ -15,6 +15,16 @@ use crate::{
 /// Environment variable that enables git-registry-backed artifact resolution.
 pub const GIT_REGISTRY_ENDPOINT_ENV: &str = "SIM_GIT_REGISTRY_ENDPOINT";
 
+/// Environment variable that opts in to fetching from a non-loopback host over
+/// insecure `http://`. Without it, only loopback endpoints are permitted, so an
+/// unauthenticated cleartext fetch cannot reach a remote host by default (F8).
+pub const GIT_REGISTRY_ALLOW_INSECURE_ENV: &str = "SIM_GIT_REGISTRY_ALLOW_INSECURE";
+
+/// Maximum bytes accepted for a registry index response (F18).
+const MAX_INDEX_BYTES: usize = 1 << 20; // 1 MiB
+/// Maximum bytes accepted for a registry artifact response (F18).
+const MAX_ARTIFACT_BYTES: usize = 64 << 20; // 64 MiB
+
 /// Networked resolver for SIM library artifacts hosted by a git-forge package
 /// registry.
 ///
@@ -63,11 +73,10 @@ impl GitRegistryResolver {
             &selected.file_name,
         );
         if !artifact.is_file() {
-            let bytes = http_get(&self.artifact_url(
-                &spec.package,
-                &selected.version,
-                &selected.file_name,
-            )?)?;
+            let bytes = http_get(
+                &self.artifact_url(&spec.package, &selected.version, &selected.file_name)?,
+                MAX_ARTIFACT_BYTES,
+            )?;
             let parent = artifact
                 .parent()
                 .ok_or_else(|| CliError::new("git registry cache artifact has no parent"))?;
@@ -85,7 +94,7 @@ impl GitRegistryResolver {
     }
 
     fn select_version(&self, spec: &CratesIoSpec) -> Result<IndexedArtifact, CliError> {
-        let index = http_get(&self.index_url(&spec.package)?)?;
+        let index = http_get(&self.index_url(&spec.package)?, MAX_INDEX_BYTES)?;
         let index = String::from_utf8(index)
             .map_err(|err| CliError::new(format!("git registry index is not UTF-8: {err}")))?;
         let mut versions = Vec::new();
@@ -140,7 +149,31 @@ fn normalize_endpoint(endpoint: String) -> Result<String, CliError> {
             "git registry endpoint must use http:// in this build",
         ));
     }
+    // F8: this build has no TLS client, so the fetch is unauthenticated
+    // cleartext. Confine it to loopback by default; reaching a remote host over
+    // insecure http:// requires an explicit opt-in.
+    let url = HttpUrl::parse(&endpoint)?;
+    if !host_is_loopback(&url.host) && !insecure_remote_allowed() {
+        return Err(CliError::new(format!(
+            "git registry endpoint host {} is not loopback; refusing an unauthenticated http:// \
+             fetch to a remote host (set {} to override)",
+            url.host, GIT_REGISTRY_ALLOW_INSECURE_ENV
+        )));
+    }
     Ok(endpoint)
+}
+
+fn host_is_loopback(host: &str) -> bool {
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    host.parse::<std::net::IpAddr>()
+        .map(|ip| ip.is_loopback())
+        .unwrap_or(false)
+}
+
+fn insecure_remote_allowed() -> bool {
+    std::env::var_os(GIT_REGISTRY_ALLOW_INSECURE_ENV).is_some_and(|value| !value.is_empty())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -195,7 +228,7 @@ fn url_path_component(component: &str) -> Result<String, CliError> {
     Ok(encoded)
 }
 
-fn http_get(url: &str) -> Result<Vec<u8>, CliError> {
+fn http_get(url: &str, cap: usize) -> Result<Vec<u8>, CliError> {
     let parsed = HttpUrl::parse(url)?;
     let mut stream = TcpStream::connect((parsed.host.as_str(), parsed.port)).map_err(|err| {
         CliError::new(format!(
@@ -215,11 +248,19 @@ fn http_get(url: &str) -> Result<Vec<u8>, CliError> {
     stream
         .write_all(request.as_bytes())
         .map_err(|err| CliError::new(format!("write git registry request: {err}")))?;
+    // F18: bound the whole response (headers + body). `take(cap + 1)` lets us
+    // detect an over-cap stream without reading it unboundedly into memory.
     let mut response = Vec::new();
     stream
+        .take((cap as u64).saturating_add(1))
         .read_to_end(&mut response)
         .map_err(|err| CliError::new(format!("read git registry response: {err}")))?;
-    parse_http_response(url, &response)
+    if response.len() > cap {
+        return Err(CliError::new(format!(
+            "git registry response from {url} exceeds {cap} bytes"
+        )));
+    }
+    parse_http_response(url, &response, cap)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -262,7 +303,7 @@ impl HttpUrl {
     }
 }
 
-fn parse_http_response(url: &str, response: &[u8]) -> Result<Vec<u8>, CliError> {
+fn parse_http_response(url: &str, response: &[u8], cap: usize) -> Result<Vec<u8>, CliError> {
     let Some(split) = response.windows(4).position(|window| window == b"\r\n\r\n") else {
         return Err(CliError::new(format!(
             "git registry response from {url} has no header terminator"
@@ -299,12 +340,17 @@ fn parse_http_response(url: &str, response: &[u8]) -> Result<Vec<u8>, CliError> 
         .get("transfer-encoding")
         .is_some_and(|value| value.eq_ignore_ascii_case("chunked"))
     {
-        return decode_chunked_body(body);
+        return decode_chunked_body(body, cap);
     }
     if let Some(length) = header_map.get("content-length") {
         let length = length.parse::<usize>().map_err(|err| {
             CliError::new(format!("git registry content length is invalid: {err}"))
         })?;
+        if length > cap {
+            return Err(CliError::new(format!(
+                "git registry response body length {length} exceeds {cap} bytes"
+            )));
+        }
         if body.len() < length {
             return Err(CliError::new("git registry response body is truncated"));
         }
@@ -313,7 +359,7 @@ fn parse_http_response(url: &str, response: &[u8]) -> Result<Vec<u8>, CliError> 
     Ok(body.to_vec())
 }
 
-fn decode_chunked_body(mut body: &[u8]) -> Result<Vec<u8>, CliError> {
+fn decode_chunked_body(mut body: &[u8], cap: usize) -> Result<Vec<u8>, CliError> {
     let mut decoded = Vec::new();
     loop {
         let line_end = body
@@ -328,16 +374,29 @@ fn decode_chunked_body(mut body: &[u8]) -> Result<Vec<u8>, CliError> {
         if size == 0 {
             return Ok(decoded);
         }
-        if body.len() < size + 2 {
+        // F17: `size + 2` must not wrap. A header like `fffffffffffffffe`
+        // parses to usize::MAX-1; the old `size + 2` wrapped to 0 in release,
+        // bypassing the truncation guard so `&body[..size]` sliced out of
+        // bounds and panicked. Reject the overflow instead.
+        let need = size
+            .checked_add(2)
+            .ok_or_else(|| CliError::new("chunked git registry body chunk size overflow"))?;
+        if body.len() < need {
             return Err(CliError::new("chunked git registry body is truncated"));
         }
+        // F18: bound the total decoded length as well as the raw response.
+        if decoded.len().saturating_add(size) > cap {
+            return Err(CliError::new(format!(
+                "chunked git registry body exceeds {cap} bytes"
+            )));
+        }
         decoded.extend_from_slice(&body[..size]);
-        if &body[size..size + 2] != b"\r\n" {
+        if &body[size..need] != b"\r\n" {
             return Err(CliError::new(
                 "chunked git registry body has a bad delimiter",
             ));
         }
-        body = &body[size + 2..];
+        body = &body[need..];
     }
 }
 
@@ -387,6 +446,40 @@ mod tests {
                 .to_string(),
             "git registry endpoint must use http:// in this build"
         );
+    }
+
+    #[test]
+    fn rejects_non_loopback_insecure_endpoint() {
+        let err = GitRegistryResolver::new("http://forge.example/sim", PathBuf::new())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("is not loopback"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn registry_rejects_overflowing_chunk_size() {
+        let err = decode_chunked_body(b"fffffffffffffffe\r\n", MAX_ARTIFACT_BYTES)
+            .expect_err("overflowing chunk size must error, not panic")
+            .to_string();
+        assert!(err.contains("overflow"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn registry_rejects_oversized_content_length() {
+        let response = b"HTTP/1.1 200 OK\r\nContent-Length: 4096\r\nConnection: close\r\n\r\n";
+        let err = parse_http_response("http://loopback/index.txt", response, 16)
+            .expect_err("body length past the cap must error")
+            .to_string();
+        assert!(err.contains("exceeds 16 bytes"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn registry_caps_chunked_decoded_length() {
+        // One 8-byte chunk decoded under a 4-byte cap must be rejected.
+        let err = decode_chunked_body(b"8\r\nAAAAAAAA\r\n0\r\n", 4)
+            .expect_err("decoded length past the cap must error")
+            .to_string();
+        assert!(err.contains("exceeds 4 bytes"), "unexpected error: {err}");
     }
 
     #[test]

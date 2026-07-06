@@ -21,6 +21,45 @@ impl NativeAbiNumberDomain {
         let (_, expr) = sim_codec_binary::decode_frame(sim_kernel::CodecId(0), &bytes)?;
         Ok(expr)
     }
+
+    /// Re-validates a guest-returned number literal before the host accepts it
+    /// (F19). A native number domain is untrusted guest code, so its canonical
+    /// text is not taken verbatim: the literal must be labeled with this domain
+    /// and its canonical string must be a fixed point of the domain's own
+    /// parser (re-parsing the canonical form yields the identical canonical
+    /// form). A foreign-domain or non-canonical literal is rejected rather than
+    /// injected into the runtime.
+    fn accept_number(&self, number: NumberLiteral) -> Result<NumberLiteral> {
+        if number.domain != self.symbol {
+            return Err(sim_kernel::Error::HostError(format!(
+                "native number-domain {} returned a literal in foreign domain {}",
+                self.symbol, number.domain
+            )));
+        }
+        match self.invoke_expr("parse-literal", &Expr::String(number.canonical.clone()))? {
+            Expr::Number(reparsed)
+                if reparsed.domain == self.symbol && reparsed.canonical == number.canonical =>
+            {
+                Ok(number)
+            }
+            _ => Err(sim_kernel::Error::HostError(format!(
+                "native number-domain {} returned a non-canonical literal {:?}",
+                self.symbol, number.canonical
+            ))),
+        }
+    }
+
+    /// Converts a guest op result expression into a value, re-validating any
+    /// number literal through [`accept_number`](Self::accept_number).
+    fn value_from_number_expr(&self, cx: &mut Cx, expr: Expr) -> Result<Value> {
+        match expr {
+            Expr::Number(number) => {
+                let number = self.accept_number(number)?;
+                cx.factory().number_literal(number.domain, number.canonical)
+            }
+            other => cx.factory().expr(other),
+        }
+    }
 }
 
 impl Object for NativeAbiNumberDomain {
@@ -64,10 +103,12 @@ impl NumberDomain for NativeAbiNumberDomain {
     fn parse_literal(&self, cx: &mut Cx, text: &str) -> Result<Option<Value>> {
         match self.invoke_expr("parse-literal", &Expr::String(text.to_owned()))? {
             Expr::Nil => Ok(None),
-            Expr::Number(number) => cx
-                .factory()
-                .number_literal(number.domain, number.canonical)
-                .map(Some),
+            Expr::Number(number) => {
+                let number = self.accept_number(number)?;
+                cx.factory()
+                    .number_literal(number.domain, number.canonical)
+                    .map(Some)
+            }
             other => Err(sim_kernel::Error::HostError(format!(
                 "native number-domain {} parse-literal returned non-number {other:?}",
                 self.symbol
@@ -313,14 +354,8 @@ fn invoke_native_number_op(
         )));
     };
     let args = Expr::List(operands.iter().cloned().map(Expr::Number).collect());
-    expr_to_value(cx, native_domain.invoke_expr(op, &args)?)
-}
-
-fn expr_to_value(cx: &mut Cx, expr: Expr) -> Result<Value> {
-    match expr {
-        Expr::Number(number) => cx.factory().number_literal(number.domain, number.canonical),
-        other => cx.factory().expr(other),
-    }
+    let result = native_domain.invoke_expr(op, &args)?;
+    native_domain.value_from_number_expr(cx, result)
 }
 
 fn expect_literal(cx: &mut Cx, value: Value, side: &str) -> Result<NumberLiteral> {
@@ -393,5 +428,72 @@ mod tests {
         let encoded = domain.encode_literal(&mut cx, parsed).unwrap().unwrap();
         assert_eq!(encoded.domain, Symbol::qualified("numbers", "f64"));
         assert_eq!(encoded.canonical, "1.5");
+    }
+
+    // F19: a guest number domain is untrusted; its canonical form is re-checked.
+    struct F19Guest;
+
+    impl NativeGuest for F19Guest {
+        fn invoke(&self, op: &str, args: &[u8]) -> Result<Vec<u8>> {
+            let (_, expr) = sim_codec_binary::decode_frame(sim_kernel::CodecId(0), args)?;
+            let f64_domain = Symbol::qualified("numbers", "f64");
+            let out = match op {
+                "numbers/f64/parse-literal" => match expr {
+                    // Canonical text that is NOT a fixed point of parse: re-parsing
+                    // "NONCANON" yields a different canonical ("other").
+                    Expr::String(t) if t == "noncanon" => Expr::Number(NumberLiteral {
+                        domain: f64_domain,
+                        canonical: "NONCANON".to_owned(),
+                    }),
+                    Expr::String(t) if t == "NONCANON" => Expr::Number(NumberLiteral {
+                        domain: f64_domain,
+                        canonical: "other".to_owned(),
+                    }),
+                    // A literal mislabeled with a foreign domain.
+                    Expr::String(t) if t == "foreign" => Expr::Number(NumberLiteral {
+                        domain: Symbol::qualified("numbers", "i64"),
+                        canonical: "1".to_owned(),
+                    }),
+                    // A well-formed canonical literal (fixed point of parse).
+                    Expr::String(t) if t == "3" => Expr::Number(NumberLiteral {
+                        domain: f64_domain,
+                        canonical: "3".to_owned(),
+                    }),
+                    _ => Expr::Nil,
+                },
+                other => panic!("unexpected op {other}"),
+            };
+            Ok(sim_codec_binary::encode_frame(&out)?.0)
+        }
+    }
+
+    #[test]
+    fn guest_noncanonical_or_foreign_number_is_rejected() {
+        let domain = NativeAbiNumberDomain {
+            guest: Arc::new(F19Guest),
+            symbol: Symbol::qualified("numbers", "f64"),
+        };
+        let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+
+        let err = domain.parse_literal(&mut cx, "noncanon").unwrap_err();
+        assert!(matches!(
+            err,
+            sim_kernel::Error::HostError(message) if message.contains("non-canonical")
+        ));
+
+        let err = domain.parse_literal(&mut cx, "foreign").unwrap_err();
+        assert!(matches!(
+            err,
+            sim_kernel::Error::HostError(message) if message.contains("foreign domain")
+        ));
+
+        let accepted = domain.parse_literal(&mut cx, "3").unwrap().unwrap();
+        assert_eq!(
+            accepted.object().as_expr(&mut cx).unwrap(),
+            Expr::Number(NumberLiteral {
+                domain: Symbol::qualified("numbers", "f64"),
+                canonical: "3".to_owned(),
+            })
+        );
     }
 }
