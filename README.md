@@ -2,6 +2,22 @@
 
 sim-run is the command-line bootloader repository for SIM.
 
+## Run it
+
+Installing the `sim-run` crate gives you the `sim` command -- one binary that
+starts a session, loads plug-ins, and answers you at a live prompt.
+
+```bash
+cargo install sim-run     # installs the `sim` command
+sim --version
+sim repl                  # a live prompt: type (math/add 6 7) -> 13
+```
+
+`sim webui` opens the browser UI and `sim serve mcp` starts a Model Context
+Protocol server; the full walkthrough (what each surface shows, local
+fallbacks) is in [sim-say](https://github.com/sim-nest/sim-say). The exact
+command grammar is under [Reference: the command surface](#reference-the-command-surface).
+
 ## Crates
 
 - `sim-run` provides the `sim` binary.
@@ -13,9 +29,10 @@ sim-run is the command-line bootloader repository for SIM.
   values, so a terminal is a runtime-loaded surface rather than a baked
   subcommand. Both directions are pure and testable without a tty.
 
-## Command Surface
+## Reference: the command surface
 
-The checked binary surface is:
+For the run-first quickstart, see [Run it](#run-it) above. The checked binary
+surface is:
 
 ```bash
 sim --help
