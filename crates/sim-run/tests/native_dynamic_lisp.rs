@@ -69,7 +69,7 @@ fn native_lisp_codec_loads_and_decodes_through_cli_loader() {
         .expect("Lisp codec output should be text");
     assert_eq!(encoded, "(quote native-codec-loaded)");
 
-    let list = Command::new(env!("CARGO_BIN_EXE_sim-run"))
+    let list = Command::new(env!("CARGO_BIN_EXE_sim"))
         .arg("--load")
         .arg(format!("path:{}", plugin_path.display()))
         .arg("--list")
@@ -113,7 +113,7 @@ fn native_lisp_codec_loads_from_git_registry_symbol() {
     ]);
     let cache = unique_cache_dir("lisp-registry");
 
-    let list = Command::new(env!("CARGO_BIN_EXE_sim-run"))
+    let list = Command::new(env!("CARGO_BIN_EXE_sim"))
         .env(sim_run_core::GIT_REGISTRY_ENDPOINT_ENV, server.endpoint())
         .env("SIM_CLI_CACHE_DIR", &cache)
         .arg("--load")

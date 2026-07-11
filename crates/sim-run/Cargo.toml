@@ -10,7 +10,7 @@ repository = "https://github.com/sim-nest/sim-run"
 homepage = "https://github.com/sim-nest/sim-run"
 
 [[bin]]
-name = "sim-run"
+name = "sim"
 path = "src/main.rs"
 
 [features]

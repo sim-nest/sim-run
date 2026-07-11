@@ -9,7 +9,7 @@ use sim_wasm_abi::{WasmExport, WasmManifest, encode_exports_frame, encode_manife
 fn wasm_feature_loads_fixture_module_through_cli() {
     let fixture = write_wasm_fixture();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_sim-run"))
+    let output = Command::new(env!("CARGO_BIN_EXE_sim"))
         .arg("--load")
         .arg(format!("path:{}", fixture.display()))
         .arg("--list")

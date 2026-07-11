@@ -101,7 +101,7 @@ fn default_codec() -> Symbol {
 
 #[cfg(test)]
 mod tests {
-    use sim::kernel::Lib;
+    use sim_kernel::{Export, Lib};
 
     use super::{ReplLib, repl_entrypoint_symbol};
 
@@ -112,7 +112,7 @@ mod tests {
 
         assert!(manifest.exports.iter().any(|export| matches!(
             export,
-            sim::kernel::Export::Function { symbol, .. } if symbol == &repl_entrypoint_symbol()
+            Export::Function { symbol, .. } if symbol == &repl_entrypoint_symbol()
         )));
     }
 }

@@ -61,19 +61,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use sim::kernel::{Cx, DefaultFactory, EagerPolicy, Symbol};
+    use sim_codec_lisp::LispCodecLib;
+    use sim_kernel::{Cx, Symbol};
+    use sim_lib_numbers_prelude::NumbersPreludeLib;
 
     use super::{eval_line, run_repl_lines};
 
     fn boot() -> Cx {
-        let mut cx = Cx::new(Arc::new(EagerPolicy), Arc::new(DefaultFactory));
-        sim::runtime::install_core_runtime(&mut cx);
-        sim::numbers_prelude::NumbersPreludeLib::new()
-            .install_all(&mut cx)
-            .unwrap();
-        let lisp = sim::codec_lisp::LispCodecLib::new(cx.registry_mut().fresh_codec_id()).unwrap();
+        let mut cx = sim_test_support::core_cx();
+        NumbersPreludeLib::new().install_all(&mut cx).unwrap();
+        let lisp = LispCodecLib::new(cx.registry_mut().fresh_codec_id()).unwrap();
         cx.load_lib(&lisp).unwrap();
         cx
     }

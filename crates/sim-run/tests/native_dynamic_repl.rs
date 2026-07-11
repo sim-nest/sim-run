@@ -67,7 +67,7 @@ fn sim_repl_loads_eval_bundle_and_evaluates_stdin() {
 }
 
 fn run_repl_input(bundle_dir: &Path, input: &str) -> std::process::Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_sim-run"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_sim"))
         .arg("repl")
         .env("SIM_REPL_BUNDLE_DIR", bundle_dir)
         .stdin(Stdio::piped())

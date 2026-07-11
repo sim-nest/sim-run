@@ -16,7 +16,9 @@ sim-kernel = { version = "0.1.0" }
 sim-value = { version = "0.1.0" }
 
 [dev-dependencies]
-sim = { package = "sim-nest", version = "0.1.0", default-features = false, features = ["core", "shape", "codec-lisp", "numbers-prelude"] }
+sim-codec-lisp = { version = "0.1.0" }
+sim-lib-numbers-prelude = { version = "0.1.0" }
+sim-test-support = { version = "0.1.0" }
 
 [lints]
 workspace = true
