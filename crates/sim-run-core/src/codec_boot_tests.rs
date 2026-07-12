@@ -249,6 +249,7 @@ fn explicit_host_codec_loads_before_other_sources() {
             LibSourceSpec::Bytes(b"ordinary-lib".to_vec()),
         ],
         native_audio_provider: None,
+        config: crate::ConfigLoadOptions::default(),
         list: false,
         inspect: None,
         payload: Payload::default(),

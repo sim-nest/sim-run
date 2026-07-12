@@ -32,6 +32,7 @@ mod args;
 mod boot;
 mod bootloader;
 mod codec_boot;
+mod config;
 mod crates_io;
 mod envelope;
 mod exit;
@@ -45,6 +46,8 @@ mod source;
 
 #[cfg(test)]
 mod codec_boot_tests;
+#[cfg(test)]
+mod config_tests;
 #[cfg(test)]
 mod handoff_tests;
 #[cfg(test)]
@@ -60,6 +63,7 @@ pub use args::{CliCommand, parse_args};
 pub use boot::{CliBoot, CliEnvelope, Payload};
 pub use bootloader::Bootloader;
 pub use codec_boot::{DEFAULT_CODEC_NAME, boot_codec_name, codec_lib_symbol};
+pub use config::{ConfigLoadOptions, RuntimeConfigState, load_config_sources};
 pub use crates_io::{CratesIoResolver, CratesIoSpec, ResolvedCratesIoSource, VersionReq};
 #[cfg(feature = "registry")]
 pub use git_registry::{GIT_REGISTRY_ENDPOINT_ENV, GitRegistryResolver};
@@ -78,6 +82,12 @@ Options:
   --load SRC          Add a library source to load.
   --native-audio-provider SRC
                       Try a native audio provider source and degrade if absent.
+  --config-home PATH  Read home config from PATH.
+  --config-work PATH  Read working config from PATH.
+  --config-file PATH  Read one shared config Dir file after root files.
+  --config-site SYMBOL
+                      Read a config Dir from a loaded site export.
+  --no-config-files   Skip filesystem config discovery.
   --list              Request a loaded-lib list.
   --inspect SYMBOL    Request inspection of a loaded lib or export.
   --eval TEXT         Carry eval text for loaded-lib handoff.

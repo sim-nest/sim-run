@@ -357,6 +357,7 @@ fn entrypoint_receives_cli_envelope_value() {
         codec: Some("test".to_owned()),
         loads: vec![LibSourceSpec::Host("app/echo".to_owned())],
         native_audio_provider: None,
+        config: crate::ConfigLoadOptions::default(),
         list: false,
         inspect: None,
         payload: Payload {

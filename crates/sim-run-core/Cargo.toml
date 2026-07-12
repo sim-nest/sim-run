@@ -10,6 +10,8 @@ repository = "https://github.com/sim-nest/sim-run"
 homepage = "https://github.com/sim-nest/sim-run"
 
 [dependencies]
+sim-codec-config = { version = "0.1.0" }
+sim-config = { version = "0.1.0" }
 sim-kernel = { version = "0.1.0" }
 sim-lib-net-core = { version = "0.1.4" }
 sim-lib-stream-host = { version = "0.1.0" }

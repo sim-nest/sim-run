@@ -10,6 +10,7 @@ use sim_lib_stream_host::native_audio_provider_capability;
 use crate::{
     CliBoot, CliError, CratesIoResolver, CratesIoSpec, LibSourceSpec, LoadReceipt, LoadReceiptRole,
     codec_boot::{boot_codec_name, codec_lib_symbol, explicit_codec_source_index},
+    config::{RuntimeConfigState, load_config_sources},
     crates_io::fallback_spec_for_symbol,
     source::symbol_from_text,
 };
@@ -27,6 +28,7 @@ pub struct LoadSession {
     catalog_sources: BTreeMap<Symbol, LibSourceSpec>,
     default_verb_sources: BTreeMap<String, Vec<LibSourceSpec>>,
     receipts: Vec<LoadReceipt>,
+    config: RuntimeConfigState,
 }
 
 impl LoadSession {
@@ -44,6 +46,7 @@ impl LoadSession {
             catalog_sources: BTreeMap::new(),
             default_verb_sources: BTreeMap::new(),
             receipts: Vec::new(),
+            config: RuntimeConfigState::default(),
         }
     }
 
@@ -176,9 +179,21 @@ impl LoadSession {
         &self.receipts
     }
 
+    /// Returns the runtime config state discovered during boot.
+    pub fn config_state(&self) -> &RuntimeConfigState {
+        &self.config
+    }
+
+    /// Returns the runtime config state mutably for host integration.
+    pub fn config_state_mut(&mut self) -> &mut RuntimeConfigState {
+        &mut self.config
+    }
+
     /// Loads every requested library in the parsed boot controls.
     pub fn load_boot(&mut self, boot: &CliBoot) -> Result<&[LoadReceipt], CliError> {
         let boot = self.boot_with_default_verb_sources(boot);
+        let config_libs = config_libs_for_boot(&boot);
+        self.config = load_config_sources(&mut self.cx, &boot.config, &config_libs);
         self.load_native_audio_provider(&boot);
         let codec_name = boot_codec_name(&boot);
         let codec_symbol = codec_lib_symbol(codec_name);
@@ -376,6 +391,41 @@ fn catalog_source_spec(source: CatalogSource) -> LibSourceSpec {
         CatalogSource::Path(path) => LibSourceSpec::Path(path),
         CatalogSource::Url(url) => LibSourceSpec::Url(url),
         CatalogSource::Bytes(bytes) => LibSourceSpec::Bytes(bytes),
+    }
+}
+
+fn config_libs_for_boot(boot: &CliBoot) -> Vec<Symbol> {
+    let codec_name = boot_codec_name(boot);
+    let mut libs = Vec::new();
+    push_unique_symbol(&mut libs, symbol_from_text(&codec_lib_symbol(codec_name)));
+    for source in &boot.loads {
+        if let Some(symbol) = config_lib_for_source(source) {
+            push_unique_symbol(&mut libs, symbol);
+        }
+    }
+    if let Some(source) = boot.native_audio_provider.as_deref()
+        && let Some(symbol) = config_lib_for_source(source)
+    {
+        push_unique_symbol(&mut libs, symbol);
+    }
+    libs
+}
+
+fn config_lib_for_source(source: &LibSourceSpec) -> Option<Symbol> {
+    match source {
+        LibSourceSpec::Symbol(symbol) | LibSourceSpec::Host(symbol) => {
+            Some(symbol_from_text(symbol))
+        }
+        LibSourceSpec::Path(_)
+        | LibSourceSpec::Url(_)
+        | LibSourceSpec::Bytes(_)
+        | LibSourceSpec::CratesIo(_) => None,
+    }
+}
+
+fn push_unique_symbol(symbols: &mut Vec<Symbol>, symbol: Symbol) {
+    if !symbols.iter().any(|existing| existing == &symbol) {
+        symbols.push(symbol);
     }
 }
 
