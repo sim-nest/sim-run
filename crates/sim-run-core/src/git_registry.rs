@@ -340,7 +340,7 @@ fn parse_http_response(url: &str, response: &[u8], cap: usize) -> Result<Vec<u8>
         .get("transfer-encoding")
         .is_some_and(|value| value.eq_ignore_ascii_case("chunked"))
     {
-        return decode_chunked_body(body, cap);
+        return decode_git_registry_chunked(body, cap);
     }
     if let Some(length) = header_map.get("content-length") {
         let length = length.parse::<usize>().map_err(|err| {
@@ -359,44 +359,24 @@ fn parse_http_response(url: &str, response: &[u8], cap: usize) -> Result<Vec<u8>
     Ok(body.to_vec())
 }
 
-fn decode_chunked_body(mut body: &[u8], cap: usize) -> Result<Vec<u8>, CliError> {
-    let mut decoded = Vec::new();
-    loop {
-        let line_end = body
-            .windows(2)
-            .position(|window| window == b"\r\n")
-            .ok_or_else(|| CliError::new("chunked git registry body has no size line"))?;
-        let size_text = std::str::from_utf8(&body[..line_end])
-            .map_err(|err| CliError::new(format!("chunk size is not UTF-8: {err}")))?;
-        let size = usize::from_str_radix(size_text.trim(), 16)
-            .map_err(|err| CliError::new(format!("chunk size is invalid: {err}")))?;
-        body = &body[line_end + 2..];
-        if size == 0 {
-            return Ok(decoded);
+fn decode_git_registry_chunked(body: &[u8], cap: usize) -> Result<Vec<u8>, CliError> {
+    sim_lib_net_core::decode_chunked(body, cap).map_err(map_git_registry_chunked_error)
+}
+
+fn map_git_registry_chunked_error(error: sim_lib_net_core::NetError) -> CliError {
+    use sim_lib_net_core::NetError;
+    match error {
+        NetError::InvalidChunkSize(detail) => CliError::new(format!(
+            "chunked git registry body has invalid chunk size: {detail}"
+        )),
+        NetError::TruncatedChunk => CliError::new("chunked git registry body is truncated"),
+        NetError::InvalidChunkDelimiter => {
+            CliError::new("chunked git registry body has a bad delimiter")
         }
-        // F17: `size + 2` must not wrap. A header like `fffffffffffffffe`
-        // parses to usize::MAX-1; the old `size + 2` wrapped to 0 in release,
-        // bypassing the truncation guard so `&body[..size]` sliced out of
-        // bounds and panicked. Reject the overflow instead.
-        let need = size
-            .checked_add(2)
-            .ok_or_else(|| CliError::new("chunked git registry body chunk size overflow"))?;
-        if body.len() < need {
-            return Err(CliError::new("chunked git registry body is truncated"));
+        NetError::OversizeBody(cap) => {
+            CliError::new(format!("chunked git registry body exceeds {cap} bytes"))
         }
-        // F18: bound the total decoded length as well as the raw response.
-        if decoded.len().saturating_add(size) > cap {
-            return Err(CliError::new(format!(
-                "chunked git registry body exceeds {cap} bytes"
-            )));
-        }
-        decoded.extend_from_slice(&body[..size]);
-        if &body[size..need] != b"\r\n" {
-            return Err(CliError::new(
-                "chunked git registry body has a bad delimiter",
-            ));
-        }
-        body = &body[need..];
+        other => CliError::new(format!("chunked git registry body is invalid: {other}")),
     }
 }
 
@@ -458,7 +438,7 @@ mod tests {
 
     #[test]
     fn registry_rejects_overflowing_chunk_size() {
-        let err = decode_chunked_body(b"fffffffffffffffe\r\n", MAX_ARTIFACT_BYTES)
+        let err = decode_git_registry_chunked(b"fffffffffffffffe\r\n", usize::MAX)
             .expect_err("overflowing chunk size must error, not panic")
             .to_string();
         assert!(err.contains("overflow"), "unexpected error: {err}");
@@ -476,7 +456,7 @@ mod tests {
     #[test]
     fn registry_caps_chunked_decoded_length() {
         // One 8-byte chunk decoded under a 4-byte cap must be rejected.
-        let err = decode_chunked_body(b"8\r\nAAAAAAAA\r\n0\r\n", 4)
+        let err = decode_git_registry_chunked(b"8\r\nAAAAAAAA\r\n0\r\n", 4)
             .expect_err("decoded length past the cap must error")
             .to_string();
         assert!(err.contains("exceeds 4 bytes"), "unexpected error: {err}");
