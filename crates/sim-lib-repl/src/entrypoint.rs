@@ -7,7 +7,7 @@ use sim_kernel::{
 };
 use sim_run_core::cli_main_entrypoint_symbol;
 
-use crate::run_repl_lines;
+use crate::{eval_requested_text, run_repl_lines};
 
 /// Returns the function symbol exported for the bootloader handoff.
 pub fn repl_entrypoint_symbol() -> Symbol {
@@ -69,30 +69,117 @@ impl ObjectCompat for ReplEntrypoint {
 
 impl Callable for ReplEntrypoint {
     fn call(&self, cx: &mut Cx, args: Args) -> Result<Value> {
-        let codec = match args.values().first() {
-            Some(envelope) => envelope_codec(cx, envelope)?,
-            None => default_codec(),
+        let envelope = match args.values().first() {
+            Some(envelope) => ReplEnvelope::from_value(cx, envelope)?,
+            None => ReplEnvelope::default(),
         };
+        let source = envelope.eval_source()?;
+        let codec = envelope.codec.unwrap_or_else(default_codec);
         let stdin = io::stdin();
         let mut stdout = io::stdout();
-        run_repl_lines(cx, &codec, stdin.lock(), &mut stdout).map_err(Error::Eval)?;
+        if let Some(source) = source {
+            let result = eval_requested_text(cx, &codec, &source).map_err(Error::Eval)?;
+            use std::io::Write;
+            writeln!(stdout, "{result}")
+                .map_err(|err| Error::Eval(format!("write stdout: {err}")))?;
+        } else {
+            run_repl_lines(cx, &codec, stdin.lock(), &mut stdout).map_err(Error::Eval)?;
+        }
         cx.factory().bool(true)
     }
 }
 
-fn envelope_codec(cx: &mut Cx, envelope: &Value) -> Result<Symbol> {
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct ReplEnvelope {
+    codec: Option<Symbol>,
+    verb: Option<String>,
+    args: Vec<String>,
+    eval: Option<String>,
+}
+
+impl ReplEnvelope {
+    fn from_value(cx: &mut Cx, envelope: &Value) -> Result<Self> {
+        Ok(Self {
+            codec: envelope_codec(cx, envelope)?,
+            verb: envelope_string(cx, envelope, "verb")?,
+            args: envelope_args(cx, envelope)?,
+            eval: envelope_string(cx, envelope, "eval")?,
+        })
+    }
+
+    fn eval_source(&self) -> Result<Option<String>> {
+        if let Some(eval) = &self.eval {
+            return Ok(Some(eval.clone()));
+        }
+        if self.verb.as_deref() != Some("eval") {
+            return Ok(None);
+        }
+        let source = self
+            .args
+            .iter()
+            .skip(1)
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(" ");
+        if source.is_empty() {
+            Err(Error::Eval("eval verb requires source text".to_owned()))
+        } else {
+            Ok(Some(source))
+        }
+    }
+}
+
+fn envelope_codec(cx: &mut Cx, envelope: &Value) -> Result<Option<Symbol>> {
     let Some(table) = envelope.object().as_table_impl() else {
         return Err(Error::Eval("CLI envelope is not a table".to_owned()));
     };
     let value = table.get(cx, Symbol::new("codec"))?;
     match value.object().as_expr(cx)? {
-        Expr::Symbol(symbol) => Ok(symbol),
-        Expr::Nil => Ok(default_codec()),
+        Expr::Symbol(symbol) => Ok(Some(symbol)),
+        Expr::Nil => Ok(None),
         other => Err(Error::TypeMismatch {
             expected: "codec symbol",
             found: sim_value::kind::expr_kind(&other),
         }),
     }
+}
+
+fn envelope_string(cx: &mut Cx, envelope: &Value, name: &str) -> Result<Option<String>> {
+    let Some(table) = envelope.object().as_table_impl() else {
+        return Err(Error::Eval("CLI envelope is not a table".to_owned()));
+    };
+    let value = table.get(cx, Symbol::new(name))?;
+    match value.object().as_expr(cx)? {
+        Expr::String(value) => Ok(Some(value)),
+        Expr::Nil => Ok(None),
+        other => Err(Error::TypeMismatch {
+            expected: "string or nil",
+            found: sim_value::kind::expr_kind(&other),
+        }),
+    }
+}
+
+fn envelope_args(cx: &mut Cx, envelope: &Value) -> Result<Vec<String>> {
+    let Some(table) = envelope.object().as_table_impl() else {
+        return Err(Error::Eval("CLI envelope is not a table".to_owned()));
+    };
+    let value = table.get(cx, Symbol::new("args"))?;
+    let Expr::List(items) = value.object().as_expr(cx)? else {
+        return Err(Error::TypeMismatch {
+            expected: "argument list",
+            found: "non-list",
+        });
+    };
+    items
+        .into_iter()
+        .map(|item| match item {
+            Expr::String(value) => Ok(value),
+            other => Err(Error::TypeMismatch {
+                expected: "string argument",
+                found: sim_value::kind::expr_kind(&other),
+            }),
+        })
+        .collect()
 }
 
 fn default_codec() -> Symbol {

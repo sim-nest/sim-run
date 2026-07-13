@@ -12,4 +12,7 @@ mod entrypoint;
 mod eval;
 
 pub use entrypoint::{ReplLib, repl_entrypoint_symbol};
-pub use eval::{eval_line, run_repl_lines};
+pub use eval::{
+    ReplEvalOptions, eval_line, eval_requested_text, eval_requested_text_with_options,
+    run_repl_lines,
+};

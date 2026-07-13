@@ -107,11 +107,12 @@ fn repl_session(session: LoadSession) -> Result<LoadSession, CliError> {
 #[cfg(feature = "dynamic-native")]
 fn uses_default_repl_bundle(boot: &CliBoot) -> bool {
     boot.loads.is_empty()
-        && boot
-            .payload
-            .args
-            .first()
-            .is_some_and(|arg| arg.to_string_lossy() == "repl")
+        && (boot.payload.eval.is_some()
+            || boot
+                .payload
+                .args
+                .first()
+                .is_some_and(|arg| matches!(arg.to_string_lossy().as_ref(), "repl" | "eval")))
 }
 
 #[cfg(feature = "dynamic-native")]

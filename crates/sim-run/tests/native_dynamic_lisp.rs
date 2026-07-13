@@ -13,7 +13,7 @@ use sim_kernel::{
 };
 
 const LISP_CODEC_PATCHES: &[(&str, &str, &str)] = &[
-    ("sim", "sim-sdk", "."),
+    ("sim-nest", "sim-sdk", "."),
     ("sim-citizen", "sim-citizen", "crates/sim-citizen"),
     (
         "sim-citizen-derive",
