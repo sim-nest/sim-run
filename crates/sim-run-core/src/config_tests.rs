@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use sim_config::{ConfigRoots, ConfigSource};
+use sim_config::{ConfigRoots, ConfigSource, ConfigView};
 use sim_kernel::{
     AbiVersion, Cx, DefaultFactory, Expr, Lib, LibManifest, LibTarget, Linker, LoadCx,
     NoopEvalPolicy, Symbol, Version,
@@ -14,19 +14,6 @@ use crate::{CliBoot, ConfigLoadOptions, LibSourceSpec, LoadSession, load_config_
 
 fn lib(namespace: &str, name: &str) -> Symbol {
     Symbol::qualified(namespace, name)
-}
-
-fn table_field<'a>(table: &'a Expr, key: &str) -> Option<&'a Expr> {
-    let Expr::Map(entries) = table else {
-        return None;
-    };
-    entries
-        .iter()
-        .find_map(|(candidate, value)| match candidate {
-            Expr::Symbol(symbol) if symbol.as_qualified_str() == key => Some(value),
-            Expr::String(text) if text == key => Some(value),
-            _ => None,
-        })
 }
 
 fn temp_root(label: &str) -> PathBuf {
@@ -91,15 +78,10 @@ keep = "home"
         state.layers()[1].source,
         ConfigSource::WorkFile { .. }
     ));
-    let table = &state.effective().dir.table(&cookbook).unwrap().table;
-    assert_eq!(
-        table_field(table, "mode"),
-        Some(&Expr::String("work".to_owned()))
-    );
-    assert_eq!(
-        table_field(table, "keep"),
-        Some(&Expr::String("home".to_owned()))
-    );
+    let table = state.effective().dir.table(&cookbook).unwrap();
+    let view = ConfigView::new(table);
+    assert_eq!(view.string("mode"), Some("work"));
+    assert_eq!(view.string("keep"), Some("home"));
 
     let _ = fs::remove_dir_all(base);
 }
@@ -181,11 +163,8 @@ fn site_backed_dir_resolves_through_registry_site_export() {
         state.layers().first().unwrap().source,
         ConfigSource::Site { site: ref layer_site } if layer_site == &site
     ));
-    let table = &state.effective().dir.table(&cookbook).unwrap().table;
-    assert_eq!(
-        table_field(table, "mode"),
-        Some(&Expr::String("site".to_owned()))
-    );
+    let table = state.effective().dir.table(&cookbook).unwrap();
+    assert_eq!(ConfigView::new(table).string("mode"), Some("site"));
 }
 
 #[test]
