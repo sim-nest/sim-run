@@ -1,0 +1,1 @@
+cargo test -p sim-run-core config_status_reports_loaded_libs_and_source_provenance

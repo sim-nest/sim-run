@@ -118,6 +118,92 @@ minimum_loaded = ["codec/lisp"]
 }
 
 #[test]
+fn effective_config_discovers_requested_per_lib_file() {
+    let base = temp_root("effective-per-lib");
+    let home = base.join("home");
+    let work = base.join("work");
+    write_file(
+        &work.join("libs").join("sim").join("cookbook.toml"),
+        r#"minimum_loaded = ["codec/lisp"]
+
+[[loadable_lib]]
+id = "numbers/cas"
+source = "symbol:numbers/cas"
+"#,
+    );
+    let boot = CliBoot {
+        config: roots(&home, &work),
+        config_report: Some(ConfigReportRequest {
+            kind: ConfigReportKind::Effective {
+                lib: lib("sim", "cookbook"),
+            },
+            json: false,
+        }),
+        ..CliBoot::default()
+    };
+    let mut session = LoadSession::new();
+
+    let output = session.run_config_report(&boot).unwrap();
+
+    assert!(output.starts_with("lib sim/cookbook\n"), "{output}");
+    assert!(
+        output.contains("minimum_loaded = [\"codec/lisp\"]"),
+        "{output}"
+    );
+    assert!(output.contains("[[loadable_lib]]"), "{output}");
+    assert!(output.contains("id = \"numbers/cas\""), "{output}");
+
+    let _ = fs::remove_dir_all(base);
+}
+
+#[test]
+fn effective_cookbook_override_reports_reordered_subset() {
+    let base = temp_root("cookbook-override");
+    let home = base.join("home");
+    let work = base.join("work");
+    write_file(
+        &home.join("libs").join("sim").join("cookbook.toml"),
+        r#"minimum_loaded = ["codec/lisp"]
+"#,
+    );
+    write_file(
+        &work.join("libs").join("sim").join("cookbook.toml"),
+        r#"[[loadable_lib]]
+id = "demo/beta"
+source = "symbol:demo/beta"
+
+[[loadable_lib]]
+id = "demo/alpha"
+source = "symbol:demo/alpha"
+"#,
+    );
+    let boot = CliBoot {
+        config: roots(&home, &work),
+        config_report: Some(ConfigReportRequest {
+            kind: ConfigReportKind::Effective {
+                lib: lib("sim", "cookbook"),
+            },
+            json: false,
+        }),
+        ..CliBoot::default()
+    };
+    let mut session = LoadSession::new();
+
+    let output = session.run_config_report(&boot).unwrap();
+
+    assert!(
+        output.contains("minimum_loaded = [\"codec/lisp\"]"),
+        "{output}"
+    );
+    let beta = output.find("id = \"demo/beta\"").unwrap();
+    let alpha = output.find("id = \"demo/alpha\"").unwrap();
+    assert!(beta < alpha, "{output}");
+    assert!(!output.contains("numbers/cas"), "{output}");
+
+    let _ = fs::remove_dir_all(base);
+}
+
+#[test]
 fn missing_explicit_source_reports_diagnostic() {
     let base = temp_root("missing-source");
     let missing = base.join("missing.toml");

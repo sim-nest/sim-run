@@ -1,0 +1,9 @@
+id = "config-effective"
+title = "Config effective report"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 91
+tags = ["cli", "config", "effective", "offline", "deterministic"]
+requires = ["sim-run-core", "sim-config"]
+network = false

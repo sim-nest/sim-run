@@ -1,0 +1,9 @@
+id = "config-status"
+title = "Config status report"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 90
+tags = ["cli", "config", "status", "offline", "deterministic"]
+requires = ["sim-run-core", "sim-config"]
+network = false

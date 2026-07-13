@@ -9,6 +9,15 @@
 {"kind":"recipe","path":"recipes/02-scenarios/bytes-lib/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/bytes-lib/setup.sh"}
 {"kind":"recipe","path":"recipes/02-scenarios/chapter.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/config-cookbook-override/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/config-cookbook-override/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/config-cookbook-override/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/config-effective/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/config-effective/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/config-effective/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/config-status/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/config-status/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/config-status/setup.sh"}
 {"kind":"recipe","path":"recipes/02-scenarios/fake-crates-io/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/fake-crates-io/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/fake-crates-io/setup.sh"}

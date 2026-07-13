@@ -8,7 +8,8 @@ use sim_kernel::{
 use sim_lib_stream_host::native_audio_provider_capability;
 
 use crate::{
-    CliBoot, CliError, CratesIoResolver, CratesIoSpec, LibSourceSpec, LoadReceipt, LoadReceiptRole,
+    CliBoot, CliError, ConfigReportKind, CratesIoResolver, CratesIoSpec, LibSourceSpec,
+    LoadReceipt, LoadReceiptRole,
     codec_boot::{boot_codec_name, codec_lib_symbol, explicit_codec_source_index},
     config::{RuntimeConfigState, load_config_sources},
     crates_io::fallback_spec_for_symbol,
@@ -408,7 +409,25 @@ fn config_libs_for_boot(boot: &CliBoot) -> Vec<Symbol> {
     {
         push_unique_symbol(&mut libs, symbol);
     }
+    if let Some(request) = boot.config_report.as_ref() {
+        match &request.kind {
+            ConfigReportKind::Effective { lib } => push_unique_symbol(&mut libs, lib.clone()),
+            ConfigReportKind::Status | ConfigReportKind::Sources => {
+                for lib in representative_config_report_libs() {
+                    push_unique_symbol(&mut libs, lib);
+                }
+            }
+        }
+    }
     libs
+}
+
+fn representative_config_report_libs() -> [Symbol; 3] {
+    [
+        Symbol::qualified("sim", "cookbook"),
+        Symbol::qualified("stream", "host"),
+        Symbol::qualified("model", "defaults"),
+    ]
 }
 
 fn config_lib_for_source(source: &LibSourceSpec) -> Option<Symbol> {

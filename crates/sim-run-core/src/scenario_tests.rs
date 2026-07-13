@@ -437,6 +437,38 @@ fn recipe_commands_cover_deterministic_scenarios() {
     }
 }
 
+#[test]
+fn config_recipe_commands_cover_report_scenarios() {
+    let root = source_root();
+    let recipes = [
+        (
+            "config-status",
+            "cargo test -p sim-run-core ",
+            "config_status_reports_loaded_libs_and_source_provenance",
+        ),
+        (
+            "config-effective",
+            "cargo test -p sim-run-core ",
+            "effective_config_discovers_requested_per_lib_file",
+        ),
+        (
+            "config-cookbook-override",
+            "cargo test -p sim-run-core ",
+            "effective_cookbook_override_reports_reordered_subset",
+        ),
+    ];
+
+    for (recipe, command, test_name) in recipes {
+        let dir = root.join("recipes/02-scenarios").join(recipe);
+        let metadata = fs::read_to_string(dir.join("recipe.toml")).unwrap();
+        let setup = fs::read_to_string(dir.join("setup.sh")).unwrap();
+        assert!(metadata.contains("requires = ["), "{recipe}");
+        assert!(metadata.contains("network = false"), "{recipe}");
+        assert!(setup.contains(command), "{recipe}");
+        assert!(setup.contains(test_name), "{recipe}");
+    }
+}
+
 fn source_root() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for candidate in [

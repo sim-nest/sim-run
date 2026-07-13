@@ -1,0 +1,9 @@
+id = "config-cookbook-override"
+title = "Cookbook config override"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 92
+tags = ["cli", "config", "cookbook", "override", "offline", "deterministic"]
+requires = ["sim-run-core", "sim-config"]
+network = false
