@@ -8,8 +8,9 @@ use std::{
 
 use sim_codec_config::ConfigDecoder;
 use sim_config::{
-    ConfigDir, ConfigLayer, ConfigRoots, ConfigSecretField, ConfigSource, ConfigTable,
-    EffectiveConfig, lib_config_path, lib_symbol_from_str, merge_layers,
+    ConfigDir, ConfigLayer, ConfigProbe, ConfigProbeCaps, ConfigProbeReport, ConfigProbeRequest,
+    ConfigRoots, ConfigSecretField, ConfigSource, ConfigTable, EffectiveConfig, ProbeMode,
+    lib_config_path, lib_symbol_from_str, merge_layers,
 };
 use sim_kernel::{Cx, Symbol};
 
@@ -54,7 +55,7 @@ pub struct RuntimeConfigState {
     effective: EffectiveConfig,
     source_reports: Vec<ConfigSourceReport>,
     secret_fields: Vec<ConfigSecretField>,
-    probe_report_lines: Vec<String>,
+    probe_reports: Vec<ConfigProbeReport>,
     diagnostics: Vec<String>,
 }
 
@@ -79,9 +80,9 @@ impl RuntimeConfigState {
         &self.secret_fields
     }
 
-    /// Returns display-only probe report lines until typed probe reports land.
-    pub fn probe_report_lines(&self) -> &[String] {
-        &self.probe_report_lines
+    /// Returns typed probe report records in discovery order.
+    pub fn probe_reports(&self) -> &[ConfigProbeReport] {
+        &self.probe_reports
     }
 
     /// Returns non-fatal discovery diagnostics.
@@ -105,9 +106,9 @@ impl RuntimeConfigState {
         }
     }
 
-    /// Adds a display-only probe report line.
-    pub fn push_probe_report_line(&mut self, line: impl Into<String>) {
-        self.probe_report_lines.push(line.into());
+    /// Adds a typed probe report record.
+    pub fn push_probe_report(&mut self, report: ConfigProbeReport) {
+        self.probe_reports.push(report);
     }
 
     /// Adds a source status record.
@@ -127,8 +128,25 @@ pub fn load_config_sources(
     opts: &ConfigLoadOptions,
     libs: &[Symbol],
 ) -> RuntimeConfigState {
+    load_config_sources_with_probes(cx, opts, libs, &[])
+}
+
+/// Loads config layers from probes, files, and site exports.
+pub fn load_config_sources_with_probes(
+    cx: &mut Cx,
+    opts: &ConfigLoadOptions,
+    libs: &[Symbol],
+    probes: &[&dyn ConfigProbe],
+) -> RuntimeConfigState {
     let mut state = RuntimeConfigState::default();
     let libs = unique_libs(libs);
+    run_config_probes(
+        &mut state,
+        &libs,
+        probes,
+        ProbeMode::default(),
+        ConfigProbeCaps::default(),
+    );
     if opts.read_files {
         read_root_files(&mut state, &opts.roots.home, RootKind::Home, &libs);
         read_root_files(
@@ -145,6 +163,38 @@ pub fn load_config_sources(
         read_site_dir(cx, &mut state, site);
     }
     state
+}
+
+fn run_config_probes(
+    state: &mut RuntimeConfigState,
+    libs: &[Symbol],
+    probes: &[&dyn ConfigProbe],
+    mode: ProbeMode,
+    caps: ConfigProbeCaps,
+) {
+    for lib in libs {
+        for probe in probes {
+            let request = ConfigProbeRequest {
+                lib: lib.clone(),
+                mode,
+                caps: caps.clone(),
+            };
+            run_config_probe(state, *probe, &request);
+        }
+    }
+}
+
+/// Executes one config probe, applying any emitted layer and recording its report.
+pub fn run_config_probe(
+    state: &mut RuntimeConfigState,
+    probe: &dyn ConfigProbe,
+    request: &ConfigProbeRequest,
+) {
+    let (layer, report) = probe.probe(request);
+    if let Some(layer) = layer {
+        state.push_layer(layer);
+    }
+    state.push_probe_report(report);
 }
 
 fn unique_libs(libs: &[Symbol]) -> Vec<Symbol> {

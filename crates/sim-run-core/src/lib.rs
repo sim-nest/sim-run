@@ -66,7 +66,10 @@ pub use args::{CliCommand, parse_args};
 pub use boot::{CliBoot, CliEnvelope, Payload};
 pub use bootloader::Bootloader;
 pub use codec_boot::{DEFAULT_CODEC_NAME, boot_codec_name, codec_lib_symbol};
-pub use config::{ConfigLoadOptions, RuntimeConfigState, load_config_sources};
+pub use config::{
+    ConfigLoadOptions, RuntimeConfigState, load_config_sources, load_config_sources_with_probes,
+    run_config_probe,
+};
 pub use crates_io::{CratesIoResolver, CratesIoSpec, ResolvedCratesIoSource, VersionReq};
 #[cfg(feature = "registry")]
 pub use git_registry::{GIT_REGISTRY_ENDPOINT_ENV, GitRegistryResolver};

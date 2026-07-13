@@ -1,7 +1,10 @@
 //! Loaded-state and effective-config reports.
 
 use sim_codec_config::ConfigEncoder;
-use sim_config::{ConfigSecretField, ConfigSource, EffectiveConfig};
+use sim_config::{
+    ConfigProbeReport, ConfigProbeStatus, ConfigSecretField, ConfigSource, EffectiveConfig,
+    ProbeMode,
+};
 use sim_kernel::{Expr, Symbol};
 
 use crate::{CliBoot, CliError, LoadReceipt, LoadReceiptRole, LoadSession};
@@ -93,8 +96,8 @@ pub struct LoadedStateReport {
     pub effective: EffectiveConfig,
     /// Secret-bearing config fields to redact in report renderers.
     pub secret_fields: Vec<ConfigSecretField>,
-    /// Display-only probe reports until typed probe records land.
-    pub probe_reports: Vec<String>,
+    /// Typed probe report records in discovery order.
+    pub probe_reports: Vec<ConfigProbeReport>,
     /// Non-fatal config discovery diagnostics.
     pub diagnostics: Vec<String>,
 }
@@ -111,7 +114,7 @@ impl LoadedStateReport {
             config_sources: session.config_state().source_reports().to_vec(),
             effective: session.config_state().effective().clone(),
             secret_fields: session.config_state().secret_fields().to_vec(),
-            probe_reports: session.config_state().probe_report_lines().to_vec(),
+            probe_reports: session.config_state().probe_reports().to_vec(),
             diagnostics: session.config_state().diagnostics().to_vec(),
         }
     }
@@ -184,7 +187,7 @@ pub fn format_config_status_json(report: &LoadedStateReport) -> String {
     output.push_str(",\"effective\":");
     push_effective_json(&mut output, report);
     output.push_str(",\"probes\":");
-    push_strings_json(&mut output, &report.probe_reports);
+    push_probe_reports_json(&mut output, &report.probe_reports);
     output.push_str(",\"diagnostics\":");
     push_strings_json(&mut output, &report.diagnostics);
     output.push_str("}\n");
@@ -275,14 +278,36 @@ fn push_config_sources(output: &mut String, sources: &[ConfigSourceReport]) {
     }
 }
 
-fn push_probe_reports(output: &mut String, probes: &[String]) {
+fn push_probe_reports(output: &mut String, probes: &[ConfigProbeReport]) {
     output.push_str("probes:\n");
     if probes.is_empty() {
         output.push_str("- none\n");
         return;
     }
     for probe in probes {
-        output.push_str(&format!("- {probe}\n"));
+        output.push_str(&format!(
+            "- probe={} lib={} mode={} status={}",
+            probe.probe,
+            probe.lib,
+            mode_label(probe.mode),
+            probe_status_label(&probe.status)
+        ));
+        match &probe.status {
+            ConfigProbeStatus::Applied => {}
+            ConfigProbeStatus::Skipped { reason } => {
+                output.push_str(&format!(" reason={reason}"));
+            }
+            ConfigProbeStatus::Denied { capability } => {
+                output.push_str(&format!(" capability={capability}"));
+            }
+            ConfigProbeStatus::Failed { message } => {
+                output.push_str(&format!(" message={message}"));
+            }
+        }
+        output.push_str(&format!(
+            " emitted={}\n",
+            emitted_keys_label(&probe.emitted_keys)
+        ));
     }
 }
 
@@ -327,6 +352,41 @@ fn push_config_sources_json(output: &mut String, sources: &[ConfigSourceReport])
         push_json_string(output, &source_label(&source.source));
         output.push_str(",\"status\":");
         push_json_string(output, status_label(source.status));
+        output.push('}');
+    }
+    output.push(']');
+}
+
+fn push_probe_reports_json(output: &mut String, probes: &[ConfigProbeReport]) {
+    output.push('[');
+    for (index, probe) in probes.iter().enumerate() {
+        comma(output, index);
+        output.push('{');
+        output.push_str("\"probe\":");
+        push_json_string(output, &probe.probe.as_qualified_str());
+        output.push_str(",\"lib\":");
+        push_json_string(output, &probe.lib.as_qualified_str());
+        output.push_str(",\"mode\":");
+        push_json_string(output, mode_label(probe.mode));
+        output.push_str(",\"status\":");
+        push_json_string(output, probe_status_label(&probe.status));
+        match &probe.status {
+            ConfigProbeStatus::Applied => {}
+            ConfigProbeStatus::Skipped { reason } => {
+                output.push_str(",\"reason\":");
+                push_json_string(output, reason);
+            }
+            ConfigProbeStatus::Denied { capability } => {
+                output.push_str(",\"capability\":");
+                push_json_string(output, capability);
+            }
+            ConfigProbeStatus::Failed { message } => {
+                output.push_str(",\"message\":");
+                push_json_string(output, message);
+            }
+        }
+        output.push_str(",\"emitted_keys\":");
+        push_strings_json(output, &probe.emitted_keys);
         output.push('}');
     }
     output.push(']');
@@ -497,13 +557,37 @@ fn source_label(source: &ConfigSource) -> String {
     match source {
         ConfigSource::BuiltIn { lib } => format!("built-in:{}", lib.as_qualified_str()),
         ConfigSource::Probe { probe, mode } => {
-            format!("probe:{}:{mode:?}", probe.as_qualified_str())
+            format!("probe:{}:{}", probe.as_qualified_str(), mode_label(*mode))
         }
         ConfigSource::HomeFile { path } => format!("home-file:{}", path.display()),
         ConfigSource::WorkFile { path } => format!("work-file:{}", path.display()),
         ConfigSource::SingleFile { path } => format!("single-file:{}", path.display()),
         ConfigSource::Site { site } => format!("site:{}", site.as_qualified_str()),
         ConfigSource::Explicit { label } => format!("explicit:{label}"),
+    }
+}
+
+fn mode_label(mode: ProbeMode) -> &'static str {
+    match mode {
+        ProbeMode::Modeled => "modeled",
+        ProbeMode::Real => "real",
+    }
+}
+
+fn probe_status_label(status: &ConfigProbeStatus) -> &'static str {
+    match status {
+        ConfigProbeStatus::Applied => "applied",
+        ConfigProbeStatus::Skipped { .. } => "skipped",
+        ConfigProbeStatus::Denied { .. } => "denied",
+        ConfigProbeStatus::Failed { .. } => "failed",
+    }
+}
+
+fn emitted_keys_label(keys: &[String]) -> String {
+    if keys.is_empty() {
+        "-".to_owned()
+    } else {
+        keys.join(",")
     }
 }
 

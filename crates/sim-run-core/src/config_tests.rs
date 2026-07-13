@@ -4,13 +4,19 @@ use std::{
     sync::Arc,
 };
 
-use sim_config::{ConfigRoots, ConfigSource, ConfigView};
+use sim_config::{
+    ConfigDir, ConfigLayer, ConfigProbe, ConfigProbeCaps, ConfigProbeReport, ConfigProbeRequest,
+    ConfigProbeStatus, ConfigRoots, ConfigSource, ConfigView, ProbeMode,
+};
 use sim_kernel::{
     AbiVersion, Cx, DefaultFactory, Expr, Lib, LibManifest, LibTarget, Linker, LoadCx,
     NoopEvalPolicy, Symbol, Version,
 };
 
-use crate::{CliBoot, ConfigLoadOptions, LibSourceSpec, LoadSession, load_config_sources};
+use crate::{
+    CliBoot, ConfigLoadOptions, LibSourceSpec, LoadSession, load_config_sources,
+    load_config_sources_with_probes, run_config_probe,
+};
 
 fn lib(namespace: &str, name: &str) -> Symbol {
     Symbol::qualified(namespace, name)
@@ -41,6 +47,128 @@ fn roots(home: &Path, work: &Path) -> ConfigLoadOptions {
 
 fn test_cx() -> Cx {
     Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory))
+}
+
+struct ModeledDefaultsProbe;
+
+impl ModeledDefaultsProbe {
+    fn symbol() -> Symbol {
+        Symbol::qualified("config", "fake")
+    }
+}
+
+impl ConfigProbe for ModeledDefaultsProbe {
+    fn symbol(&self) -> Symbol {
+        Self::symbol()
+    }
+
+    fn probe(&self, request: &ConfigProbeRequest) -> (Option<ConfigLayer>, ConfigProbeReport) {
+        let table = Expr::Map(vec![
+            (
+                Expr::Symbol(Symbol::new("backend")),
+                Expr::String("modeled".to_owned()),
+            ),
+            (
+                Expr::Symbol(Symbol::new("probe_only")),
+                Expr::String("yes".to_owned()),
+            ),
+        ]);
+        let layer = ConfigLayer::new(
+            ConfigSource::Probe {
+                probe: self.symbol(),
+                mode: request.mode,
+            },
+            ConfigDir::one(request.lib.clone(), table).unwrap(),
+        );
+        (
+            Some(layer),
+            ConfigProbeReport {
+                probe: self.symbol(),
+                lib: request.lib.clone(),
+                mode: request.mode,
+                status: ConfigProbeStatus::Applied,
+                emitted_keys: vec!["backend".to_owned(), "probe_only".to_owned()],
+            },
+        )
+    }
+}
+
+struct HardwareProbe;
+
+impl HardwareProbe {
+    fn symbol() -> Symbol {
+        Symbol::qualified("config", "hardware")
+    }
+}
+
+impl ConfigProbe for HardwareProbe {
+    fn symbol(&self) -> Symbol {
+        Self::symbol()
+    }
+
+    fn probe(&self, request: &ConfigProbeRequest) -> (Option<ConfigLayer>, ConfigProbeReport) {
+        if request.mode == ProbeMode::Real && !request.caps.hardware_inventory {
+            return (
+                None,
+                ConfigProbeReport {
+                    probe: self.symbol(),
+                    lib: request.lib.clone(),
+                    mode: request.mode,
+                    status: ConfigProbeStatus::Denied {
+                        capability: "hardware_inventory".to_owned(),
+                    },
+                    emitted_keys: Vec::new(),
+                },
+            );
+        }
+        let layer = ConfigLayer::new(
+            ConfigSource::Probe {
+                probe: self.symbol(),
+                mode: request.mode,
+            },
+            ConfigDir::one(
+                request.lib.clone(),
+                Expr::Map(vec![(
+                    Expr::Symbol(Symbol::new("backend")),
+                    Expr::String("real".to_owned()),
+                )]),
+            )
+            .unwrap(),
+        );
+        (
+            Some(layer),
+            ConfigProbeReport {
+                probe: self.symbol(),
+                lib: request.lib.clone(),
+                mode: request.mode,
+                status: ConfigProbeStatus::Applied,
+                emitted_keys: vec!["backend".to_owned()],
+            },
+        )
+    }
+}
+
+struct FailingProbe;
+
+impl ConfigProbe for FailingProbe {
+    fn symbol(&self) -> Symbol {
+        Symbol::qualified("config", "failing")
+    }
+
+    fn probe(&self, request: &ConfigProbeRequest) -> (Option<ConfigLayer>, ConfigProbeReport) {
+        (
+            None,
+            ConfigProbeReport {
+                probe: self.symbol(),
+                lib: request.lib.clone(),
+                mode: request.mode,
+                status: ConfigProbeStatus::Failed {
+                    message: "probe fixture failed".to_owned(),
+                },
+                emitted_keys: Vec::new(),
+            },
+        )
+    }
 }
 
 #[test]
@@ -84,6 +212,122 @@ keep = "home"
     assert_eq!(view.string("keep"), Some("home"));
 
     let _ = fs::remove_dir_all(base);
+}
+
+#[test]
+fn modeled_probe_defaults_load_before_home_and_work_files() {
+    let base = temp_root("probe-order");
+    let home = base.join("home");
+    let work = base.join("work");
+    let stream_host = lib("stream", "host");
+    write_file(
+        &home.join("libs").join("stream").join("host.toml"),
+        r#"backend = "home"
+"#,
+    );
+    write_file(
+        &work.join("libs").join("stream").join("host.toml"),
+        r#"backend = "work"
+"#,
+    );
+    let mut cx = test_cx();
+    let probe = ModeledDefaultsProbe;
+    let probes: [&dyn ConfigProbe; 1] = [&probe];
+
+    let state = load_config_sources_with_probes(
+        &mut cx,
+        &roots(&home, &work),
+        std::slice::from_ref(&stream_host),
+        &probes,
+    );
+
+    assert!(state.diagnostics().is_empty(), "{:?}", state.diagnostics());
+    assert_eq!(state.layers().len(), 3);
+    assert!(matches!(
+        state.layers()[0].source,
+        ConfigSource::Probe {
+            probe: ref layer_probe,
+            mode: ProbeMode::Modeled
+        } if layer_probe == &ModeledDefaultsProbe::symbol()
+    ));
+    assert!(matches!(
+        state.layers()[1].source,
+        ConfigSource::HomeFile { .. }
+    ));
+    assert!(matches!(
+        state.layers()[2].source,
+        ConfigSource::WorkFile { .. }
+    ));
+    assert_eq!(state.probe_reports().len(), 1);
+    assert_eq!(state.probe_reports()[0].status, ConfigProbeStatus::Applied);
+    assert_eq!(
+        state.probe_reports()[0].emitted_keys,
+        ["backend", "probe_only"]
+    );
+    let table = state.effective().dir.table(&stream_host).unwrap();
+    let view = ConfigView::new(table);
+    assert_eq!(view.string("backend"), Some("work"));
+    assert_eq!(view.string("probe_only"), Some("yes"));
+    let probe_trace = state
+        .effective()
+        .trace
+        .iter()
+        .find(|trace| trace.key == "probe_only")
+        .unwrap();
+    assert!(matches!(
+        probe_trace.source,
+        ConfigSource::Probe {
+            probe: ref layer_probe,
+            mode: ProbeMode::Modeled
+        } if layer_probe == &ModeledDefaultsProbe::symbol()
+    ));
+
+    let _ = fs::remove_dir_all(base);
+}
+
+#[test]
+fn real_probe_denial_and_failure_are_non_fatal_reports() {
+    let stream_host = lib("stream", "host");
+    let hardware = HardwareProbe;
+    let failing = FailingProbe;
+    let mut state = crate::RuntimeConfigState::default();
+    let denied = ConfigProbeRequest {
+        lib: stream_host.clone(),
+        mode: ProbeMode::Real,
+        caps: ConfigProbeCaps::default(),
+    };
+
+    run_config_probe(&mut state, &hardware, &denied);
+
+    assert!(state.layers().is_empty());
+    assert!(state.diagnostics().is_empty());
+    assert_eq!(
+        state.probe_reports()[0].status,
+        ConfigProbeStatus::Denied {
+            capability: "hardware_inventory".to_owned()
+        }
+    );
+
+    let granted_caps = ConfigProbeCaps {
+        hardware_inventory: true,
+        ..ConfigProbeCaps::default()
+    };
+    let granted = ConfigProbeRequest {
+        caps: granted_caps,
+        ..denied.clone()
+    };
+    run_config_probe(&mut state, &hardware, &granted);
+    run_config_probe(&mut state, &failing, &granted);
+
+    assert_eq!(state.layers().len(), 1);
+    assert_eq!(state.probe_reports()[1].status, ConfigProbeStatus::Applied);
+    assert_eq!(
+        state.probe_reports()[2].status,
+        ConfigProbeStatus::Failed {
+            message: "probe fixture failed".to_owned()
+        }
+    );
+    assert!(state.diagnostics().is_empty());
 }
 
 #[test]

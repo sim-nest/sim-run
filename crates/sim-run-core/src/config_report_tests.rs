@@ -4,14 +4,15 @@ use std::{
 };
 
 use sim_config::{
-    ConfigDir, ConfigLayer, ConfigRoots, ConfigSecretField, ConfigSource, ConfigTable,
+    ConfigDir, ConfigLayer, ConfigProbeReport, ConfigProbeStatus, ConfigRoots, ConfigSecretField,
+    ConfigSource, ConfigTable, ProbeMode,
 };
 use sim_kernel::{AbiVersion, Expr, Lib, LibManifest, LibTarget, Linker, LoadCx, Symbol, Version};
 
 use crate::{
     CliBoot, ConfigLoadOptions, ConfigReportKind, ConfigReportRequest, LibSourceSpec, LoadSession,
-    LoadedStateReport, RuntimeConfigState, format_config_status_json, format_effective_config,
-    format_effective_config_json, load_config_sources,
+    LoadedStateReport, RuntimeConfigState, format_config_status, format_config_status_json,
+    format_effective_config, format_effective_config_json, load_config_sources,
 };
 
 fn lib(namespace: &str, name: &str) -> Symbol {
@@ -189,6 +190,59 @@ fn text_and_json_renderers_redact_secret_fields() {
         assert!(!rendered.contains("raw-secret-key"), "{rendered}");
         assert!(rendered.contains("[redacted]"), "{rendered}");
     }
+}
+
+#[test]
+fn config_status_renders_typed_probe_report_records() {
+    let lib = lib("stream", "host");
+    let mut state = RuntimeConfigState::default();
+    state.push_probe_report(ConfigProbeReport {
+        probe: Symbol::qualified("config", "fake"),
+        lib: lib.clone(),
+        mode: ProbeMode::Modeled,
+        status: ConfigProbeStatus::Applied,
+        emitted_keys: vec!["backend".to_owned()],
+    });
+    state.push_probe_report(ConfigProbeReport {
+        probe: Symbol::qualified("config", "real"),
+        lib,
+        mode: ProbeMode::Real,
+        status: ConfigProbeStatus::Denied {
+            capability: "hardware_inventory".to_owned(),
+        },
+        emitted_keys: Vec::new(),
+    });
+    let mut session = LoadSession::new();
+    *session.config_state_mut() = state;
+    let report = LoadedStateReport::from_session(&session);
+
+    let text = format_config_status(&report);
+    let json = format_config_status_json(&report);
+
+    assert!(
+        text.contains(
+            "probe=config/fake lib=stream/host mode=modeled status=applied emitted=backend"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "probe=config/real lib=stream/host mode=real status=denied capability=hardware_inventory emitted=-"
+        ),
+        "{text}"
+    );
+    assert!(
+        json.contains(
+            "\"probe\":\"config/fake\",\"lib\":\"stream/host\",\"mode\":\"modeled\",\"status\":\"applied\",\"emitted_keys\":[\"backend\"]"
+        ),
+        "{json}"
+    );
+    assert!(
+        json.contains(
+            "\"probe\":\"config/real\",\"lib\":\"stream/host\",\"mode\":\"real\",\"status\":\"denied\",\"capability\":\"hardware_inventory\",\"emitted_keys\":[]"
+        ),
+        "{json}"
+    );
 }
 
 struct FixtureLib {
