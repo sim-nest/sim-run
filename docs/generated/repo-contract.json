@@ -384,10 +384,10 @@
     "generated_by": "cargo run -p xtask -- simdoc",
     "generation_timestamp": "2026-07-16T03:56:38+02:00",
     "generator": "xtask repo-contract v1",
-    "git_commit": "5a90e14629996acb851d8a4690dc286b069b8d05",
+    "git_commit": "ff23850ee4d4c3fb12fb38019cc8eb2fa2516a05",
     "repo": "sim-run",
     "schema": "sim.provenance.v1",
-    "source_commit": "5a90e14629996acb851d8a4690dc286b069b8d05",
+    "source_commit": "ff23850ee4d4c3fb12fb38019cc8eb2fa2516a05",
     "source_remote": "https://github.com/sim-nest/sim-run",
     "validation_commands": [
       "cargo fmt --all --check",
@@ -400,9 +400,9 @@
       "cargo run -p xtask -- validation-matrix --check --repo .",
       "cargo run -p xtask -- crate-catalog --check --repo ."
     ],
-    "workspace_hash": "72e089c7e360db0e",
+    "workspace_hash": "ed3853b0fc5eb33f",
     "workspace_hash_algorithm": "fnv1a64",
-    "workspace_hash_input_count": 72,
+    "workspace_hash_input_count": 73,
     "workspace_hash_inputs": [
       "Cargo.toml",
       "crates/sim-lib-repl/Cargo.toml",
@@ -418,6 +418,7 @@
       "crates/sim-run/tests/config_report.rs",
       "crates/sim-run/tests/native_dynamic_lisp.rs",
       "crates/sim-run/tests/native_dynamic_repl.rs",
+      "crates/sim-run/tests/support/mod.rs",
       "crates/sim-run/tests/wasm_loader.rs",
       "crates/sim-run-core/Cargo.toml",
       "crates/sim-run-core/src/args.rs",

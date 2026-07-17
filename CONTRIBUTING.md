@@ -19,6 +19,8 @@ Every PR runs these gates in CI, and they must be green before merge:
 - `cargo fmt --all --check`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo test --workspace`
+- `cargo clippy --workspace --all-features --all-targets -- -D warnings`
+- `cargo test --workspace --all-features`
 - `cargo doc --workspace --no-deps`
 
 Please keep source and Markdown ASCII-only, and add or update tests for behavior

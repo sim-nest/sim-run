@@ -1,12 +1,51 @@
 #![cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
 
+mod support;
+
 use std::{
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
+use support::{
+    FeatureBuildContext, cargo_bin, maybe_feature_build_context, remove_dir_all_if_exists,
+    unique_target_dir,
+};
+
+const NUMBERS_F64_SOURCE: (&str, &str, &str) = (
+    "sim-lib-numbers-f64",
+    "sim-numbers",
+    "crates/sim-lib-numbers-f64",
+);
+const STANDARD_CORE_SOURCE: (&str, &str, &str) = (
+    "sim-lib-standard-core",
+    "sim-runtime",
+    "crates/sim-lib-standard-core",
+);
 const PATCHES: &[(&str, &str, &str)] = &[
+    ("sim-citizen", "sim-citizen", "crates/sim-citizen"),
+    (
+        "sim-citizen-derive",
+        "sim-citizen",
+        "crates/sim-citizen-derive",
+    ),
+    ("sim-codec", "sim-codecs", "crates/sim-codec"),
+    ("sim-codec-binary", "sim-codecs", "crates/sim-codec-binary"),
+    ("sim-cookbook", "sim-foundation", "crates/sim-cookbook"),
+    ("sim-kernel", "sim-kernel", "."),
+    (
+        "sim-lib-numbers-core",
+        "sim-numbers",
+        "crates/sim-lib-numbers-core",
+    ),
+    ("sim-macros", "sim-foundation", "crates/sim-macros"),
+    ("sim-shape", "sim-shape", "."),
+    ("sim-value", "sim-foundation", "crates/sim-value"),
+];
+const REQUIRED_SOURCES: &[(&str, &str, &str)] = &[
+    NUMBERS_F64_SOURCE,
+    STANDARD_CORE_SOURCE,
     ("sim-citizen", "sim-citizen", "crates/sim-citizen"),
     (
         "sim-citizen-derive",
@@ -29,7 +68,10 @@ const PATCHES: &[(&str, &str, &str)] = &[
 
 #[test]
 fn sim_repl_loads_native_proof_bundle_and_evaluates_stdin() {
-    let bundle_dir = build_repl_proof_bundle();
+    let Some(context) = maybe_feature_build_context(REQUIRED_SOURCES) else {
+        return;
+    };
+    let bundle_dir = build_repl_proof_bundle(&context);
     assert!(
         bundle_dir
             .join(dylib_file_name("sim_lib_numbers_f64"))
@@ -93,36 +135,34 @@ fn assert_repl_success(output: &std::process::Output) {
     );
 }
 
-fn build_repl_proof_bundle() -> PathBuf {
-    let target_dir = unique_target_dir();
+fn build_repl_proof_bundle(context: &FeatureBuildContext) -> PathBuf {
+    let target_dir = unique_target_dir("repl-native-bundle");
     build_native_dylib(
+        context,
         "sim-lib-numbers-f64",
-        numbers_f64_manifest_path(),
+        NUMBERS_F64_SOURCE,
         &["native-export"],
         &target_dir,
     );
     build_native_dylib(
+        context,
         "sim-lib-standard-core",
-        standard_core_proof_manifest_path(),
+        STANDARD_CORE_SOURCE,
         &["native-export"],
         &target_dir,
     );
     target_dir.join("debug")
 }
 
-fn build_native_dylib(package: &str, manifest_path: PathBuf, features: &[&str], target_dir: &Path) {
+fn build_native_dylib(
+    context: &FeatureBuildContext,
+    package: &str,
+    manifest_spec: (&str, &str, &str),
+    features: &[&str],
+    target_dir: &Path,
+) {
     let mut command = Command::new(cargo_bin());
-    command.env("RUSTFLAGS", "-D warnings").arg("build");
-    if let Some(meta_manifest) = meta_workspace_manifest() {
-        command
-            .arg("--manifest-path")
-            .arg(meta_manifest)
-            .arg("-p")
-            .arg(package);
-    } else {
-        command.arg("--manifest-path").arg(manifest_path);
-        add_patch_args(&mut command);
-    }
+    context.configure_build(&mut command, package, manifest_spec, PATCHES);
     if !features.is_empty() {
         command.arg("--features").arg(features.join(","));
     }
@@ -132,93 +172,6 @@ fn build_native_dylib(package: &str, manifest_path: PathBuf, features: &[&str], 
         .status()
         .unwrap_or_else(|err| panic!("cargo build for {package} should start: {err}"));
     assert!(status.success(), "{package} native dylib build failed");
-}
-
-fn meta_workspace_manifest() -> Option<PathBuf> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if manifest_dir
-        .parent()
-        .and_then(Path::file_name)
-        .is_some_and(|name| name == "packages")
-    {
-        return manifest_dir
-            .parent()
-            .and_then(Path::parent)
-            .map(|root| root.join("Cargo.toml"));
-    }
-    None
-}
-
-fn numbers_f64_manifest_path() -> PathBuf {
-    package_path(
-        "sim-lib-numbers-f64",
-        "sim-numbers",
-        "crates/sim-lib-numbers-f64",
-    )
-    .join("Cargo.toml")
-}
-
-fn standard_core_proof_manifest_path() -> PathBuf {
-    package_path(
-        "sim-lib-standard-core",
-        "sim-runtime",
-        "crates/sim-lib-standard-core",
-    )
-    .join("Cargo.toml")
-}
-
-fn package_path(crate_name: &str, repo_name: &str, source_path: &str) -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if manifest_dir
-        .parent()
-        .and_then(Path::file_name)
-        .is_some_and(|name| name == "packages")
-    {
-        return manifest_dir
-            .parent()
-            .expect("meta-workspace package should have a packages parent")
-            .join(crate_name);
-    }
-
-    let sim_cli_repo = manifest_dir
-        .parent()
-        .and_then(Path::parent)
-        .expect("sim-run package should live under crates/sim-run");
-    if repo_name == "sim-run" {
-        return sim_cli_repo.join(source_path);
-    }
-    sim_cli_repo
-        .parent()
-        .expect("sim-run checkout should have sibling repos")
-        .join(repo_name)
-        .join(source_path)
-}
-
-fn add_patch_args(command: &mut Command) {
-    for (crate_name, repo_name, source_path) in PATCHES {
-        let path = package_path(crate_name, repo_name, source_path);
-        command.arg("--config").arg(format!(
-            "patch.crates-io.{crate_name}.path={}",
-            toml_string(&path)
-        ));
-    }
-}
-
-fn toml_string(path: &Path) -> String {
-    let raw = path.to_string_lossy();
-    format!("\"{}\"", raw.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
-fn cargo_bin() -> String {
-    std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned())
-}
-
-fn unique_target_dir() -> PathBuf {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time should be after unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("sim-repl-native-bundle-{nanos}"))
 }
 
 fn dylib_file_name(base: &str) -> String {
@@ -233,11 +186,5 @@ fn dylib_file_name(base: &str) -> String {
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     {
         format!("lib{base}.so")
-    }
-}
-
-fn remove_dir_all_if_exists(path: &Path) {
-    if path.exists() {
-        let _ = std::fs::remove_dir_all(path);
     }
 }
