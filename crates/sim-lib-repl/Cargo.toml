@@ -14,7 +14,6 @@ sim-run-core = { version = "0.1.0", path = "../sim-run-core" }
 sim-codec = { version = "0.1.0" }
 sim-kernel = { version = "0.1.0" }
 sim-lib-core = { version = "0.1.2" }
-sim-lib-numbers-arith = { version = "0.1.0" }
 sim-shape = { version = "0.1.0" }
 sim-value = { version = "0.1.0" }
 

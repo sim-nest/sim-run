@@ -5,8 +5,6 @@ use sim_kernel::{
     AbiVersion, Args, Callable, Cx, EagerPolicy, Error, Export, Expr, Lib, LibManifest, LibTarget,
     Linker, LoadCx, Object, ObjectCompat, Result, StrictNames, Symbol, Value, Version,
 };
-use sim_lib_core::install_once;
-use sim_lib_numbers_arith::NumbersArithmeticLib;
 use sim_run_core::cli_main_entrypoint_symbol;
 
 use crate::{eval_requested_text, run_repl_lines};
@@ -71,7 +69,7 @@ impl ObjectCompat for ReplEntrypoint {
 
 impl Callable for ReplEntrypoint {
     fn call(&self, cx: &mut Cx, args: Args) -> Result<Value> {
-        prepare_repl_runtime(cx)?;
+        prepare_repl_runtime(cx);
         let envelope = match args.values().first() {
             Some(envelope) => ReplEnvelope::from_value(cx, envelope)?,
             None => ReplEnvelope::default(),
@@ -92,12 +90,10 @@ impl Callable for ReplEntrypoint {
     }
 }
 
-fn prepare_repl_runtime(cx: &mut Cx) -> Result<()> {
+fn prepare_repl_runtime(cx: &mut Cx) {
     if cx.eval_policy_name() == "noop" {
         cx.set_eval_policy(Arc::new(StrictNames(EagerPolicy)));
     }
-    install_once(cx, &NumbersArithmeticLib::new())?;
-    Ok(())
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

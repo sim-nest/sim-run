@@ -110,9 +110,17 @@ fn sim_repl_loads_native_proof_bundle_and_evaluates_stdin() {
     assert!(stdout.contains("foo"), "{stdout}");
     assert_eq!(String::from_utf8(output.stderr).unwrap(), "");
 
-    let output = run_repl_input(&bundle_dir, "(math/add (math/mul 6 7) 0)\n");
+    let output = run_repl_input(&bundle_dir, "42\n");
     assert_repl_success(&output);
     assert_eq!(String::from_utf8(output.stdout).unwrap(), "42\n");
+    assert_eq!(String::from_utf8(output.stderr).unwrap(), "");
+
+    let output = run_repl_input(&bundle_dir, "(math/add 1 2)\n");
+    assert_repl_success(&output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("UnknownFunction"), "{stdout}");
+    assert!(stdout.contains("math"), "{stdout}");
+    assert!(stdout.contains("add"), "{stdout}");
     assert_eq!(String::from_utf8(output.stderr).unwrap(), "");
 
     let target_dir = bundle_dir
