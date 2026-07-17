@@ -1,9 +1,12 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 use sim_kernel::{
-    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, GrantSeat, Lib,
-    LibBootDependency, LibId, LibLoader, LibManifest, LibSource as KernelLibSource,
-    LibSourceSpec as KernelLibSourceSpec, LoadedLib, LoaderRegistry, NoopEvalPolicy, Symbol,
+    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, GrantSeat, Lib, LibId,
+    LibLoader, LibManifest, LibSource as KernelLibSource, LibSourceSpec as KernelLibSourceSpec,
+    LoaderRegistry, NoopEvalPolicy, Symbol,
 };
 use sim_lib_stream_host::native_audio_provider_capability;
 
@@ -13,6 +16,7 @@ use crate::{
     codec_boot::{boot_codec_name, codec_lib_symbol, explicit_codec_source_index},
     config::{RuntimeConfigState, load_config_sources},
     crates_io::fallback_spec_for_symbol,
+    host::{HostLibRegistry, HostSourceLoader, host_receipt},
     source::symbol_from_text,
 };
 
@@ -256,12 +260,16 @@ impl LoadSession {
     pub fn load_boot(&mut self, boot: &CliBoot) -> Result<&[LoadReceipt], CliError> {
         let boot = self.boot_with_default_verb_sources(boot);
         let config_libs = config_libs_for_boot(&boot, &self.default_verb_config_libs);
-        self.config = load_config_sources(&mut self.cx, &boot.config, &config_libs);
-        self.load_native_audio_provider(&boot);
         let codec_name = boot_codec_name(&boot);
         let codec_symbol = codec_lib_symbol(codec_name);
         let codec_index = self.boot_codec_source_index(&boot, &codec_symbol);
+        self.config = load_config_sources(&mut self.cx, &pre_site_config(&boot), &config_libs);
+        let preloaded_config_sources =
+            self.load_config_site_sources(&boot, codec_name, &codec_symbol, codec_index)?;
+        self.config = load_config_sources(&mut self.cx, &boot.config, &config_libs);
+        self.load_native_audio_provider(&boot);
         match codec_index {
+            Some(index) if preloaded_config_sources.contains(&index) => {}
             Some(index) => {
                 self.load_boot_codec_source(codec_name, &codec_symbol, &boot.loads[index])?;
             }
@@ -274,11 +282,39 @@ impl LoadSession {
             }
         }
         for (index, source) in boot.loads.iter().enumerate() {
-            if Some(index) != codec_index {
+            if Some(index) != codec_index && !preloaded_config_sources.contains(&index) {
                 self.load_source(source)?;
             }
         }
         Ok(&self.receipts)
+    }
+
+    fn load_config_site_sources(
+        &mut self,
+        boot: &CliBoot,
+        codec_name: &str,
+        codec_symbol: &str,
+        codec_index: Option<usize>,
+    ) -> Result<BTreeSet<usize>, CliError> {
+        let mut preloaded = BTreeSet::new();
+        if boot.config.site_sources.is_empty() {
+            return Ok(preloaded);
+        }
+        for (index, source) in boot.loads.iter().enumerate() {
+            let Ok(manifest) = self.inspect_source_manifest(source) else {
+                continue;
+            };
+            if !manifest_exports_requested_site(&manifest, &boot.config.site_sources) {
+                continue;
+            }
+            if Some(index) == codec_index {
+                self.load_boot_codec_source(codec_name, codec_symbol, source)?;
+            } else {
+                self.load_source(source)?;
+            }
+            preloaded.insert(index);
+        }
+        Ok(preloaded)
     }
 
     fn load_native_audio_provider(&mut self, boot: &CliBoot) {
@@ -571,113 +607,6 @@ impl Default for LoadSession {
     }
 }
 
-type PlainHostFactory = Box<dyn Fn() -> Box<dyn Lib> + Send + Sync>;
-type ConfigHostFactory = Box<dyn Fn(&RuntimeConfigState) -> Box<dyn Lib> + Send + Sync>;
-
-enum HostFactory {
-    Plain(PlainHostFactory),
-    Config(ConfigHostFactory),
-}
-
-#[derive(Default)]
-pub(crate) struct HostLibRegistry {
-    factories: BTreeMap<String, HostFactory>,
-}
-
-impl HostLibRegistry {
-    fn add(
-        &mut self,
-        name: impl Into<String>,
-        factory: impl Fn() -> Box<dyn Lib> + Send + Sync + 'static,
-    ) {
-        self.factories
-            .insert(name.into(), HostFactory::Plain(Box::new(factory)));
-    }
-
-    fn add_with_config(
-        &mut self,
-        name: impl Into<String>,
-        factory: impl Fn(&RuntimeConfigState) -> Box<dyn Lib> + Send + Sync + 'static,
-    ) {
-        self.factories
-            .insert(name.into(), HostFactory::Config(Box::new(factory)));
-    }
-
-    pub(crate) fn instantiate(
-        &self,
-        name: &str,
-        config: &RuntimeConfigState,
-    ) -> Result<Box<dyn Lib>, CliError> {
-        self.factories
-            .get(name)
-            .map(|factory| match factory {
-                HostFactory::Plain(factory) => factory(),
-                HostFactory::Config(factory) => factory(config),
-            })
-            .ok_or_else(|| CliError::new(format!("unknown host library: {name}")))
-    }
-
-    fn inspect_manifest(
-        &self,
-        name: &str,
-        config: &RuntimeConfigState,
-    ) -> Result<LibManifest, CliError> {
-        Ok(self.instantiate(name, config)?.manifest())
-    }
-
-    fn contains(&self, name: &str) -> bool {
-        self.factories.contains_key(name)
-    }
-}
-
-struct HostSourceLoader;
-
-impl LibLoader for HostSourceLoader {
-    fn can_load(&self, source: &KernelLibSource) -> bool {
-        matches!(source, KernelLibSource::Host(_))
-    }
-
-    fn load(&self, _cx: &mut Cx, source: KernelLibSource) -> sim_kernel::Result<Box<dyn Lib>> {
-        match source {
-            KernelLibSource::Host(lib) => Ok(lib),
-            _ => Err(KernelError::Lib(
-                "host loader received a non-host source".to_owned(),
-            )),
-        }
-    }
-}
-
-fn host_receipt(
-    source: LibSourceSpec,
-    role: LoadReceiptRole,
-    loaded: LoadedLib,
-    loaded_libs: &[LoadedLib],
-) -> LoadReceipt {
-    let dependencies = loaded
-        .manifest
-        .requires
-        .iter()
-        .filter_map(|dependency| {
-            let loaded = loaded_libs
-                .iter()
-                .find(|candidate| candidate.manifest.id == dependency.id)?;
-            Some(LibBootDependency {
-                lib_id: loaded.id,
-                symbol: loaded.manifest.id.clone(),
-            })
-        })
-        .collect();
-    LoadReceipt {
-        lib_id: loaded.id,
-        role,
-        requested_source: source.clone(),
-        resolved_source: source,
-        manifest: loaded.manifest,
-        dependencies,
-        exports: loaded.exports,
-    }
-}
-
 fn ensure_loadable_path(
     data_source: &KernelLibSourceSpec,
     source: &LibSourceSpec,
@@ -708,4 +637,17 @@ fn manifest_exports_codec(manifest: &LibManifest, codec_symbol: &Symbol) -> bool
         sim_kernel::Export::Codec { symbol, .. } => symbol == codec_symbol,
         _ => false,
     })
+}
+
+fn manifest_exports_requested_site(manifest: &LibManifest, sites: &[Symbol]) -> bool {
+    manifest.exports.iter().any(|export| match export {
+        sim_kernel::Export::Site { symbol, .. } => sites.iter().any(|site| site == symbol),
+        _ => false,
+    })
+}
+
+fn pre_site_config(boot: &CliBoot) -> crate::ConfigLoadOptions {
+    let mut config = boot.config.clone();
+    config.site_sources.clear();
+    config
 }

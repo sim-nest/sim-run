@@ -379,40 +379,6 @@ source = "symbol:numbers/cas"
 }
 
 #[test]
-fn site_backed_dir_resolves_through_registry_site_export() {
-    let mut cx = test_cx();
-    let cookbook = lib("sim", "cookbook");
-    let site = lib("config", "runtime");
-    let dir_expr = Expr::Map(vec![(
-        Expr::Symbol(cookbook.clone()),
-        Expr::Map(vec![(
-            Expr::Symbol(Symbol::new("mode")),
-            Expr::String("site".to_owned()),
-        )]),
-    )]);
-    let site_value = cx.factory().expr(dir_expr).unwrap();
-    cx.registry_mut()
-        .register_site_value(site.clone(), site_value)
-        .unwrap();
-    let opts = ConfigLoadOptions {
-        roots: ConfigRoots::new(None, temp_root("site-unused")),
-        read_files: false,
-        single_file: None,
-        site_sources: vec![site.clone()],
-    };
-
-    let state = load_config_sources(&mut cx, &opts, &[]);
-
-    assert!(state.diagnostics().is_empty(), "{:?}", state.diagnostics());
-    assert!(matches!(
-        state.layers().first().unwrap().source,
-        ConfigSource::Site { site: ref layer_site } if layer_site == &site
-    ));
-    let table = state.effective().dir.table(&cookbook).unwrap();
-    assert_eq!(ConfigView::new(table).string("mode"), Some("site"));
-}
-
-#[test]
 fn load_boot_discovers_codec_and_explicit_host_lib_configs() {
     let base = temp_root("boot-discovers-libs");
     let home = base.join("home");

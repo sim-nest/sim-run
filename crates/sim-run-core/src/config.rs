@@ -12,7 +12,7 @@ use sim_config::{
     ConfigRoots, ConfigSecretField, ConfigSource, ConfigTable, EffectiveConfig, ProbeMode,
     lib_config_path, lib_symbol_from_str, merge_layers,
 };
-use sim_kernel::{Cx, Symbol};
+use sim_kernel::{Args, Cx, Symbol};
 
 use crate::report::{ConfigSourceReport, SourceStatus};
 
@@ -25,7 +25,8 @@ pub struct ConfigLoadOptions {
     pub read_files: bool,
     /// Explicit shared config file to read after root files.
     pub single_file: Option<PathBuf>,
-    /// Site exports that produce config Dir expressions.
+    /// Site exports that return config Dir expressions when called with
+    /// `config/dir`.
     pub site_sources: Vec<Symbol>,
 }
 
@@ -292,7 +293,28 @@ fn read_site_dir(cx: &mut Cx, state: &mut RuntimeConfigState, site: &Symbol) {
         state.push_diagnostic(format!("config site not found: {site}"));
         return;
     };
-    let expr = match value.object().as_expr(cx) {
+    let Some(callable) = value.object().as_callable() else {
+        state.push_source_report(source, SourceStatus::Rejected);
+        state.push_diagnostic(format!("config site {site} is not callable"));
+        return;
+    };
+    let request = match cx.factory().symbol(config_site_dir_request_symbol()) {
+        Ok(request) => request,
+        Err(err) => {
+            state.push_source_report(source, SourceStatus::Rejected);
+            state.push_diagnostic(format!("read config site {site}: {err}"));
+            return;
+        }
+    };
+    let dir_value = match callable.call(cx, Args::new(vec![request])) {
+        Ok(value) => value,
+        Err(err) => {
+            state.push_source_report(source, SourceStatus::Rejected);
+            state.push_diagnostic(format!("read config site {site}: {err}"));
+            return;
+        }
+    };
+    let expr = match dir_value.object().as_expr(cx) {
         Ok(expr) => expr,
         Err(err) => {
             state.push_source_report(source, SourceStatus::Rejected);
@@ -307,6 +329,10 @@ fn read_site_dir(cx: &mut Cx, state: &mut RuntimeConfigState, site: &Symbol) {
             state.push_diagnostic(format!("read config site {site}: {err}"));
         }
     }
+}
+
+fn config_site_dir_request_symbol() -> Symbol {
+    Symbol::qualified("config", "dir")
 }
 
 fn decode_table_file(path: &Path) -> Result<sim_kernel::Expr, String> {

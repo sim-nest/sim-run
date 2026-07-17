@@ -39,6 +39,7 @@ mod exit;
 #[cfg(feature = "registry")]
 mod git_registry;
 mod handoff;
+mod host;
 mod introspect;
 mod load;
 mod receipt;
@@ -49,6 +50,8 @@ mod source;
 mod codec_boot_tests;
 #[cfg(test)]
 mod config_report_tests;
+#[cfg(test)]
+mod config_site_tests;
 #[cfg(test)]
 mod config_tests;
 #[cfg(test)]
