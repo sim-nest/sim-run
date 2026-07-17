@@ -16,9 +16,9 @@ use std::{env, path::PathBuf};
 const REPL_BUNDLE_DIR_ENV: &str = "SIM_REPL_BUNDLE_DIR";
 
 #[cfg(feature = "dynamic-native")]
-struct ReplBundle {
+struct ReplProofBundle {
     numbers_f64: PathBuf,
-    standard_core: PathBuf,
+    standard_core_proof: PathBuf,
 }
 
 pub(crate) fn run<I, S>(args: I) -> Result<i32, CliError>
@@ -80,7 +80,7 @@ fn with_git_registry(session: LoadSession) -> Result<LoadSession, CliError> {
 
 #[cfg(feature = "dynamic-native")]
 fn repl_session(session: LoadSession) -> Result<LoadSession, CliError> {
-    let bundle = ReplBundle::resolve()?;
+    let bundle = ReplProofBundle::resolve()?;
     Ok(session
         .with_context(|cx| {
             cx.set_eval_policy(Arc::new(sim_kernel::StrictNames(sim_kernel::EagerPolicy)));
@@ -98,7 +98,7 @@ fn repl_session(session: LoadSession) -> Result<LoadSession, CliError> {
             vec![
                 LibSourceSpec::Host("codec/lisp".to_owned()),
                 LibSourceSpec::Path(bundle.numbers_f64),
-                LibSourceSpec::Path(bundle.standard_core),
+                LibSourceSpec::Path(bundle.standard_core_proof),
                 LibSourceSpec::Host("lib/repl".to_owned()),
             ],
         ))
@@ -116,14 +116,14 @@ fn uses_default_repl_bundle(boot: &CliBoot) -> bool {
 }
 
 #[cfg(feature = "dynamic-native")]
-impl ReplBundle {
+impl ReplProofBundle {
     fn resolve() -> Result<Self, CliError> {
         let dirs = candidate_bundle_dirs();
         let numbers_f64 = find_required_dylib(&dirs, "sim_lib_numbers_f64")?;
-        let standard_core = find_required_dylib(&dirs, "sim_lib_standard_core")?;
+        let standard_core_proof = find_required_dylib(&dirs, "sim_lib_standard_core")?;
         Ok(Self {
             numbers_f64,
-            standard_core,
+            standard_core_proof,
         })
     }
 }
@@ -174,7 +174,7 @@ fn missing_bundle_error(name: &str, dirs: &[PathBuf]) -> CliError {
             .join(", ")
     };
     CliError::new(format!(
-        "repl eval bundle is missing {name}; searched {searched}. Build the native eval bundle into the sim binary target directory or set {REPL_BUNDLE_DIR_ENV} to the directory containing the native dylibs"
+        "repl native proof bundle is missing {name}; searched {searched}. Build the native proof bundle into the sim binary target directory or set {REPL_BUNDLE_DIR_ENV} to the directory containing the native dylibs"
     ))
 }
 

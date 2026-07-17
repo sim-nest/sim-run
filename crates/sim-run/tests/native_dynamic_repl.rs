@@ -28,8 +28,8 @@ const PATCHES: &[(&str, &str, &str)] = &[
 ];
 
 #[test]
-fn sim_repl_loads_eval_bundle_and_evaluates_stdin() {
-    let bundle_dir = build_repl_bundle();
+fn sim_repl_loads_native_proof_bundle_and_evaluates_stdin() {
+    let bundle_dir = build_repl_proof_bundle();
     assert!(
         bundle_dir
             .join(dylib_file_name("sim_lib_numbers_f64"))
@@ -93,7 +93,7 @@ fn assert_repl_success(output: &std::process::Output) {
     );
 }
 
-fn build_repl_bundle() -> PathBuf {
+fn build_repl_proof_bundle() -> PathBuf {
     let target_dir = unique_target_dir();
     build_native_dylib(
         "sim-lib-numbers-f64",
@@ -103,7 +103,7 @@ fn build_repl_bundle() -> PathBuf {
     );
     build_native_dylib(
         "sim-lib-standard-core",
-        standard_core_manifest_path(),
+        standard_core_proof_manifest_path(),
         &["native-export"],
         &target_dir,
     );
@@ -158,7 +158,7 @@ fn numbers_f64_manifest_path() -> PathBuf {
     .join("Cargo.toml")
 }
 
-fn standard_core_manifest_path() -> PathBuf {
+fn standard_core_proof_manifest_path() -> PathBuf {
     package_path(
         "sim-lib-standard-core",
         "sim-runtime",
