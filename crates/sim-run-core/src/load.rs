@@ -35,6 +35,7 @@ pub struct LoadSession {
     default_verb_config_libs: BTreeMap<String, Vec<Symbol>>,
     receipts: Vec<LoadReceipt>,
     config: RuntimeConfigState,
+    native_audio_provider_active: bool,
 }
 
 trait GrantOutcome {
@@ -77,6 +78,7 @@ impl LoadSession {
             default_verb_config_libs: BTreeMap::new(),
             receipts: Vec::new(),
             config: RuntimeConfigState::default(),
+            native_audio_provider_active: false,
         }
     }
 
@@ -256,8 +258,14 @@ impl LoadSession {
         &mut self.config
     }
 
+    /// Returns whether the optional native audio provider loaded successfully.
+    pub fn native_audio_provider_active(&self) -> bool {
+        self.native_audio_provider_active
+    }
+
     /// Loads every requested library in the parsed boot controls.
     pub fn load_boot(&mut self, boot: &CliBoot) -> Result<&[LoadReceipt], CliError> {
+        self.native_audio_provider_active = false;
         let boot = self.boot_with_default_verb_sources(boot);
         let config_libs = config_libs_for_boot(&boot, &self.default_verb_config_libs);
         let codec_name = boot_codec_name(&boot);
@@ -321,16 +329,20 @@ impl LoadSession {
         let Some(source) = boot.native_audio_provider.as_deref() else {
             return;
         };
-        expect_granted!(
-            self.seat
-                .grant(&mut self.cx, native_audio_provider_capability())
-        );
-        if self
-            .load_source_with_role(source, LoadReceiptRole::Library)
-            .is_err()
-        {
-            // Placement resolution keeps the modeled site live when a native
-            // provider is absent or rejected.
+        match self.load_source_with_role(source, LoadReceiptRole::Library) {
+            Ok(_) => {
+                expect_granted!(
+                    self.seat
+                        .grant(&mut self.cx, native_audio_provider_capability())
+                );
+                self.native_audio_provider_active = true;
+            }
+            Err(err) => {
+                self.config
+                    .push_diagnostic(format!("native audio provider skipped: {err}"));
+                // Placement resolution keeps the modeled site live when a
+                // native provider is absent or rejected.
+            }
         }
     }
 
@@ -555,7 +567,7 @@ fn config_libs_for_boot(
         .payload
         .args
         .first()
-        .map(|arg| arg.to_string_lossy().into_owned())
+        .and_then(|arg| arg.as_os_str().to_str().map(str::to_owned))
         && let Some(symbols) = default_verb_config_libs.get(&verb)
     {
         for symbol in symbols {

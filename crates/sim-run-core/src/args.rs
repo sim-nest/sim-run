@@ -2,7 +2,7 @@ use std::{ffi::OsString, path::PathBuf};
 
 use crate::{
     CliBoot, CliError, ConfigReportKind, ConfigReportRequest, LibSourceSpec,
-    source::symbol_from_text,
+    source::{parse_source_os, symbol_from_text},
 };
 
 /// Top-level command selected by the bootloader parser.
@@ -50,7 +50,14 @@ where
     let mut seen = ConfigFlagsSeen::default();
     let mut cursor = 0;
     while cursor < args.len() {
-        let arg = arg_string(&args[cursor]);
+        let arg = match arg_text(&args[cursor], "argument flag") {
+            Ok(arg) => arg.to_owned(),
+            Err(_) if is_positional_os_arg(&args[cursor]) => {
+                boot.payload.args.extend(args.drain(cursor..));
+                break;
+            }
+            Err(err) => return Err(err),
+        };
         match arg.as_str() {
             "--" => {
                 boot.payload.args.extend(args.drain(cursor + 1..));
@@ -63,37 +70,37 @@ where
                 cursor += 1;
             }
             "--codec" => {
-                boot.codec = set_once(boot.codec, "--codec", take_value(&args, &mut cursor)?)?;
+                boot.codec = set_once(boot.codec, "--codec", take_text_value(&args, &mut cursor)?)?;
             }
             "--load" => {
-                let source = take_value(&args, &mut cursor)?;
-                boot.loads.push(source.parse::<LibSourceSpec>()?);
+                let source = take_os_value(&args, &mut cursor)?;
+                boot.loads.push(parse_source_os(source)?);
             }
             "--native-audio-provider" => {
-                let source = take_value(&args, &mut cursor)?;
+                let source = take_os_value(&args, &mut cursor)?;
                 boot.native_audio_provider = set_once(
                     boot.native_audio_provider,
                     "--native-audio-provider",
-                    Box::new(source.parse::<LibSourceSpec>()?),
+                    Box::new(parse_source_os(source)?),
                 )?;
             }
             "--config-home" => {
                 reject_seen(&mut seen.home, "--config-home")?;
-                boot.config.roots.home = Some(PathBuf::from(take_value(&args, &mut cursor)?));
+                boot.config.roots.home = Some(PathBuf::from(take_os_value(&args, &mut cursor)?));
             }
             "--config-work" => {
                 reject_seen(&mut seen.work, "--config-work")?;
-                boot.config.roots.work = PathBuf::from(take_value(&args, &mut cursor)?);
+                boot.config.roots.work = PathBuf::from(take_os_value(&args, &mut cursor)?);
             }
             "--config-file" => {
                 boot.config.single_file = set_once(
                     boot.config.single_file,
                     "--config-file",
-                    PathBuf::from(take_value(&args, &mut cursor)?),
+                    PathBuf::from(take_os_value(&args, &mut cursor)?),
                 )?;
             }
             "--config-site" => {
-                let site = symbol_from_text(&take_value(&args, &mut cursor)?);
+                let site = symbol_from_text(&take_text_value(&args, &mut cursor)?);
                 boot.config.site_sources.push(site);
             }
             "--no-config-files" => {
@@ -102,22 +109,28 @@ where
                 cursor += 1;
             }
             "--inspect" => {
-                boot.inspect =
-                    set_once(boot.inspect, "--inspect", take_value(&args, &mut cursor)?)?;
+                boot.inspect = set_once(
+                    boot.inspect,
+                    "--inspect",
+                    take_text_value(&args, &mut cursor)?,
+                )?;
             }
             "--eval" => {
-                boot.payload.eval =
-                    set_once(boot.payload.eval, "--eval", take_value(&args, &mut cursor)?)?;
+                boot.payload.eval = set_once(
+                    boot.payload.eval,
+                    "--eval",
+                    take_text_value(&args, &mut cursor)?,
+                )?;
             }
             "--script" => {
-                let script = PathBuf::from(take_value(&args, &mut cursor)?);
+                let script = PathBuf::from(take_os_value(&args, &mut cursor)?);
                 boot.payload.script = set_once(boot.payload.script, "--script", script)?;
             }
             "--stdin" => {
                 boot.payload.stdin = set_once(
                     boot.payload.stdin,
                     "--stdin",
-                    take_value(&args, &mut cursor)?,
+                    take_text_value(&args, &mut cursor)?,
                 )?;
             }
             _ if arg.starts_with("--codec=") => {
@@ -201,13 +214,22 @@ where
     Ok(CliCommand::Boot(Box::new(boot)))
 }
 
-fn take_value(args: &[OsString], cursor: &mut usize) -> Result<String, CliError> {
-    let flag = arg_string(&args[*cursor]);
+fn take_text_value(args: &[OsString], cursor: &mut usize) -> Result<String, CliError> {
+    let flag = arg_text(&args[*cursor], "argument flag")?.to_owned();
     let Some(value) = args.get(*cursor + 1) else {
         return Err(CliError::missing_value(&flag));
     };
     *cursor += 2;
-    Ok(arg_string(value))
+    Ok(arg_text(value, &flag)?.to_owned())
+}
+
+fn take_os_value(args: &[OsString], cursor: &mut usize) -> Result<OsString, CliError> {
+    let flag = arg_text(&args[*cursor], "argument flag")?.to_owned();
+    let Some(value) = args.get(*cursor + 1) else {
+        return Err(CliError::missing_value(&flag));
+    };
+    *cursor += 2;
+    Ok(value.clone())
 }
 
 fn inline_value(arg: &str, prefix: &str) -> Result<String, CliError> {
@@ -247,7 +269,7 @@ fn parse_config_report(args: &[OsString]) -> Result<ConfigReportRequest, CliErro
     let mut json = false;
     let mut positionals = Vec::new();
     for arg in args {
-        let arg = arg_string(arg);
+        let arg = arg_text(arg, "config command argument")?.to_owned();
         match arg.as_str() {
             "--json" => {
                 if json {
@@ -281,14 +303,34 @@ fn parse_config_report(args: &[OsString]) -> Result<ConfigReportRequest, CliErro
     Ok(ConfigReportRequest { kind, json })
 }
 
-fn arg_string(arg: &OsString) -> String {
-    arg.to_string_lossy().into_owned()
+fn arg_text<'a>(arg: &'a OsString, context: &str) -> Result<&'a str, CliError> {
+    arg.as_os_str()
+        .to_str()
+        .ok_or_else(|| CliError::new(format!("{context} requires UTF-8 text")))
+}
+
+fn is_positional_os_arg(arg: &OsString) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+
+        !arg.as_os_str().as_bytes().starts_with(b"-")
+    }
+
+    #[cfg(not(unix))]
+    {
+        arg.as_os_str()
+            .to_str()
+            .is_some_and(|arg| !arg.starts_with('-'))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{Payload, source::LibSourceSpec};
+    #[cfg(unix)]
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
     #[test]
     fn parses_boot_flags_and_repeated_loads() {
@@ -383,6 +425,71 @@ mod tests {
             boot.native_audio_provider.as_deref(),
             Some(&LibSourceSpec::Path(PathBuf::from("./jack-provider.so")))
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_path_value_preserves_non_utf8_bytes() {
+        let parsed = parse_args(vec![
+            OsString::from("sim"),
+            OsString::from("--load"),
+            OsString::from_vec(b"path:/tmp/sim-run-\xff-loader.wasm".to_vec()),
+        ])
+        .unwrap();
+        let CliCommand::Boot(boot) = parsed else {
+            panic!("expected boot command");
+        };
+        let LibSourceSpec::Path(path) = &boot.loads[0] else {
+            panic!("expected path source");
+        };
+
+        assert_eq!(
+            path.as_os_str().as_bytes(),
+            b"/tmp/sim-run-\xff-loader.wasm"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn script_path_value_preserves_non_utf8_bytes() {
+        let parsed = parse_args(vec![
+            OsString::from("sim"),
+            OsString::from("--script"),
+            OsString::from_vec(b"/tmp/sim-run-\xff-script.sim".to_vec()),
+        ])
+        .unwrap();
+        let CliCommand::Boot(boot) = parsed else {
+            panic!("expected boot command");
+        };
+        let path = boot.payload.script.as_ref().unwrap();
+
+        assert_eq!(path.as_os_str().as_bytes(), b"/tmp/sim-run-\xff-script.sim");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_text_value_fails_closed() {
+        let err = parse_args(vec![
+            OsString::from("sim"),
+            OsString::from("--codec"),
+            OsString::from_vec(b"li\xffsp".to_vec()),
+        ])
+        .unwrap_err();
+
+        assert_eq!(err.to_string(), "--codec requires UTF-8 text");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_positional_payload_is_preserved() {
+        let payload = OsString::from_vec(b"run-\xff".to_vec());
+        let parsed = parse_args(vec![OsString::from("sim"), payload.clone()]).unwrap();
+        let CliCommand::Boot(boot) = parsed else {
+            panic!("expected boot command");
+        };
+
+        assert_eq!(boot.payload.args, vec![payload]);
+        assert_eq!(boot.envelope().verb, None);
     }
 
     #[test]

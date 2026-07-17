@@ -348,6 +348,47 @@ fn missing_native_audio_provider_does_not_block_boot() {
 
     assert_eq!(receipts.len(), 1);
     assert_eq!(receipts[0].manifest.id, Symbol::new("codec/lisp"));
+    assert!(!session.native_audio_provider_active());
+    assert!(
+        session
+            .cx()
+            .require(&sim_lib_stream_host::native_audio_provider_capability())
+            .is_err()
+    );
+    assert!(
+        session
+            .config_state()
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| {
+                diagnostic.starts_with("native audio provider skipped: path source not found")
+            })
+    );
+}
+
+#[test]
+fn loaded_native_audio_provider_is_active_and_granted() {
+    let mut session = LoadSession::new()
+        .with_host_factory("codec/lisp", || {
+            Box::new(FixtureLib::new("codec/lisp", "codec-value", HostRegistered))
+        })
+        .with_host_factory("audio/provider/jack", || {
+            Box::new(FixtureLib::new(
+                "audio/provider/jack",
+                "native-provider-value",
+                HostRegistered,
+            ))
+        });
+    let boot = CliBoot {
+        native_audio_provider: Some(Box::new(LibSourceSpec::Host(
+            "audio/provider/jack".to_owned(),
+        ))),
+        ..CliBoot::default()
+    };
+
+    session.load_boot(&boot).unwrap();
+
+    assert!(session.native_audio_provider_active());
     assert!(
         session
             .cx()
@@ -364,6 +405,7 @@ fn default_boot_does_not_grant_native_audio_provider_capability() {
 
     session.load_boot(&CliBoot::default()).unwrap();
 
+    assert!(!session.native_audio_provider_active());
     assert!(
         session
             .cx()

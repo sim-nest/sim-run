@@ -118,7 +118,7 @@ impl RuntimeConfigState {
             .push(ConfigSourceReport { source, status });
     }
 
-    fn push_diagnostic(&mut self, diagnostic: String) {
+    pub(crate) fn push_diagnostic(&mut self, diagnostic: String) {
         self.diagnostics.push(diagnostic);
     }
 }

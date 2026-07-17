@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf, str::FromStr};
+use std::{ffi::OsString, fmt, path::PathBuf, str::FromStr};
 
 use crate::{CliError, CratesIoSpec};
 use sim_kernel::{LibSourceSpec as KernelLibSourceSpec, Symbol};
@@ -55,6 +55,28 @@ impl LibSourceSpec {
     }
 }
 
+pub(crate) fn parse_source_os(source: OsString) -> Result<LibSourceSpec, CliError> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+
+        let bytes = source.as_os_str().as_bytes();
+        if let Some(rest) = bytes.strip_prefix(b"path:") {
+            if rest.is_empty() {
+                return Err(CliError::new("path: source value is empty"));
+            }
+            return Ok(LibSourceSpec::Path(PathBuf::from(OsString::from_vec(
+                rest.to_vec(),
+            ))));
+        }
+    }
+
+    let source = source
+        .into_string()
+        .map_err(|_| CliError::new("non-UTF-8 library source requires path:"))?;
+    source.parse()
+}
+
 impl fmt::Display for LibSourceSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -104,6 +126,8 @@ impl FromStr for LibSourceSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
     #[test]
     fn parses_supported_source_specs() {
@@ -157,5 +181,30 @@ mod tests {
                 .to_string(),
             "unsupported library source kind: crate"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn source_path_os_bytes_survive_non_utf8() {
+        let parsed = parse_source_os(OsString::from_vec(
+            b"path:/tmp/sim-run-\xff-provider.so".to_vec(),
+        ))
+        .unwrap();
+
+        let LibSourceSpec::Path(path) = parsed else {
+            panic!("expected path source");
+        };
+        assert_eq!(
+            path.as_os_str().as_bytes(),
+            b"/tmp/sim-run-\xff-provider.so"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_text_source_fails_closed() {
+        let err = parse_source_os(OsString::from_vec(b"symbol:codec/\xff".to_vec())).unwrap_err();
+
+        assert_eq!(err.to_string(), "non-UTF-8 library source requires path:");
     }
 }
