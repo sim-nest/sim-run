@@ -40,7 +40,7 @@ fn codec_export(name: &str) -> Export {
 struct FixtureLib {
     manifest: LibManifest,
     codec: Option<String>,
-    entrypoint: Option<(Symbol, FixtureEntrypoint)>,
+    entrypoints: Vec<(Symbol, FixtureEntrypoint)>,
 }
 
 impl FixtureLib {
@@ -53,16 +53,37 @@ impl FixtureLib {
         Self {
             manifest: manifest(&format!("codec-{name}"), exports),
             codec: Some(name.to_owned()),
-            entrypoint: entrypoint.map(|entrypoint| (entrypoint_symbol, entrypoint)),
+            entrypoints: entrypoint
+                .into_iter()
+                .map(|entrypoint| (entrypoint_symbol.clone(), entrypoint))
+                .collect(),
         }
     }
 
     fn app(id: &str, entrypoint: FixtureEntrypoint) -> Self {
         let entrypoint_symbol = cli_main_entrypoint_symbol(id);
+        Self::with_entrypoints(id, vec![(entrypoint_symbol, entrypoint)])
+    }
+
+    fn app_for_verb(id: &str, verb: &str, entrypoint: FixtureEntrypoint) -> Self {
+        Self::with_entrypoints(id, vec![(cli_main_entrypoint_symbol(verb), entrypoint)])
+    }
+
+    fn generic(id: &str, entrypoint: FixtureEntrypoint) -> Self {
+        Self::with_entrypoints(id, vec![(Symbol::new(CLI_MAIN_ENTRYPOINT), entrypoint)])
+    }
+
+    fn with_entrypoints(id: &str, entrypoints: Vec<(Symbol, FixtureEntrypoint)>) -> Self {
         Self {
-            manifest: manifest(id, vec![cli_main_export(entrypoint_symbol.clone())]),
+            manifest: manifest(
+                id,
+                entrypoints
+                    .iter()
+                    .map(|(symbol, _)| cli_main_export(symbol.clone()))
+                    .collect(),
+            ),
             codec: None,
-            entrypoint: Some((entrypoint_symbol, entrypoint)),
+            entrypoints,
         }
     }
 
@@ -70,7 +91,7 @@ impl FixtureLib {
         Self {
             manifest: manifest(id, Vec::new()),
             codec: None,
-            entrypoint: None,
+            entrypoints: Vec::new(),
         }
     }
 }
@@ -87,7 +108,7 @@ impl Lib for FixtureLib {
                 cx.factory().bool(true)?,
             )?;
         }
-        if let Some((symbol, entrypoint)) = &self.entrypoint {
+        for (symbol, entrypoint) in &self.entrypoints {
             linker.function_value(
                 symbol.clone(),
                 cx.factory().opaque(Arc::new(entrypoint.clone()))?,
@@ -258,6 +279,74 @@ fn explicit_loaded_lib_entrypoint_wins_over_codec_entrypoint() {
 }
 
 #[test]
+fn exact_verb_entrypoint_wins_within_loaded_library() {
+    let boot = CliBoot {
+        codec: Some("test".to_owned()),
+        loads: vec![LibSourceSpec::Host("app/multi".to_owned())],
+        payload: Payload {
+            args: vec![OsString::from("repl")],
+            ..Payload::default()
+        },
+        ..CliBoot::default()
+    };
+    let mut session = LoadSession::new()
+        .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
+        .with_host_factory("app/multi", || {
+            Box::new(FixtureLib::with_entrypoints(
+                "app-multi",
+                vec![
+                    (
+                        cli_main_entrypoint_symbol("serve"),
+                        FixtureEntrypoint::failure(),
+                    ),
+                    (
+                        cli_main_entrypoint_symbol("repl"),
+                        FixtureEntrypoint::success(),
+                    ),
+                ],
+            ))
+        });
+
+    let code = session.run_loaded_boot(&boot).unwrap();
+
+    assert_eq!(code, 0);
+}
+
+#[test]
+fn generic_entrypoint_fallback_runs_when_exact_verb_is_absent() {
+    let boot = CliBoot {
+        codec: Some("test".to_owned()),
+        loads: vec![LibSourceSpec::Host("app/generic".to_owned())],
+        payload: Payload {
+            args: vec![OsString::from("repl")],
+            ..Payload::default()
+        },
+        ..CliBoot::default()
+    };
+    let mut session = LoadSession::new()
+        .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
+        .with_host_factory("app/generic", || {
+            Box::new(FixtureLib::with_entrypoints(
+                "app-generic",
+                vec![
+                    (
+                        Symbol::new(CLI_MAIN_ENTRYPOINT),
+                        FixtureEntrypoint::success(),
+                    ),
+                    (
+                        cli_main_entrypoint_symbol("serve"),
+                        FixtureEntrypoint::failure(),
+                    ),
+                ],
+            ))
+        });
+
+    let code = session.run_loaded_boot(&boot).unwrap();
+
+    assert_eq!(code, 0);
+}
+
+#[test]
 fn default_verb_sources_load_when_verb_has_no_explicit_loads() {
     let boot = CliBoot {
         codec: Some("test".to_owned()),
@@ -270,7 +359,11 @@ fn default_verb_sources_load_when_verb_has_no_explicit_loads() {
     let mut session = LoadSession::new()
         .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
         .with_host_factory("app/repl", || {
-            Box::new(FixtureLib::app("app-repl", FixtureEntrypoint::success()))
+            Box::new(FixtureLib::app_for_verb(
+                "app-repl",
+                "repl",
+                FixtureEntrypoint::success(),
+            ))
         })
         .with_default_verb_sources("repl", vec![LibSourceSpec::Host("app/repl".to_owned())]);
 
@@ -295,11 +388,16 @@ fn explicit_loads_override_default_verb_sources() {
     let mut session = LoadSession::new()
         .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
         .with_host_factory("app/default", || {
-            Box::new(FixtureLib::app("app-default", FixtureEntrypoint::failure()))
+            Box::new(FixtureLib::app_for_verb(
+                "app-default",
+                "repl",
+                FixtureEntrypoint::failure(),
+            ))
         })
         .with_host_factory("app/explicit", || {
-            Box::new(FixtureLib::app(
+            Box::new(FixtureLib::app_for_verb(
                 "app-explicit",
+                "repl",
                 FixtureEntrypoint::success(),
             ))
         })
@@ -383,7 +481,7 @@ fn entrypoint_receives_cli_envelope_value() {
     let mut session = LoadSession::new()
         .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
         .with_host_factory("app/echo", move || {
-            Box::new(FixtureLib::app(
+            Box::new(FixtureLib::generic(
                 "app-echo",
                 FixtureEntrypoint::echo(expected.clone()),
             ))

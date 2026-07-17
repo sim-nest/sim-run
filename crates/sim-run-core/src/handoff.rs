@@ -34,7 +34,7 @@ impl LoadSession {
 
     /// Runs the selected loaded CLI entrypoint for an already-loaded session.
     pub fn run_loaded_handoff(&mut self, envelope: &CliEnvelope) -> Result<i32, CliError> {
-        let entrypoint = select_cli_entrypoint(self.receipts())?;
+        let entrypoint = select_cli_entrypoint(self.receipts(), envelope.verb.as_deref())?;
         run_loaded_cli(self.cx_mut(), &entrypoint, envelope)
     }
 }
@@ -48,18 +48,23 @@ pub fn cli_main_entrypoint_symbol(name: &str) -> Symbol {
 ///
 /// Prefers a `--load` library over the boot codec, and returns an error
 /// when no loaded lib claims the entrypoint.
-pub fn select_cli_entrypoint(receipts: &[LoadReceipt]) -> Result<CliEntrypoint, CliError> {
-    receipts
-        .iter()
-        .filter(|receipt| matches!(receipt.role, LoadReceiptRole::Library))
-        .find_map(entrypoint_for_receipt)
-        .or_else(|| {
-            receipts
-                .iter()
-                .filter(|receipt| matches!(receipt.role, LoadReceiptRole::BootCodec { .. }))
-                .find_map(entrypoint_for_receipt)
-        })
-        .ok_or_else(|| no_entrypoint_error(receipts))
+pub fn select_cli_entrypoint(
+    receipts: &[LoadReceipt],
+    verb: Option<&str>,
+) -> Result<CliEntrypoint, CliError> {
+    select_from_role(
+        receipts,
+        |role| matches!(role, LoadReceiptRole::Library),
+        verb,
+    )
+    .or_else(|| {
+        select_from_role(
+            receipts,
+            |role| matches!(role, LoadReceiptRole::BootCodec { .. }),
+            verb,
+        )
+    })
+    .ok_or_else(|| no_entrypoint_error(receipts, verb))
 }
 
 /// Calls a loaded entrypoint with the boot envelope and returns its exit code.
@@ -80,15 +85,56 @@ pub fn run_loaded_cli(
     value_to_exit_code(cx, result)
 }
 
-fn entrypoint_for_receipt(receipt: &LoadReceipt) -> Option<CliEntrypoint> {
+fn select_from_role(
+    receipts: &[LoadReceipt],
+    role_matches: impl Fn(&LoadReceiptRole) -> bool + Copy,
+    verb: Option<&str>,
+) -> Option<CliEntrypoint> {
+    if let Some(verb) = verb {
+        find_entrypoint(receipts, role_matches, |record| {
+            record_claims_exact_cli_main(record, verb)
+        })
+        .or_else(|| find_entrypoint(receipts, role_matches, record_claims_generic_cli_main))
+    } else {
+        find_entrypoint(receipts, role_matches, record_claims_cli_main)
+    }
+}
+
+fn find_entrypoint(
+    receipts: &[LoadReceipt],
+    role_matches: impl Fn(&LoadReceiptRole) -> bool,
+    record_matches: impl Fn(&ExportRecord) -> bool + Copy,
+) -> Option<CliEntrypoint> {
+    receipts
+        .iter()
+        .filter(|receipt| role_matches(&receipt.role))
+        .find_map(|receipt| entrypoint_for_receipt(receipt, record_matches))
+}
+
+fn entrypoint_for_receipt(
+    receipt: &LoadReceipt,
+    record_matches: impl Fn(&ExportRecord) -> bool + Copy,
+) -> Option<CliEntrypoint> {
     receipt
         .exports
         .iter()
-        .find(|record| record_claims_cli_main(record))
+        .find(|record| record_matches(record))
         .map(|record| CliEntrypoint {
             lib: receipt.manifest.id.clone(),
             symbol: record.symbol.clone(),
         })
+}
+
+fn record_claims_exact_cli_main(record: &ExportRecord, verb: &str) -> bool {
+    record.kind == ExportKind::named(ExportKind::FUNCTION)
+        && matches!(record.state, ExportState::Resolved { .. })
+        && record.symbol == cli_main_entrypoint_symbol(verb)
+}
+
+fn record_claims_generic_cli_main(record: &ExportRecord) -> bool {
+    record.kind == ExportKind::named(ExportKind::FUNCTION)
+        && matches!(record.state, ExportState::Resolved { .. })
+        && record.symbol == Symbol::new(CLI_MAIN_ENTRYPOINT)
 }
 
 fn record_claims_cli_main(record: &ExportRecord) -> bool {
@@ -102,7 +148,7 @@ fn symbol_claims_cli_main(symbol: &Symbol) -> bool {
     symbol == CLI_MAIN_ENTRYPOINT || symbol.starts_with(&format!("{CLI_MAIN_ENTRYPOINT}/"))
 }
 
-fn no_entrypoint_error(receipts: &[LoadReceipt]) -> CliError {
+fn no_entrypoint_error(receipts: &[LoadReceipt], verb: Option<&str>) -> CliError {
     let loaded = if receipts.is_empty() {
         "none".to_owned()
     } else {
@@ -112,7 +158,10 @@ fn no_entrypoint_error(receipts: &[LoadReceipt]) -> CliError {
             .collect::<Vec<_>>()
             .join(", ")
     };
+    let requested = verb
+        .map(|verb| format!(" {CLI_MAIN_ENTRYPOINT}/{verb} or {CLI_MAIN_ENTRYPOINT}"))
+        .unwrap_or_else(|| format!(" {CLI_MAIN_ENTRYPOINT}"));
     CliError::new(format!(
-        "no loaded lib claims {CLI_MAIN_ENTRYPOINT}; loaded libs: {loaded}; load one with --load"
+        "no loaded lib claims{requested}; loaded libs: {loaded}; load one with --load"
     ))
 }

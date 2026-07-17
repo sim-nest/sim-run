@@ -58,8 +58,15 @@ impl ScenarioLib {
         }
     }
 
-    fn command(id: &str, entrypoint: ScenarioEntrypoint) -> Self {
-        let entrypoint_symbol = cli_main_entrypoint_symbol(id);
+    fn command_for_verb(id: &str, verb: &str, entrypoint: ScenarioEntrypoint) -> Self {
+        Self::command_for_symbol(id, cli_main_entrypoint_symbol(verb), entrypoint)
+    }
+
+    fn command_for_symbol(
+        id: &str,
+        entrypoint_symbol: Symbol,
+        entrypoint: ScenarioEntrypoint,
+    ) -> Self {
         Self {
             manifest: manifest(id, vec![cli_main_export(entrypoint_symbol.clone())]),
             codec: None,
@@ -233,8 +240,9 @@ fn scenario_load_host_lib_dispatches_verb() {
         ..CliBoot::default()
     };
     let mut session = scenario_session().with_host_factory("scenario/host", || {
-        Box::new(ScenarioLib::command(
+        Box::new(ScenarioLib::command_for_verb(
             "host-command",
+            "host-run",
             ScenarioEntrypoint::expecting(ExpectedEnvelope {
                 codec: "codec/test",
                 verb: "host-run",
@@ -490,8 +498,9 @@ fn scenario_session() -> LoadSession {
 
 fn artifact_lib(bytes: &[u8]) -> sim_kernel::Result<Box<dyn Lib>> {
     match bytes {
-        b"bytes-command" => Ok(Box::new(ScenarioLib::command(
+        b"bytes-command" => Ok(Box::new(ScenarioLib::command_for_verb(
             "bytes-command",
+            "bytes-run",
             ScenarioEntrypoint::expecting(ExpectedEnvelope {
                 codec: "codec/test",
                 verb: "bytes-run",
@@ -501,8 +510,9 @@ fn artifact_lib(bytes: &[u8]) -> sim_kernel::Result<Box<dyn Lib>> {
                 stdin: "nil",
             }),
         ))),
-        b"crate-command" => Ok(Box::new(ScenarioLib::command(
+        b"crate-command" => Ok(Box::new(ScenarioLib::command_for_verb(
             "crate-command",
+            "crate-run",
             ScenarioEntrypoint::expecting(ExpectedEnvelope {
                 codec: "codec/test",
                 verb: "crate-run",
@@ -512,8 +522,9 @@ fn artifact_lib(bytes: &[u8]) -> sim_kernel::Result<Box<dyn Lib>> {
                 stdin: "nil",
             }),
         ))),
-        b"server-command" => Ok(Box::new(ScenarioLib::command(
+        b"server-command" => Ok(Box::new(ScenarioLib::command_for_verb(
             "server-command",
+            "server",
             ScenarioEntrypoint::expecting(ExpectedEnvelope {
                 codec: "codec/test",
                 verb: "server",
