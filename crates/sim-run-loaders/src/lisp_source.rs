@@ -16,116 +16,6 @@ pub struct LispSourceLoader {
     codec: sim_kernel::Symbol,
 }
 
-#[cfg(test)]
-mod tests {
-    use std::{path::PathBuf, sync::Arc};
-
-    use sim_kernel::{Expr, LibLoader, LibTarget, Symbol};
-
-    use super::{LispSourceLoader, compile_lisp_source_lib};
-
-    #[test]
-    fn lisp_source_loader_accepts_lisp_paths() {
-        let loader = LispSourceLoader::default();
-        assert!(loader.can_load(&crate::path_source(PathBuf::from("lib.lisp"))));
-        assert!(!loader.can_load(&crate::bytes_source(Vec::new())));
-    }
-
-    #[cfg(feature = "codec-binary")]
-    #[test]
-    fn lisp_source_expr_compiles_to_binary_pack() {
-        let pack =
-            super::compile_lisp_source_pack(PathBuf::from("demo.lisp"), source_expr()).unwrap();
-
-        assert_eq!(pack.manifest.id, Symbol::qualified("loader", "source-demo"));
-        assert_eq!(
-            pack.manifest.target,
-            LibTarget::CodecSource(Symbol::qualified("codec", "lisp"))
-        );
-        assert_eq!(pack.exports.len(), 1);
-        assert_eq!(pack.exports[0].kind(), crate::ReexportKind::Function);
-    }
-
-    #[cfg(feature = "shape")]
-    #[test]
-    fn lisp_source_defmacro_loads_source_macro_object() {
-        let lib =
-            compile_lisp_source_lib(PathBuf::from("macro.lisp"), source_defmacro_expr()).unwrap();
-        let mut cx = sim_kernel::Cx::new(
-            Arc::new(sim_kernel::EagerPolicy),
-            Arc::new(sim_kernel::DefaultFactory),
-        );
-
-        cx.load_lib(lib.as_ref()).unwrap();
-
-        let value = cx
-            .registry()
-            .macro_by_symbol(&Symbol::qualified("loader", "when"))
-            .unwrap();
-        let mac = value.object().downcast_ref::<crate::SourceTemplateMacro>();
-        assert!(mac.is_some());
-    }
-
-    fn source_expr() -> Expr {
-        Expr::List(vec![
-            symbol("sim_lib"),
-            Expr::List(vec![
-                symbol("id"),
-                Expr::String("loader/source-demo".to_owned()),
-            ]),
-            Expr::List(vec![symbol("version"), Expr::String("0.2.0".to_owned())]),
-            Expr::List(vec![
-                symbol("export"),
-                symbol("function"),
-                Expr::String("loader/tick".to_owned()),
-                symbol("tick"),
-            ]),
-        ])
-    }
-
-    #[cfg(feature = "shape")]
-    fn source_defmacro_expr() -> Expr {
-        Expr::List(vec![
-            symbol("sim_lib"),
-            Expr::List(vec![
-                symbol("id"),
-                Expr::String("loader/source-defmacro-demo".to_owned()),
-            ]),
-            Expr::List(vec![symbol("version"), Expr::String("0.2.0".to_owned())]),
-            Expr::List(vec![
-                symbol("defmacro"),
-                Expr::String("loader/when".to_owned()),
-                Expr::List(vec![symbol("condition"), symbol("&rest"), symbol("body")]),
-                Expr::Quote {
-                    mode: sim_kernel::QuoteMode::QuasiQuote,
-                    expr: Box::new(Expr::List(vec![
-                        symbol("if"),
-                        Expr::Quote {
-                            mode: sim_kernel::QuoteMode::Unquote,
-                            expr: Box::new(symbol("condition")),
-                        },
-                        Expr::List(vec![
-                            symbol("do"),
-                            Expr::Quote {
-                                mode: sim_kernel::QuoteMode::Splice,
-                                expr: Box::new(symbol("body")),
-                            },
-                        ]),
-                        Expr::Nil,
-                    ])),
-                },
-            ]),
-        ])
-    }
-
-    fn symbol(name: &str) -> Expr {
-        Expr::Symbol(match name.split_once('/') {
-            Some((namespace, name)) => Symbol::qualified(namespace, name),
-            None => Symbol::new(name),
-        })
-    }
-}
-
 impl Default for LispSourceLoader {
     fn default() -> Self {
         Self::new(sim_kernel::Symbol::qualified("codec", "lisp"))
@@ -292,4 +182,114 @@ pub fn compile_lisp_source_pack(
         manifest: compiled.manifest,
         exports: compiled.exports,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{path::PathBuf, sync::Arc};
+
+    use sim_kernel::{Expr, LibLoader, LibTarget, Symbol};
+
+    use super::{LispSourceLoader, compile_lisp_source_lib};
+
+    #[test]
+    fn lisp_source_loader_accepts_lisp_paths() {
+        let loader = LispSourceLoader::default();
+        assert!(loader.can_load(&crate::path_source(PathBuf::from("lib.lisp"))));
+        assert!(!loader.can_load(&crate::bytes_source(Vec::new())));
+    }
+
+    #[cfg(feature = "codec-binary")]
+    #[test]
+    fn lisp_source_expr_compiles_to_binary_pack() {
+        let pack =
+            super::compile_lisp_source_pack(PathBuf::from("demo.lisp"), source_expr()).unwrap();
+
+        assert_eq!(pack.manifest.id, Symbol::qualified("loader", "source-demo"));
+        assert_eq!(
+            pack.manifest.target,
+            LibTarget::CodecSource(Symbol::qualified("codec", "lisp"))
+        );
+        assert_eq!(pack.exports.len(), 1);
+        assert_eq!(pack.exports[0].kind(), crate::ReexportKind::Function);
+    }
+
+    #[cfg(feature = "shape")]
+    #[test]
+    fn lisp_source_defmacro_loads_source_macro_object() {
+        let lib =
+            compile_lisp_source_lib(PathBuf::from("macro.lisp"), source_defmacro_expr()).unwrap();
+        let mut cx = sim_kernel::Cx::new(
+            Arc::new(sim_kernel::EagerPolicy),
+            Arc::new(sim_kernel::DefaultFactory),
+        );
+
+        cx.load_lib(lib.as_ref()).unwrap();
+
+        let value = cx
+            .registry()
+            .macro_by_symbol(&Symbol::qualified("loader", "when"))
+            .unwrap();
+        let mac = value.object().downcast_ref::<crate::SourceTemplateMacro>();
+        assert!(mac.is_some());
+    }
+
+    fn source_expr() -> Expr {
+        Expr::List(vec![
+            symbol("sim_lib"),
+            Expr::List(vec![
+                symbol("id"),
+                Expr::String("loader/source-demo".to_owned()),
+            ]),
+            Expr::List(vec![symbol("version"), Expr::String("0.2.0".to_owned())]),
+            Expr::List(vec![
+                symbol("export"),
+                symbol("function"),
+                Expr::String("loader/tick".to_owned()),
+                symbol("tick"),
+            ]),
+        ])
+    }
+
+    #[cfg(feature = "shape")]
+    fn source_defmacro_expr() -> Expr {
+        Expr::List(vec![
+            symbol("sim_lib"),
+            Expr::List(vec![
+                symbol("id"),
+                Expr::String("loader/source-defmacro-demo".to_owned()),
+            ]),
+            Expr::List(vec![symbol("version"), Expr::String("0.2.0".to_owned())]),
+            Expr::List(vec![
+                symbol("defmacro"),
+                Expr::String("loader/when".to_owned()),
+                Expr::List(vec![symbol("condition"), symbol("&rest"), symbol("body")]),
+                Expr::Quote {
+                    mode: sim_kernel::QuoteMode::QuasiQuote,
+                    expr: Box::new(Expr::List(vec![
+                        symbol("if"),
+                        Expr::Quote {
+                            mode: sim_kernel::QuoteMode::Unquote,
+                            expr: Box::new(symbol("condition")),
+                        },
+                        Expr::List(vec![
+                            symbol("do"),
+                            Expr::Quote {
+                                mode: sim_kernel::QuoteMode::Splice,
+                                expr: Box::new(symbol("body")),
+                            },
+                        ]),
+                        Expr::Nil,
+                    ])),
+                },
+            ]),
+        ])
+    }
+
+    fn symbol(name: &str) -> Expr {
+        Expr::Symbol(match name.split_once('/') {
+            Some((namespace, name)) => Symbol::qualified(namespace, name),
+            None => Symbol::new(name),
+        })
+    }
 }
