@@ -34,6 +34,7 @@ mod bootloader;
 mod codec_boot;
 mod config;
 mod crates_io;
+mod device_host;
 mod envelope;
 mod exit;
 #[cfg(feature = "registry")]
@@ -55,6 +56,8 @@ mod config_site_tests;
 #[cfg(test)]
 mod config_tests;
 #[cfg(test)]
+mod device_host_tests;
+#[cfg(test)]
 mod handoff_tests;
 #[cfg(test)]
 mod introspect_tests;
@@ -74,6 +77,13 @@ pub use config::{
     run_config_probe,
 };
 pub use crates_io::{CratesIoResolver, CratesIoSpec, ResolvedCratesIoSource, VersionReq};
+pub use device_host::{
+    AdapterTick, DeviceAdapterLoopPlan, DeviceConsentPolicy, DeviceEdgeSession, DeviceHostSpec,
+    DeviceHostStalePolicy, DevicePlacement, DevicePlacementError, DeviceProfile, DeviceProvider,
+    DeviceProviderKind, DeviceRateClass, DeviceSession, DeviceSite, DeviceSiteLocality,
+    DeviceSurfaceHubJoin, RouteArg, StubProvider, StubSession, compose_device_host,
+    compose_device_host_with_provider, derive_device_rate_class, install_device_bases,
+};
 #[cfg(feature = "registry")]
 pub use git_registry::{GIT_REGISTRY_ENDPOINT_ENV, GitRegistryResolver};
 pub use handoff::{CLI_MAIN_ENTRYPOINT, CliEntrypoint, cli_main_entrypoint_symbol};
