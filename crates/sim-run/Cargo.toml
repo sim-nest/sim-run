@@ -21,21 +21,19 @@ path = "src/main.rs"
 dynamic-native = [
   "dep:sim-run-loaders",
   "sim-run-loaders/dynamic-native",
-  "dep:sim-kernel",
   "dep:sim-lib-repl",
 ]
 registry = ["sim-run-core/registry"]
 wasm = [
   "dep:sim-run-loaders",
   "sim-run-loaders/wasm",
-  "dep:sim-kernel",
   "dep:sim-wasm-abi",
 ]
 
 [dependencies]
 sim-run-core = { version = "0.1.6", path = "../sim-run-core" }
 sim-run-loaders = { version = "0.1.4", path = "../sim-run-loaders", optional = true, default-features = false }
-sim-kernel = { version = "0.1.4", optional = true }
+sim-kernel = { version = "0.1.4" }
 sim-lib-repl = { version = "0.1.0", path = "../sim-lib-repl", optional = true }
 sim-wasm-abi = { version = "0.1.1", optional = true }
 

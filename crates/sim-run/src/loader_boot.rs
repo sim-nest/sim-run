@@ -28,6 +28,7 @@ where
 {
     let command = sim_run_core::parse_args(args)?;
     let mut session = loader_session(&command)?;
+    session = crate::watch::with_watch_if_selected(&command, session);
     sim_run_core::run_command_with_session(command, &mut session)
 }
 
