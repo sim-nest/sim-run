@@ -1,0 +1,108 @@
+schema = "sim.features"
+
+[[feature]]
+id = "feature/sim-run/index"
+title = "Repository index contract"
+summary = "Expose generated package, card, surface, and recipe facts as a checked SIM Index fragment."
+owner = "crate/xtask"
+audiences = ["code"]
+guidance = "Use this row when checking which generated index facts the repo exports."
+claims_anchors = [
+  "anchor/cli/xtask",
+  "anchor/doc/generated/feature-map",
+  "anchor/doc/generated/sim-index-fragment",
+]
+claims_surfaces = [
+  "cli/xtask",
+  "docs/sim-run/generated",
+]
+claims_specimens = [
+  "recipe/sim-run/publish-readiness/package-list",
+]
+
+[[feature]]
+id = "feature/sim-run/bootloader"
+title = "Bootloader command dispatch"
+summary = "Start product commands through the shared bootloader and loaded runtime libraries."
+owner = "crate/sim-run-core"
+audiences = ["user", "code"]
+guidance = "Use this row when following how command verbs enter the runtime."
+claims_anchors = [
+  "anchor/cli/sim-run",
+  "anchor/crate/sim-run-core",
+  "anchor/rustdoc/sim-run-core/bootloader",
+  "anchor/rustdoc/sim-run-core/run_with_session",
+]
+claims_surfaces = [
+  "cli/sim-run",
+  "site/sim-run-core",
+]
+claims_specimens = [
+  "recipe/sim-run/01-basics/version",
+  "recipe/sim-run/02-scenarios/boot-lisp-eval",
+]
+
+[[feature]]
+id = "feature/sim-run/repl"
+title = "Interactive REPL"
+summary = "Run a SIM read-eval-print loop through the loaded REPL library and command surface."
+owner = "crate/sim-lib-repl"
+audiences = ["user", "code"]
+guidance = "Use this row when starting an interactive local session."
+claims_anchors = [
+  "anchor/cli/repl",
+  "anchor/crate/sim-lib-repl",
+  "anchor/export/sim-lib-repl/cli/main/repl",
+  "anchor/runtime-lib/sim-lib-repl/repl-lib",
+]
+claims_surfaces = [
+  "cli/repl",
+]
+claims_specimens = [
+  "recipe/sim-run/01-basics/version",
+]
+supports = [
+  "feature/sim-run/bootloader",
+]
+
+[[feature]]
+id = "feature/sim-run/terminal-surface"
+title = "Terminal view surface"
+summary = "Render and interpret terminal view intents through the loaded TTY surface library."
+owner = "crate/sim-view-tty"
+audiences = ["user", "code"]
+guidance = "Use this row when checking the terminal surface exported by sim-view-tty."
+claims_anchors = [
+  "anchor/crate/sim-view-tty",
+  "anchor/export/sim-view-tty/surface/tty/intent",
+  "anchor/export/sim-view-tty/surface/tty/render",
+  "anchor/runtime-lib/sim-view-tty/tty-view-lib",
+]
+claims_surfaces = [
+  "view/sim-view-tty",
+]
+claims_specimens = [
+  "recipe/sim-run/02-scenarios/host-verb",
+]
+supports = [
+  "feature/sim-run/bootloader",
+]
+
+[[route]]
+id = "route/start-a-sim-session"
+task = "Start an interactive SIM session"
+audiences = ["user"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader prepares the command runtime." },
+  { feature = "feature/sim-run/repl", why = "The REPL is the interactive entry point." },
+  { specimen = "recipe/sim-run/01-basics/version", why = "The first recipe confirms the command path." },
+]
+
+[[route]]
+id = "route/check-sim-run-index"
+task = "Check the sim-run index fragment"
+audiences = ["code"]
+steps = [
+  { feature = "feature/sim-run/index", why = "The index row owns the generated fragment." },
+  { specimen = "recipe/sim-run/publish-readiness/package-list", why = "The recipe exercises package metadata." },
+]

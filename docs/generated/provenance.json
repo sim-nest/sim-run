@@ -3,10 +3,10 @@
   "generated_by": "cargo run -p xtask -- simdoc",
   "generation_timestamp": "2026-07-16T03:56:38+02:00",
   "generator": "xtask repo-contract v1",
-  "git_commit": "03f19c9faa37330996c7e47a0d4b408385aadc18",
+  "git_commit": "94753cbd044db569126097b6291709fc015ed3e7",
   "repo": "sim-run",
   "schema": "sim.provenance.v1",
-  "source_commit": "03f19c9faa37330996c7e47a0d4b408385aadc18",
+  "source_commit": "94753cbd044db569126097b6291709fc015ed3e7",
   "source_remote": "https://github.com/sim-nest/sim-run",
   "validation_commands": [
     "cargo fmt --all --check",
@@ -19,9 +19,9 @@
     "cargo run -p xtask -- validation-matrix --check --repo .",
     "cargo run -p xtask -- crate-catalog --check --repo ."
   ],
-  "workspace_hash": "61cfab2a0c77418f",
+  "workspace_hash": "f12ae2b737979214",
   "workspace_hash_algorithm": "fnv1a64",
-  "workspace_hash_input_count": 99,
+  "workspace_hash_input_count": 100,
   "workspace_hash_inputs": [
     "Cargo.toml",
     "crates/sim-lib-repl/Cargo.toml",
@@ -107,6 +107,7 @@
     "crates/sim-view-tty/src/lib.rs",
     "crates/sim-view-tty/src/render.rs",
     "crates/sim-view-tty/src/tests.rs",
+    "features.toml",
     "recipes/01-basics/version/recipe.toml",
     "recipes/02-scenarios/boot-lisp-eval/recipe.toml",
     "recipes/02-scenarios/bytes-lib/recipe.toml",
