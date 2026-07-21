@@ -26,6 +26,8 @@ the exact command grammar is under
 - `sim-run-core` provides the command entry API used by the binary.
 - `sim-run-loaders` provides source-kind helpers, source and binary lib loaders,
   and optional native/wasm loader mechanisms.
+- `sim-lib-index` provides the loadable `cli/main/index` entry point and the
+  immutable table view over the embedded public SIM Index snapshot.
 - `sim-lib-repl` provides the loadable `cli/main/repl` entry point and the
   read-eval-print core used by that entry point.
 - `sim-view-tty` is a loadable terminal (CLI/TUI) view/edit surface: it projects
@@ -43,6 +45,7 @@ sim --help
 sim --version
 sim --codec lisp --load symbol:demo run --payload-for-loaded-libs
 sim --codec lisp --load symbol:demo -- run --payload-for-loaded-libs
+sim index find codec --audience code --json
 ```
 
 The parser accepts `--codec`, repeated `--load`, `--list`, `--inspect`,
@@ -62,6 +65,11 @@ function export under `cli/main`, such as `cli/main/demo`. Entry points from
 explicit `--load` libraries take precedence over the boot codec entry point. The
 returned value maps to the process exit code by truthiness: truthy is `0`, false
 or nil is `1`.
+
+`sim index` is a host-registered runtime library. It decodes the embedded public
+SIM Index snapshot through `codec/index`, exports it as an immutable `index/dir`
+Table/Dir value, and provides `list`, `show`, `find`, `trace`, and `examples`
+queries for human and agent use.
 
 `crates.io:` resolution belongs to `sim-run-core`, not the kernel. The resolver
 checks a CLI-owned cache directory first: `SIM_CLI_CACHE_DIR` when set, then

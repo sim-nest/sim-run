@@ -4,6 +4,11 @@
     {
       "features": [],
       "group": "workspace",
+      "package": "sim-lib-index"
+    },
+    {
+      "features": [],
+      "group": "workspace",
       "package": "sim-lib-repl"
     },
     {

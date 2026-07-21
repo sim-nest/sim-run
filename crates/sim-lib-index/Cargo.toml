@@ -1,0 +1,21 @@
+[package]
+name = "sim-lib-index"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Loadable SIM Index exploration library for the sim bootloader."
+readme = "README.md"
+publish = true
+repository = "https://github.com/sim-nest/sim-run"
+homepage = "https://github.com/sim-nest/sim-run"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sim-codec-index = { version = "0.1.0", git = "https://github.com/sim-nest/sim-codecs", rev = "640a6b971d6a82ae1e5227946f8b9c33f045bfc5" }
+sim-index-core = { version = "0.1.0", git = "https://github.com/sim-nest/sim-foundation", rev = "2a21489801376b667e794bf6598357c4622ac20f" }
+sim-kernel = { version = "0.1.4" }
+sim-run-core = { version = "0.1.0", path = "../sim-run-core" }
+
+[lints]
+workspace = true

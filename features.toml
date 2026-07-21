@@ -122,8 +122,38 @@ claims_anchors = [
 claims_surfaces = [
   "cli/repl",
 ]
+claims_specimens = [
+  "recipe/sim-run/01-basics/hello",
+]
 supports = [
   "feature/sim-run/bootloader",
+]
+
+[[feature]]
+id = "feature/sim-run/runtime-index"
+title = "Runtime index exploration"
+summary = "Explore the merged SIM Index through the bootloader as stable tables and structured query output."
+owner = "crate/sim-lib-index"
+audiences = ["user", "code"]
+guidance = "Use this row when searching, tracing, or listing index facts from the sim command."
+claims_anchors = [
+  "anchor/cli/index",
+  "anchor/crate/sim-lib-index",
+  "anchor/export/sim-lib-index/cli/main/index",
+  "anchor/runtime-lib/sim-lib-index/index-lib",
+]
+claims_surfaces = [
+  "cli/index",
+]
+claims_specimens = [
+  "recipe/sim-run/02-scenarios/index-find-codec",
+  "recipe/sim-run/02-scenarios/index-trace-cli",
+  "recipe/sim-run/02-scenarios/index-list-languages",
+  "recipe/sim-run/02-scenarios/index-examples",
+]
+supports = [
+  "feature/sim-run/bootloader",
+  "feature/sim-run/index",
 ]
 
 [[feature]]
@@ -165,5 +195,6 @@ task = "Check the sim-run index fragment"
 audiences = ["code"]
 steps = [
   { feature = "feature/sim-run/index", why = "The index row owns the generated fragment." },
+  { feature = "feature/sim-run/runtime-index", why = "The runtime command reads the merged index." },
   { specimen = "recipe/sim-run/publish-readiness/package-list", why = "The recipe exercises package metadata." },
 ]

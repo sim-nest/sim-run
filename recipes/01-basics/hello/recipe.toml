@@ -1,0 +1,9 @@
+id = "hello"
+title = "REPL Hello"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 20
+tags = ["cli", "repl", "hello"]
+requires = ["sim-lib-repl"]
+network = false

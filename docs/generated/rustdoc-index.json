@@ -2,6 +2,13 @@
   "generator": "xtask repo-contract v1",
   "packages": [
     {
+      "crate_name": "sim_lib_index",
+      "group": "workspace",
+      "manifest": "crates/sim-lib-index/Cargo.toml",
+      "package": "sim-lib-index",
+      "summary": "Loadable runtime exploration surface for the SIM Index."
+    },
+    {
       "crate_name": "sim_lib_repl",
       "group": "workspace",
       "manifest": "crates/sim-lib-repl/Cargo.toml",
