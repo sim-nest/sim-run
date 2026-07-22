@@ -22,9 +22,6 @@ code = "advisory"
 major_entrypoints = "advisory"
 frameworks = "advisory"
 
-[enforcement.overlap]
-default = "advisory"
-
 [[feature]]
 id = "feature/sim-run/index"
 title = "Repository index contract"
