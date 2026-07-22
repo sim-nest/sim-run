@@ -1,49 +1,24 @@
 {
-  "schema": "sim.card-index.v1",
+  "card_count": 3,
   "cards": [
-    "recipes/01-basics/chapter.toml",
-    "recipes/01-basics/version/purpose.md",
-    "recipes/01-basics/version/recipe.toml",
-    "recipes/01-basics/version/setup.sh",
-    "recipes/02-scenarios/boot-lisp-eval/purpose.md",
-    "recipes/02-scenarios/boot-lisp-eval/recipe.toml",
-    "recipes/02-scenarios/boot-lisp-eval/setup.sh",
-    "recipes/02-scenarios/bytes-lib/purpose.md",
-    "recipes/02-scenarios/bytes-lib/recipe.toml",
-    "recipes/02-scenarios/bytes-lib/setup.sh",
-    "recipes/02-scenarios/chapter.toml",
-    "recipes/02-scenarios/config-cookbook-override/purpose.md",
-    "recipes/02-scenarios/config-cookbook-override/recipe.toml",
-    "recipes/02-scenarios/config-cookbook-override/setup.sh",
-    "recipes/02-scenarios/config-effective/purpose.md",
-    "recipes/02-scenarios/config-effective/recipe.toml",
-    "recipes/02-scenarios/config-effective/setup.sh",
-    "recipes/02-scenarios/config-status/purpose.md",
-    "recipes/02-scenarios/config-status/recipe.toml",
-    "recipes/02-scenarios/config-status/setup.sh",
-    "recipes/02-scenarios/fake-crates-io/purpose.md",
-    "recipes/02-scenarios/fake-crates-io/recipe.toml",
-    "recipes/02-scenarios/fake-crates-io/setup.sh",
-    "recipes/02-scenarios/host-verb/purpose.md",
-    "recipes/02-scenarios/host-verb/recipe.toml",
-    "recipes/02-scenarios/host-verb/setup.sh",
-    "recipes/02-scenarios/inspect-manifest/purpose.md",
-    "recipes/02-scenarios/inspect-manifest/recipe.toml",
-    "recipes/02-scenarios/inspect-manifest/setup.sh",
-    "recipes/02-scenarios/loadable-site/purpose.md",
-    "recipes/02-scenarios/loadable-site/recipe.toml",
-    "recipes/02-scenarios/loadable-site/setup.sh",
-    "recipes/02-scenarios/placement-report/purpose.md",
-    "recipes/02-scenarios/placement-report/recipe.toml",
-    "recipes/02-scenarios/placement-report/setup.sh",
-    "recipes/02-scenarios/server-verb/purpose.md",
-    "recipes/02-scenarios/server-verb/recipe.toml",
-    "recipes/02-scenarios/server-verb/setup.sh",
-    "recipes/book.toml",
-    "recipes/publish-readiness/chapter.toml",
-    "recipes/publish-readiness/package-list/purpose.md",
-    "recipes/publish-readiness/package-list/recipe.toml",
-    "recipes/publish-readiness/package-list/setup.sh",
-    "recipes/tui-surface-keys.md"
-  ]
+    {
+      "id": "browse/catalog",
+      "kind": "browse-root",
+      "owner": "workspace",
+      "summary": "root browse catalog"
+    },
+    {
+      "id": "cookbook/sim-run",
+      "kind": "cookbook-recipe",
+      "owner": "sim-run",
+      "summary": "SIM command-line bootloader recipes."
+    },
+    {
+      "id": "registry/catalog",
+      "kind": "browse-registry",
+      "owner": "workspace",
+      "summary": "registry catalog browse card"
+    }
+  ],
+  "generator": "xtask repo-contract v1"
 }

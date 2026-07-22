@@ -1,5 +1,54 @@
 {
-  "schema": "sim.rustdoc-index.v1",
-  "repo": "sim-run",
-  "target_doc": "target/doc/"
+  "generator": "xtask repo-contract v1",
+  "packages": [
+    {
+      "crate_name": "sim_lib_index",
+      "group": "workspace",
+      "manifest": "crates/sim-lib-index/Cargo.toml",
+      "package": "sim-lib-index",
+      "summary": "Loadable runtime exploration surface for the SIM Index."
+    },
+    {
+      "crate_name": "sim_lib_repl",
+      "group": "workspace",
+      "manifest": "crates/sim-lib-repl/Cargo.toml",
+      "package": "sim-lib-repl",
+      "summary": "Loadable command-line REPL library for SIM."
+    },
+    {
+      "crate_name": "sim",
+      "group": "workspace",
+      "manifest": "crates/sim-run/Cargo.toml",
+      "package": "sim-run",
+      "summary": "The sim bootloader binary."
+    },
+    {
+      "crate_name": "sim_run_core",
+      "group": "workspace",
+      "manifest": "crates/sim-run-core/Cargo.toml",
+      "package": "sim-run-core",
+      "summary": "Core command entry API for the SIM bootloader."
+    },
+    {
+      "crate_name": "sim_run_loaders",
+      "group": "workspace",
+      "manifest": "crates/sim-run-loaders/Cargo.toml",
+      "package": "sim-run-loaders",
+      "summary": "Low-level loader plugins for the SIM bootloader."
+    },
+    {
+      "crate_name": "sim_view_tty",
+      "group": "workspace",
+      "manifest": "crates/sim-view-tty/Cargo.toml",
+      "package": "sim-view-tty",
+      "summary": "Loadable terminal (CLI/TUI) view/edit surface for SIM."
+    },
+    {
+      "crate_name": "xtask",
+      "group": "workspace",
+      "manifest": "xtask/Cargo.toml",
+      "package": "xtask",
+      "summary": "SIM workspace package for xtask."
+    }
+  ]
 }

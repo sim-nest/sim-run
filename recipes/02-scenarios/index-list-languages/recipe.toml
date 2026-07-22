@@ -1,0 +1,9 @@
+id = "index-list-languages"
+title = "Index List Language Surfaces"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 72
+tags = ["cli", "index", "language", "offline", "deterministic"]
+requires = ["sim-run", "sim-lib-index"]
+network = false

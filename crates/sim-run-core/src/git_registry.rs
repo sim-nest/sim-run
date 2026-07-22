@@ -9,8 +9,9 @@ use std::{
 
 use crate::{
     CliError, CratesIoSpec, ResolvedCratesIoSource,
-    crates_io::{ARTIFACT_FILE, cache_artifact_path_with_file, compare_versions},
+    crates_io::{cache_artifact_path_with_file, compare_versions},
 };
+use sha2::{Digest, Sha256};
 
 /// Environment variable that enables git-registry-backed artifact resolution.
 pub const GIT_REGISTRY_ENDPOINT_ENV: &str = "SIM_GIT_REGISTRY_ENDPOINT";
@@ -32,11 +33,11 @@ const MAX_ARTIFACT_BYTES: usize = 64 << 20; // 64 MiB
 /// registry (Forgejo, Gitea, GitHub, GitLab all expose one) -- not a `git
 /// clone`. The vendor is not baked in: the endpoint is configured at runtime
 /// (e.g. a self-hosted forge at `http://forge.example/sim`). The endpoint is
-/// explicit and must use `http://`. The
-/// resolver reads a text version index at `packages/<package>/index.txt`, selects
-/// the newest version matching the requested requirement, fetches the named
-/// artifact file, and stores it in the same cache layout used by
-/// [`crate::CratesIoResolver`].
+/// explicit and must use `http://`. The resolver reads a text version index at
+/// `packages/<package>/index.txt`, selects the newest version matching the
+/// requested requirement, fetches the named artifact file, verifies it against
+/// the row's SHA-256 digest, and caches the verified bytes under a hash-prefixed
+/// artifact file.
 #[derive(Clone, Debug)]
 pub struct GitRegistryResolver {
     endpoint: String,
@@ -66,23 +67,21 @@ impl GitRegistryResolver {
     /// Resolves a package requirement by fetching from the git registry endpoint.
     pub fn resolve(&self, spec: &CratesIoSpec) -> Result<ResolvedCratesIoSource, CliError> {
         let selected = self.select_version(spec)?;
-        let artifact = cache_artifact_path_with_file(
-            &self.cache_dir,
-            &spec.package,
-            &selected.version,
-            &selected.file_name,
-        );
-        if !artifact.is_file() {
+        let artifact = verified_cache_artifact_path(&self.cache_dir, &spec.package, &selected);
+        if artifact.is_file() {
+            verify_cached_artifact(&artifact, spec, &selected)?;
+        } else {
             let bytes = http_get(
                 &self.artifact_url(&spec.package, &selected.version, &selected.file_name)?,
                 MAX_ARTIFACT_BYTES,
             )?;
+            verify_artifact_bytes(&bytes, spec, &selected)?;
             let parent = artifact
                 .parent()
                 .ok_or_else(|| CliError::new("git registry cache artifact has no parent"))?;
             fs::create_dir_all(parent)
                 .map_err(|err| CliError::new(format!("create git registry cache: {err}")))?;
-            fs::write(&artifact, bytes)
+            fs::write(&artifact, &bytes)
                 .map_err(|err| CliError::new(format!("write git registry cache: {err}")))?;
         }
         Ok(ResolvedCratesIoSource {
@@ -180,6 +179,7 @@ fn insecure_remote_allowed() -> bool {
 struct IndexedArtifact {
     version: String,
     file_name: String,
+    sha256: [u8; 32],
 }
 
 fn index_artifact(line: &str) -> Result<Option<IndexedArtifact>, CliError> {
@@ -191,11 +191,126 @@ fn index_artifact(line: &str) -> Result<Option<IndexedArtifact>, CliError> {
     let Some(version) = parts.next() else {
         return Ok(None);
     };
-    let file_name = safe_artifact_file_name(parts.next().unwrap_or(ARTIFACT_FILE))?;
+    let file_name = parts.next().ok_or_else(|| {
+        CliError::new("git registry index row must use: <version> <file-name> <sha256-hex>")
+    })?;
+    let sha256 = parts.next().ok_or_else(|| {
+        CliError::new("git registry index row must use: <version> <file-name> <sha256-hex>")
+    })?;
+    if parts.next().is_some() {
+        return Err(CliError::new(
+            "git registry index row has too many fields; expected: <version> <file-name> <sha256-hex>",
+        ));
+    }
+    let file_name = safe_artifact_file_name(file_name)?;
+    let sha256 = parse_sha256_hex(sha256)?;
     Ok(Some(IndexedArtifact {
         version: version.to_owned(),
         file_name,
+        sha256,
     }))
+}
+
+fn verified_cache_artifact_path(
+    cache_dir: &Path,
+    package: &str,
+    selected: &IndexedArtifact,
+) -> PathBuf {
+    cache_artifact_path_with_file(
+        cache_dir,
+        package,
+        &selected.version,
+        &content_addressed_file_name(&selected.file_name, &selected.sha256),
+    )
+}
+
+fn content_addressed_file_name(file_name: &str, sha256: &[u8; 32]) -> String {
+    format!("sha256-{}-{file_name}", sha256_hex(sha256))
+}
+
+fn verify_cached_artifact(
+    artifact: &Path,
+    spec: &CratesIoSpec,
+    selected: &IndexedArtifact,
+) -> Result<(), CliError> {
+    let metadata = fs::metadata(artifact).map_err(|err| {
+        CliError::new(format!(
+            "read git registry cache metadata {}: {err}",
+            artifact.display()
+        ))
+    })?;
+    if metadata.len() > MAX_ARTIFACT_BYTES as u64 {
+        return Err(CliError::new(format!(
+            "cached git registry artifact {} exceeds {} bytes",
+            artifact.display(),
+            MAX_ARTIFACT_BYTES
+        )));
+    }
+    let bytes = fs::read(artifact).map_err(|err| {
+        CliError::new(format!(
+            "read git registry cache artifact {}: {err}",
+            artifact.display()
+        ))
+    })?;
+    verify_artifact_bytes(&bytes, spec, selected)
+}
+
+fn verify_artifact_bytes(
+    bytes: &[u8],
+    spec: &CratesIoSpec,
+    selected: &IndexedArtifact,
+) -> Result<(), CliError> {
+    let got = sha256(bytes);
+    if got != selected.sha256 {
+        return Err(CliError::new(format!(
+            "git registry artifact {}@{} hash mismatch (expected {}, got {})",
+            spec.package,
+            selected.version,
+            sha256_hex(&selected.sha256),
+            sha256_hex(&got),
+        )));
+    }
+    Ok(())
+}
+
+fn sha256(input: &[u8]) -> [u8; 32] {
+    let digest = Sha256::digest(input);
+    let mut bytes = [0_u8; 32];
+    bytes.copy_from_slice(&digest);
+    bytes
+}
+
+fn parse_sha256_hex(hex: &str) -> Result<[u8; 32], CliError> {
+    if hex.len() != 64 {
+        return Err(CliError::new(format!(
+            "git registry artifact sha256 must be 64 hex characters, got {}",
+            hex.len()
+        )));
+    }
+    let mut bytes = [0_u8; 32];
+    for (index, pair) in hex.as_bytes().chunks_exact(2).enumerate() {
+        bytes[index] = (hex_nibble(pair[0])? << 4) | hex_nibble(pair[1])?;
+    }
+    Ok(bytes)
+}
+
+fn hex_nibble(byte: u8) -> Result<u8, CliError> {
+    match byte {
+        b'0'..=b'9' => Ok(byte - b'0'),
+        b'a'..=b'f' => Ok(byte - b'a' + 10),
+        b'A'..=b'F' => Ok(byte - b'A' + 10),
+        _ => Err(CliError::new(format!(
+            "git registry artifact sha256 contains non-hex byte 0x{byte:02x}"
+        ))),
+    }
+}
+
+fn sha256_hex(bytes: &[u8; 32]) -> String {
+    let mut hex = String::with_capacity(64);
+    for byte in bytes {
+        hex.push_str(&format!("{byte:02x}"));
+    }
+    hex
 }
 
 fn safe_artifact_file_name(file_name: &str) -> Result<String, CliError> {
@@ -381,154 +496,5 @@ fn map_git_registry_chunked_error(error: sim_lib_net_core::NetError) -> CliError
 }
 
 #[cfg(test)]
-mod tests {
-    use std::{net::TcpListener, thread};
-
-    use super::*;
-
-    #[test]
-    fn fetches_matching_version_and_caches_artifact() {
-        let server = FixtureServer::start([
-            (
-                "/packages/sim-codec-lisp/index.txt",
-                b"0.0.9\n0.1.0\n0.2.0\n".to_vec(),
-            ),
-            (
-                "/packages/sim-codec-lisp/0.1.0/artifact.simlib",
-                b"artifact".to_vec(),
-            ),
-        ]);
-        let cache = temp_cache("git-registry-fetch");
-        let resolver = GitRegistryResolver::new(server.endpoint(), cache.clone()).unwrap();
-
-        let resolved = resolver
-            .resolve(&"sim-codec-lisp@^0.1".parse().unwrap())
-            .unwrap();
-
-        assert_eq!(resolved.version, "0.1.0");
-        assert_eq!(fs::read(&resolved.artifact).unwrap(), b"artifact");
-        assert!(resolved.artifact.starts_with(&cache));
-        server.join();
-        let _ = fs::remove_dir_all(cache);
-    }
-
-    #[test]
-    fn rejects_implicit_or_https_endpoint() {
-        assert_eq!(
-            GitRegistryResolver::new("", PathBuf::new())
-                .unwrap_err()
-                .to_string(),
-            "git registry endpoint is empty"
-        );
-        assert_eq!(
-            GitRegistryResolver::new("https://example.invalid/sim", PathBuf::new())
-                .unwrap_err()
-                .to_string(),
-            "git registry endpoint must use http:// in this build"
-        );
-    }
-
-    #[test]
-    fn rejects_non_loopback_insecure_endpoint() {
-        let err = GitRegistryResolver::new("http://forge.example/sim", PathBuf::new())
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("is not loopback"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn registry_rejects_overflowing_chunk_size() {
-        let err = decode_git_registry_chunked(b"fffffffffffffffe\r\n", usize::MAX)
-            .expect_err("overflowing chunk size must error, not panic")
-            .to_string();
-        assert!(err.contains("overflow"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn registry_rejects_oversized_content_length() {
-        let response = b"HTTP/1.1 200 OK\r\nContent-Length: 4096\r\nConnection: close\r\n\r\n";
-        let err = parse_http_response("http://loopback/index.txt", response, 16)
-            .expect_err("body length past the cap must error")
-            .to_string();
-        assert!(err.contains("exceeds 16 bytes"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn registry_caps_chunked_decoded_length() {
-        // One 8-byte chunk decoded under a 4-byte cap must be rejected.
-        let err = decode_git_registry_chunked(b"8\r\nAAAAAAAA\r\n0\r\n", 4)
-            .expect_err("decoded length past the cap must error")
-            .to_string();
-        assert!(err.contains("exceeds 4 bytes"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn rejects_unsafe_artifact_file_names() {
-        assert_eq!(
-            index_artifact("0.1.0 ../artifact.simlib")
-                .unwrap_err()
-                .to_string(),
-            "git registry artifact file name is not a safe path component: ../artifact.simlib"
-        );
-    }
-
-    struct FixtureServer {
-        endpoint: String,
-        handle: thread::JoinHandle<()>,
-    }
-
-    impl FixtureServer {
-        fn start<const N: usize>(routes: [(&'static str, Vec<u8>); N]) -> Self {
-            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-            let endpoint = format!("http://{}", listener.local_addr().unwrap());
-            let routes = routes
-                .into_iter()
-                .map(|(path, body)| (path.to_owned(), body))
-                .collect::<BTreeMap<_, _>>();
-            let handle = thread::spawn(move || {
-                for _ in 0..N {
-                    let (mut stream, _) = listener.accept().unwrap();
-                    let mut request = [0_u8; 1024];
-                    let size = stream.read(&mut request).unwrap();
-                    let request = String::from_utf8_lossy(&request[..size]);
-                    let path = request
-                        .lines()
-                        .next()
-                        .and_then(|line| line.split_ascii_whitespace().nth(1))
-                        .unwrap();
-                    let Some(body) = routes.get(path) else {
-                        let response = b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
-                        stream.write_all(response).unwrap();
-                        continue;
-                    };
-                    let response = format!(
-                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                        body.len()
-                    );
-                    stream.write_all(response.as_bytes()).unwrap();
-                    stream.write_all(body).unwrap();
-                }
-            });
-            Self { endpoint, handle }
-        }
-
-        fn endpoint(&self) -> String {
-            self.endpoint.clone()
-        }
-
-        fn join(self) {
-            self.handle.join().unwrap();
-        }
-    }
-
-    fn temp_cache(label: &str) -> PathBuf {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time should be after unix epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!(
-            "sim-run-core-git-registry-cache-{}-{label}-{nanos}",
-            std::process::id(),
-        ))
-    }
-}
+#[path = "git_registry_tests.rs"]
+mod tests;

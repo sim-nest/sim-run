@@ -18,5 +18,6 @@ kernel table value, then maps the returned value to an exit code by truthiness.
 `LibSourceSpec` parses command-line source syntax, including
 `crates.io:PACKAGE@REQ` sources resolved through the CLI-owned cache. With the
 `registry` feature, callers can install a `GitRegistryResolver` so cache misses
-fetch from an explicit git registry artifact endpoint and then resolve as local
-`path:` sources.
+fetch from an explicit git registry artifact endpoint, verify the artifact
+against the index row's SHA-256 digest, cache the verified bytes under a
+hash-prefixed file name, and then resolve as local `path:` sources.

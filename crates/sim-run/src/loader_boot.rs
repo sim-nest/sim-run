@@ -1,7 +1,6 @@
-use std::{ffi::OsString, sync::Arc};
-
-#[cfg(feature = "dynamic-native")]
-use crate::repl_boot_codec::BootLispCodecLib;
+use std::ffi::OsString;
+#[cfg(feature = "wasm")]
+use std::sync::Arc;
 
 #[cfg(feature = "dynamic-native")]
 use sim_run_core::{CliBoot, LibSourceSpec};
@@ -17,6 +16,7 @@ const REPL_BUNDLE_DIR_ENV: &str = "SIM_REPL_BUNDLE_DIR";
 
 #[cfg(feature = "dynamic-native")]
 struct ReplBundle {
+    codec_lisp: PathBuf,
     numbers_f64: PathBuf,
     standard_core: PathBuf,
 }
@@ -28,6 +28,9 @@ where
 {
     let command = sim_run_core::parse_args(args)?;
     let mut session = loader_session(&command)?;
+    session = crate::watch::with_watch_if_selected(&command, session);
+    session = crate::glasses::with_glasses_if_selected(&command, session);
+    session = crate::index::with_index_if_selected(&command, session);
     sim_run_core::run_command_with_session(command, &mut session)
 }
 
@@ -82,21 +85,13 @@ fn with_git_registry(session: LoadSession) -> Result<LoadSession, CliError> {
 fn repl_session(session: LoadSession) -> Result<LoadSession, CliError> {
     let bundle = ReplBundle::resolve()?;
     Ok(session
-        .with_context(|cx| {
-            cx.set_eval_policy(Arc::new(sim_kernel::StrictNames(sim_kernel::EagerPolicy)));
-            cx.load_lib(&sim_lib_numbers_arith::NumbersArithmeticLib::new())
-                .expect("REPL arithmetic lib should install");
-        })
-        .with_host_factory("codec/lisp", || {
-            Box::new(BootLispCodecLib::new(sim_kernel::CodecId(1)))
-        })
         .with_host_factory("lib/repl", || Box::new(sim_lib_repl::ReplLib::new()))
         .with_capability(sim_kernel::macro_expand_capability())
         .with_capability(sim_kernel::macro_expand_eval_capability())
         .with_default_verb_sources(
             "repl",
             vec![
-                LibSourceSpec::Host("codec/lisp".to_owned()),
+                LibSourceSpec::Path(bundle.codec_lisp),
                 LibSourceSpec::Path(bundle.numbers_f64),
                 LibSourceSpec::Path(bundle.standard_core),
                 LibSourceSpec::Host("lib/repl".to_owned()),
@@ -107,20 +102,23 @@ fn repl_session(session: LoadSession) -> Result<LoadSession, CliError> {
 #[cfg(feature = "dynamic-native")]
 fn uses_default_repl_bundle(boot: &CliBoot) -> bool {
     boot.loads.is_empty()
-        && boot
-            .payload
-            .args
-            .first()
-            .is_some_and(|arg| arg.to_string_lossy() == "repl")
+        && (boot.payload.eval.is_some()
+            || boot
+                .payload
+                .args
+                .first()
+                .is_some_and(|arg| matches!(arg.to_string_lossy().as_ref(), "repl" | "eval")))
 }
 
 #[cfg(feature = "dynamic-native")]
 impl ReplBundle {
     fn resolve() -> Result<Self, CliError> {
         let dirs = candidate_bundle_dirs();
+        let codec_lisp = find_required_dylib(&dirs, "sim_codec_lisp")?;
         let numbers_f64 = find_required_dylib(&dirs, "sim_lib_numbers_f64")?;
         let standard_core = find_required_dylib(&dirs, "sim_lib_standard_core")?;
         Ok(Self {
+            codec_lisp,
             numbers_f64,
             standard_core,
         })
@@ -173,7 +171,7 @@ fn missing_bundle_error(name: &str, dirs: &[PathBuf]) -> CliError {
             .join(", ")
     };
     CliError::new(format!(
-        "repl eval bundle is missing {name}; searched {searched}. Build the native eval bundle into the sim binary target directory or set {REPL_BUNDLE_DIR_ENV} to the directory containing the native dylibs"
+        "repl native bundle is missing {name}; searched {searched}. Build the native dylib bundle into the sim binary target directory or set {REPL_BUNDLE_DIR_ENV} to the directory containing the required native dylibs"
     ))
 }
 

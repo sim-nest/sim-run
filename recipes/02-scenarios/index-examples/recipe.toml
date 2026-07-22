@@ -1,0 +1,9 @@
+id = "index-examples"
+title = "Index Feature Examples"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 73
+tags = ["cli", "index", "examples", "offline", "deterministic"]
+requires = ["sim-run", "sim-lib-index"]
+network = false

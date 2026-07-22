@@ -1,6 +1,6 @@
 [package]
 name = "sim-run-core"
-version = "0.1.4"
+version = "0.1.6"
 edition.workspace = true
 license.workspace = true
 description = "Core command entry API for the SIM bootloader."
@@ -12,13 +12,18 @@ homepage = "https://github.com/sim-nest/sim-run"
 [dependencies]
 sim-codec-config = { version = "0.1.0" }
 sim-config = { version = "0.1.1" }
-sim-kernel = { version = "0.1.0" }
+sim-kernel = { version = "0.1.4" }
 sim-lib-net-core = { version = "0.1.4" }
-sim-lib-stream-host = { version = "0.1.0" }
+sim-lib-stream-host = { version = "0.1.2" }
+sim-run-loaders = { version = "0.1.4", path = "../sim-run-loaders", default-features = false }
+sha2 = { version = "0.10", optional = true }
 
 [features]
 default = []
-registry = []
+registry = ["dep:sha2"]
+
+[dev-dependencies]
+sim-view-tty = { version = "0.1.2", path = "../sim-view-tty" }
 
 [lints]
 workspace = true

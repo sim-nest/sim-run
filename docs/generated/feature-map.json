@@ -1,5 +1,149 @@
 {
-  "schema": "sim.feature-map.v1",
-  "repo": "sim-run",
-  "packages": []
+  "generator": "xtask repo-contract v1",
+  "packages": [
+    {
+      "features": [],
+      "group": "workspace",
+      "package": "sim-lib-index"
+    },
+    {
+      "features": [],
+      "group": "workspace",
+      "package": "sim-lib-repl"
+    },
+    {
+      "features": [
+        {
+          "edges": [
+            "dep:sim-run-loaders",
+            "sim-run-loaders/dynamic-native",
+            "dep:sim-lib-repl"
+          ],
+          "name": "dynamic-native",
+          "workspace_edges": [
+            {
+              "feature": null,
+              "package": "sim-run-loaders"
+            },
+            {
+              "feature": "dynamic-native",
+              "package": "sim-run-loaders"
+            },
+            {
+              "feature": null,
+              "package": "sim-lib-repl"
+            }
+          ]
+        },
+        {
+          "edges": [
+            "sim-run-core/registry"
+          ],
+          "name": "registry",
+          "workspace_edges": [
+            {
+              "feature": "registry",
+              "package": "sim-run-core"
+            }
+          ]
+        },
+        {
+          "edges": [
+            "dep:sim-run-loaders",
+            "sim-run-loaders/wasm",
+            "dep:sim-wasm-abi"
+          ],
+          "name": "wasm",
+          "workspace_edges": [
+            {
+              "feature": null,
+              "package": "sim-run-loaders"
+            },
+            {
+              "feature": "wasm",
+              "package": "sim-run-loaders"
+            }
+          ]
+        }
+      ],
+      "group": "workspace",
+      "package": "sim-run"
+    },
+    {
+      "features": [
+        {
+          "edges": [],
+          "name": "default",
+          "workspace_edges": []
+        },
+        {
+          "edges": [
+            "dep:sha2"
+          ],
+          "name": "registry",
+          "workspace_edges": []
+        }
+      ],
+      "group": "workspace",
+      "package": "sim-run-core"
+    },
+    {
+      "features": [
+        {
+          "edges": [
+            "dep:sim-codec-binary"
+          ],
+          "name": "codec-binary",
+          "workspace_edges": []
+        },
+        {
+          "edges": [
+            "dep:sim-codec"
+          ],
+          "name": "codec-lisp",
+          "workspace_edges": []
+        },
+        {
+          "edges": [],
+          "name": "default",
+          "workspace_edges": []
+        },
+        {
+          "edges": [
+            "dep:libloading",
+            "dep:sim-codec",
+            "codec-binary"
+          ],
+          "name": "dynamic-native",
+          "workspace_edges": []
+        },
+        {
+          "edges": [
+            "dep:sim-shape"
+          ],
+          "name": "shape",
+          "workspace_edges": []
+        },
+        {
+          "edges": [
+            "dep:sim-wasm-abi"
+          ],
+          "name": "wasm",
+          "workspace_edges": []
+        }
+      ],
+      "group": "workspace",
+      "package": "sim-run-loaders"
+    },
+    {
+      "features": [],
+      "group": "workspace",
+      "package": "sim-view-tty"
+    },
+    {
+      "features": [],
+      "group": "workspace",
+      "package": "xtask"
+    }
+  ]
 }

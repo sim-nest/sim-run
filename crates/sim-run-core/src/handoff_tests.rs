@@ -1,13 +1,13 @@
 use std::{ffi::OsString, path::PathBuf, sync::Arc};
 
 use sim_kernel::{
-    AbiVersion, Callable, CatalogSource, Cx, Error, Export, Lib, LibLoader, LibManifest, LibTarget,
-    Linker, LoadCx, Object, ObjectCompat, Symbol, Value, Version,
-    library::LibSource as KernelLibSource, object::Args,
+    AbiVersion, Callable, Cx, Error, Export, Lib, LibLoader, LibManifest, LibTarget, Linker,
+    LoadCx, Object, ObjectCompat, Symbol, Value, Version, library::LibSource as KernelLibSource,
+    object::Args,
 };
 
 use crate::{
-    CliBoot, LibSourceSpec, LoadSession, Payload,
+    Bootloader, CliBoot, LibSourceSpec, LoadSession, Payload,
     handoff::{CLI_MAIN_ENTRYPOINT, cli_main_entrypoint_symbol},
 };
 
@@ -40,7 +40,7 @@ fn codec_export(name: &str) -> Export {
 struct FixtureLib {
     manifest: LibManifest,
     codec: Option<String>,
-    entrypoint: Option<(Symbol, FixtureEntrypoint)>,
+    entrypoints: Vec<(Symbol, FixtureEntrypoint)>,
 }
 
 impl FixtureLib {
@@ -53,16 +53,37 @@ impl FixtureLib {
         Self {
             manifest: manifest(&format!("codec-{name}"), exports),
             codec: Some(name.to_owned()),
-            entrypoint: entrypoint.map(|entrypoint| (entrypoint_symbol, entrypoint)),
+            entrypoints: entrypoint
+                .into_iter()
+                .map(|entrypoint| (entrypoint_symbol.clone(), entrypoint))
+                .collect(),
         }
     }
 
     fn app(id: &str, entrypoint: FixtureEntrypoint) -> Self {
         let entrypoint_symbol = cli_main_entrypoint_symbol(id);
+        Self::with_entrypoints(id, vec![(entrypoint_symbol, entrypoint)])
+    }
+
+    fn app_for_verb(id: &str, verb: &str, entrypoint: FixtureEntrypoint) -> Self {
+        Self::with_entrypoints(id, vec![(cli_main_entrypoint_symbol(verb), entrypoint)])
+    }
+
+    fn generic(id: &str, entrypoint: FixtureEntrypoint) -> Self {
+        Self::with_entrypoints(id, vec![(Symbol::new(CLI_MAIN_ENTRYPOINT), entrypoint)])
+    }
+
+    fn with_entrypoints(id: &str, entrypoints: Vec<(Symbol, FixtureEntrypoint)>) -> Self {
         Self {
-            manifest: manifest(id, vec![cli_main_export(entrypoint_symbol.clone())]),
+            manifest: manifest(
+                id,
+                entrypoints
+                    .iter()
+                    .map(|(symbol, _)| cli_main_export(symbol.clone()))
+                    .collect(),
+            ),
             codec: None,
-            entrypoint: Some((entrypoint_symbol, entrypoint)),
+            entrypoints,
         }
     }
 
@@ -70,7 +91,7 @@ impl FixtureLib {
         Self {
             manifest: manifest(id, Vec::new()),
             codec: None,
-            entrypoint: None,
+            entrypoints: Vec::new(),
         }
     }
 }
@@ -87,7 +108,7 @@ impl Lib for FixtureLib {
                 cx.factory().bool(true)?,
             )?;
         }
-        if let Some((symbol, entrypoint)) = &self.entrypoint {
+        for (symbol, entrypoint) in &self.entrypoints {
             linker.function_value(
                 symbol.clone(),
                 cx.factory().opaque(Arc::new(entrypoint.clone()))?,
@@ -101,11 +122,11 @@ struct VerbCatalogLoader;
 
 impl LibLoader for VerbCatalogLoader {
     fn can_load(&self, source: &KernelLibSource) -> bool {
-        matches!(source, KernelLibSource::Bytes(_))
+        sim_run_loaders::bytes_from_source(source).is_ok_and(|bytes| bytes.is_some())
     }
 
     fn load(&self, _cx: &mut Cx, source: KernelLibSource) -> sim_kernel::Result<Box<dyn Lib>> {
-        let KernelLibSource::Bytes(bytes) = source else {
+        let Some(bytes) = sim_run_loaders::bytes_from_source(&source)? else {
             return Err(Error::Lib("verb catalog loader needs bytes".to_owned()));
         };
         let payload = String::from_utf8(bytes)
@@ -258,6 +279,74 @@ fn explicit_loaded_lib_entrypoint_wins_over_codec_entrypoint() {
 }
 
 #[test]
+fn exact_verb_entrypoint_wins_within_loaded_library() {
+    let boot = CliBoot {
+        codec: Some("test".to_owned()),
+        loads: vec![LibSourceSpec::Host("app/multi".to_owned())],
+        payload: Payload {
+            args: vec![OsString::from("repl")],
+            ..Payload::default()
+        },
+        ..CliBoot::default()
+    };
+    let mut session = LoadSession::new()
+        .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
+        .with_host_factory("app/multi", || {
+            Box::new(FixtureLib::with_entrypoints(
+                "app-multi",
+                vec![
+                    (
+                        cli_main_entrypoint_symbol("serve"),
+                        FixtureEntrypoint::failure(),
+                    ),
+                    (
+                        cli_main_entrypoint_symbol("repl"),
+                        FixtureEntrypoint::success(),
+                    ),
+                ],
+            ))
+        });
+
+    let code = session.run_loaded_boot(&boot).unwrap();
+
+    assert_eq!(code, 0);
+}
+
+#[test]
+fn generic_entrypoint_fallback_runs_when_exact_verb_is_absent() {
+    let boot = CliBoot {
+        codec: Some("test".to_owned()),
+        loads: vec![LibSourceSpec::Host("app/generic".to_owned())],
+        payload: Payload {
+            args: vec![OsString::from("repl")],
+            ..Payload::default()
+        },
+        ..CliBoot::default()
+    };
+    let mut session = LoadSession::new()
+        .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
+        .with_host_factory("app/generic", || {
+            Box::new(FixtureLib::with_entrypoints(
+                "app-generic",
+                vec![
+                    (
+                        Symbol::new(CLI_MAIN_ENTRYPOINT),
+                        FixtureEntrypoint::success(),
+                    ),
+                    (
+                        cli_main_entrypoint_symbol("serve"),
+                        FixtureEntrypoint::failure(),
+                    ),
+                ],
+            ))
+        });
+
+    let code = session.run_loaded_boot(&boot).unwrap();
+
+    assert_eq!(code, 0);
+}
+
+#[test]
 fn default_verb_sources_load_when_verb_has_no_explicit_loads() {
     let boot = CliBoot {
         codec: Some("test".to_owned()),
@@ -270,7 +359,11 @@ fn default_verb_sources_load_when_verb_has_no_explicit_loads() {
     let mut session = LoadSession::new()
         .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
         .with_host_factory("app/repl", || {
-            Box::new(FixtureLib::app("app-repl", FixtureEntrypoint::success()))
+            Box::new(FixtureLib::app_for_verb(
+                "app-repl",
+                "repl",
+                FixtureEntrypoint::success(),
+            ))
         })
         .with_default_verb_sources("repl", vec![LibSourceSpec::Host("app/repl".to_owned())]);
 
@@ -295,11 +388,16 @@ fn explicit_loads_override_default_verb_sources() {
     let mut session = LoadSession::new()
         .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
         .with_host_factory("app/default", || {
-            Box::new(FixtureLib::app("app-default", FixtureEntrypoint::failure()))
+            Box::new(FixtureLib::app_for_verb(
+                "app-default",
+                "repl",
+                FixtureEntrypoint::failure(),
+            ))
         })
         .with_host_factory("app/explicit", || {
-            Box::new(FixtureLib::app(
+            Box::new(FixtureLib::app_for_verb(
                 "app-explicit",
+                "repl",
                 FixtureEntrypoint::success(),
             ))
         })
@@ -383,7 +481,7 @@ fn entrypoint_receives_cli_envelope_value() {
     let mut session = LoadSession::new()
         .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
         .with_host_factory("app/echo", move || {
-            Box::new(FixtureLib::app(
+            Box::new(FixtureLib::generic(
                 "app-echo",
                 FixtureEntrypoint::echo(expected.clone()),
             ))
@@ -396,7 +494,7 @@ fn entrypoint_receives_cli_envelope_value() {
 
 #[test]
 fn target_verbs_dispatch_from_symbol_loaded_libs_without_baked_cli() {
-    for verb in ["server", "atelier", "cookbook", "browse", "agent"] {
+    for verb in ["server", "atelier", "cookbook", "browse", "agent", "forge"] {
         let boot = CliBoot {
             codec: Some("test".to_owned()),
             loads: vec![LibSourceSpec::Symbol(verb.to_owned())],
@@ -409,12 +507,40 @@ fn target_verbs_dispatch_from_symbol_loaded_libs_without_baked_cli() {
         let mut session = LoadSession::new()
             .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
             .with_loader(VerbCatalogLoader)
-            .with_catalog_source(verb, CatalogSource::Bytes(verb.as_bytes().to_vec()));
+            .with_catalog_source(
+                verb,
+                sim_run_loaders::catalog_bytes_source(verb.as_bytes().to_vec()),
+            );
 
         let code = session.run_loaded_boot(&boot).unwrap();
 
         assert_eq!(code, 0, "{verb} should dispatch to its loaded lib");
     }
+}
+
+#[test]
+fn forge_verb_boots_through_bootloader() {
+    let expected = ExpectedEnvelope {
+        codec: "codec/lisp",
+        verb: "forge",
+        args: vec!["forge", "lift", "summarize the contract"],
+        eval: "nil",
+        script: "nil",
+        stdin: "nil",
+    };
+
+    let code = Bootloader::standard()
+        .host_lib("codec/lisp", || Box::new(FixtureLib::codec("lisp", None)))
+        .host_verb("forge", "app/forge", move || {
+            Box::new(FixtureLib::app(
+                "forge",
+                FixtureEntrypoint::echo(expected.clone()),
+            ))
+        })
+        .run(["sim", "forge", "lift", "summarize the contract"])
+        .unwrap();
+
+    assert_eq!(code, 0);
 }
 
 #[test]
@@ -463,7 +589,10 @@ fn documented_command_equivalents_preserve_mode_payloads() {
         let mut session = LoadSession::new()
             .with_host_factory("codec/test", || Box::new(FixtureLib::codec("test", None)))
             .with_loader(VerbCatalogLoader)
-            .with_catalog_source(*verb, CatalogSource::Bytes(catalog_bytes(verb, args)));
+            .with_catalog_source(
+                *verb,
+                sim_run_loaders::catalog_bytes_source(catalog_bytes(verb, args)),
+            );
 
         let code = session.run_loaded_boot(&boot).unwrap();
 

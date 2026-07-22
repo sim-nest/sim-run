@@ -21,30 +21,27 @@ path = "src/main.rs"
 dynamic-native = [
   "dep:sim-run-loaders",
   "sim-run-loaders/dynamic-native",
-  "dep:sim-codec",
-  "dep:sim-kernel",
-  "dep:sim-lib-numbers-arith",
   "dep:sim-lib-repl",
 ]
 registry = ["sim-run-core/registry"]
 wasm = [
   "dep:sim-run-loaders",
   "sim-run-loaders/wasm",
-  "dep:sim-kernel",
   "dep:sim-wasm-abi",
 ]
 
 [dependencies]
-sim-run-core = { version = "0.1.0", path = "../sim-run-core" }
-sim-run-loaders = { version = "0.1.0", path = "../sim-run-loaders", optional = true, default-features = false }
-sim-codec = { version = "0.1.0", optional = true }
-sim-kernel = { version = "0.1.0", optional = true }
-sim-lib-numbers-arith = { version = "0.1.0", optional = true }
+sim-run-core = { version = "0.1.6", path = "../sim-run-core" }
+sim-run-loaders = { version = "0.1.4", path = "../sim-run-loaders", optional = true, default-features = false }
+sim-kernel = { version = "0.1.4" }
+sim-lib-index = { version = "0.1.0", path = "../sim-lib-index" }
 sim-lib-repl = { version = "0.1.0", path = "../sim-lib-repl", optional = true }
-sim-wasm-abi = { version = "0.1.0", optional = true }
+sim-wasm-abi = { version = "0.1.1", optional = true }
 
 [dev-dependencies]
-sim-kernel = { version = "0.1", features = ["test-support"] }
+sim-codec = { version = "0.1.0" }
+sim-kernel = { version = "0.1.4", features = ["test-support"] }
+sha2 = { version = "0.10" }
 wat = "1.245.1"
 
 [lints]

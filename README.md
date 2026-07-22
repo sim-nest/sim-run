@@ -4,24 +4,30 @@ sim-run is the command-line bootloader repository for SIM.
 
 ## Run it
 
-Installing the `sim-run` crate gives you the `sim` command -- one binary that
-starts a session, loads plug-ins, and answers you at a live prompt.
+Installing the `sim-run` crate gives you the `sim` command: a bootloader that
+loads the codec and libraries you provide, then hands your payload to the loaded
+entrypoint.
 
 ```bash
 cargo install sim-run     # installs the `sim` command
 sim --version
-sim repl                  # a live prompt: type (math/add 6 7) -> 13
+sim --help
+sim --load crates.io:sim-codec-lisp@^0.1 --list
 ```
 
-`sim webui` opens the browser UI and `sim mcp` starts a Model Context
-Protocol server; the full walkthrough (what each surface shows, local
-fallbacks) is in [sim-say](https://github.com/sim-nest/sim-say). The exact
-command grammar is under [Reference: the command surface](#reference-the-command-surface).
+Loadable libraries provide surfaces such as REPL, browser, and MCP entrypoints.
+The full walkthrough is in [sim-say](https://github.com/sim-nest/sim-say), and
+the exact command grammar is under
+[Reference: the command surface](#reference-the-command-surface).
 
 ## Crates
 
 - `sim-run` provides the `sim` binary.
 - `sim-run-core` provides the command entry API used by the binary.
+- `sim-run-loaders` provides source-kind helpers, source and binary lib loaders,
+  and optional native/wasm loader mechanisms.
+- `sim-lib-index` provides the loadable `cli/main/index` entry point and the
+  immutable table view over the embedded public SIM Index snapshot.
 - `sim-lib-repl` provides the loadable `cli/main/repl` entry point and the
   read-eval-print core used by that entry point.
 - `sim-view-tty` is a loadable terminal (CLI/TUI) view/edit surface: it projects
@@ -39,6 +45,7 @@ sim --help
 sim --version
 sim --codec lisp --load symbol:demo run --payload-for-loaded-libs
 sim --codec lisp --load symbol:demo -- run --payload-for-loaded-libs
+sim index find codec --audience code --json
 ```
 
 The parser accepts `--codec`, repeated `--load`, `--list`, `--inspect`,
@@ -59,15 +66,21 @@ explicit `--load` libraries take precedence over the boot codec entry point. The
 returned value maps to the process exit code by truthiness: truthy is `0`, false
 or nil is `1`.
 
+`sim index` is a host-registered runtime library. It decodes the embedded public
+SIM Index snapshot through `codec/index`, exports it as an immutable `index/dir`
+Table/Dir value, and provides `list`, `show`, `find`, `route`, `trace`, and `examples`
+queries for human and agent use.
+
 `crates.io:` resolution belongs to `sim-run-core`, not the kernel. The resolver
 checks a CLI-owned cache directory first: `SIM_CLI_CACHE_DIR` when set, then
 `$XDG_CACHE_HOME/sim/libs`, then `$HOME/.cache/sim/libs`. Cached package
 artifacts resolve to kernel `path:` sources. A local registry fixture can seed
 the cache for offline use. When built with `registry`, the binary can fetch a
 missing package artifact from the explicit `SIM_GIT_REGISTRY_ENDPOINT`
-git registry artifact endpoint and then store it in the same cache. When no explicit
-catalog source handles a symbol, `codec/lisp` maps to `sim-codec-lisp@^0.1`,
-and an unqualified symbol such as `demo` maps to `sim-lib-demo@^0.1`.
+git registry artifact endpoint, verify it against the index row's SHA-256
+digest, and store it under a hash-prefixed cache file. When no explicit catalog
+source handles a symbol, `codec/lisp` maps to `sim-codec-lisp@^0.1`, and an
+unqualified symbol such as `demo` maps to `sim-lib-demo@^0.1`.
 
 The `dynamic-native` and `wasm` features compose additional loader mechanisms
 into the thin binary. `dynamic-native` loads platform dynamic libraries from
@@ -83,9 +96,9 @@ source overrides outside git. Local development and package listing use the
 generated meta-workspace from the control checkout:
 
 ```bash
+cd "$CONTROL_ROOT"
 sh bin/simctl meta-build
-cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-run-core --allow-dirty --list
-cargo package --manifest-path .meta-workspace/Cargo.toml -p sim-run --allow-dirty --list
+SIM_META_WORKSPACE_MANIFEST="$PWD/.meta-workspace/Cargo.toml" sh ../sim-run/recipes/publish-readiness/package-list/setup.sh
 ```
 
 From this checkout, point cross-repo recipes at that generated manifest:
@@ -100,11 +113,16 @@ packaging uses crates.io version requirements.
 
 ## Validation
 
-These commands run in the constellation workspace; only `sim-kernel` builds from a lone clone today (see `DEVELOPING.md` in `sim-sdk`). A single-repo build lands with the first crates.io publish.
+These commands run from this checkout with crates.io constellation crates and
+local workspace members:
 
 ```bash
-cargo fmt --check && cargo test --workspace && cargo clippy --workspace -- -D warnings && cargo doc --workspace --no-deps
+cargo fmt --all --check
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo doc --workspace --no-deps
 cargo run -p xtask -- simdoc --check
+cargo run -p xtask -- check-file-sizes
 ```
 
 ## Documentation Lanes

@@ -3,14 +3,15 @@ resolver = "3"
 members = [
   "crates/sim-run-core",
   "crates/sim-run-loaders",
+  "crates/sim-lib-index",
   "crates/sim-lib-repl",
   "crates/sim-run",
   "crates/sim-view-tty",
   "xtask",
 ]
 # The CLI stack -- sim-run (crates/sim-run) and sim-lib-repl -- depends on the
-# `sim-nest` facade (imported as `sim`), which is now published on crates.io, so a
-# standalone checkout resolves it. Both are full workspace members again.
+# `sim-nest` facade (imported as `sim`). Standalone checkouts resolve the facade
+# from crates.io; crates in this repository remain local workspace members.
 
 [workspace.package]
 edition = "2024"

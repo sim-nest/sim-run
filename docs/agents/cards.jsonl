@@ -1,4 +1,7 @@
 {"kind":"recipe","path":"recipes/01-basics/chapter.toml"}
+{"kind":"recipe","path":"recipes/01-basics/hello/purpose.md"}
+{"kind":"recipe","path":"recipes/01-basics/hello/recipe.toml"}
+{"kind":"recipe","path":"recipes/01-basics/hello/setup.sh"}
 {"kind":"recipe","path":"recipes/01-basics/version/purpose.md"}
 {"kind":"recipe","path":"recipes/01-basics/version/recipe.toml"}
 {"kind":"recipe","path":"recipes/01-basics/version/setup.sh"}
@@ -24,6 +27,18 @@
 {"kind":"recipe","path":"recipes/02-scenarios/host-verb/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/host-verb/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/host-verb/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-examples/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-examples/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-examples/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-find-codec/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-find-codec/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-find-codec/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-list-languages/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-list-languages/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-list-languages/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-trace-cli/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-trace-cli/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/index-trace-cli/setup.sh"}
 {"kind":"recipe","path":"recipes/02-scenarios/inspect-manifest/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/inspect-manifest/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/inspect-manifest/setup.sh"}

@@ -1,6 +1,6 @@
 [package]
 name = "sim-run-loaders"
-version = "0.1.2"
+version = "0.1.4"
 edition.workspace = true
 license.workspace = true
 description = "Feature-composable SIM bootloader loaders."
@@ -11,19 +11,23 @@ homepage = "https://github.com/sim-nest/sim-run"
 
 [features]
 default = []
-dynamic-native = ["dep:libloading", "dep:sim-codec", "dep:sim-codec-binary"]
+codec-binary = ["dep:sim-codec-binary"]
+codec-lisp = ["dep:sim-codec"]
+dynamic-native = ["dep:libloading", "dep:sim-codec", "codec-binary"]
+shape = ["dep:sim-shape"]
 wasm = ["dep:sim-wasm-abi"]
 
 [dependencies]
 sim-codec = { version = "0.1.0", optional = true }
 sim-codec-binary = { version = "0.1.0", optional = true }
-sim-kernel = { version = "0.1.0" }
+sim-kernel = { version = "0.1.4" }
+sim-shape = { version = "0.1.1", optional = true }
 sim-value = { version = "0.1.0" }
-sim-wasm-abi = { version = "0.1.0", optional = true }
+sim-wasm-abi = { version = "0.1.1", optional = true }
 
 [dev-dependencies]
-sim-kernel = { version = "0.1", features = ["test-support"] }
-sim-wasm-abi = { version = "0.1.0" }
+sim-kernel = { version = "0.1.4", features = ["test-support"] }
+sim-wasm-abi = { version = "0.1.1" }
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies]
 libloading = { version = "0.8", optional = true }

@@ -13,9 +13,11 @@
 
 use std::ffi::OsString;
 
-use sim_kernel::{CapabilityName, Cx, Lib};
+use sim_kernel::{CapabilityName, Cx, Lib, Symbol};
 
-use crate::{CliError, LibSourceSpec, LoadSession, parse_args, run_command_with_session};
+use crate::{
+    CliError, LibSourceSpec, LoadSession, RuntimeConfigState, parse_args, run_command_with_session,
+};
 
 /// A thin bootloader over [`LoadSession`] for a single-library product binary.
 ///
@@ -68,6 +70,31 @@ impl Bootloader {
                     verb.to_owned(),
                     vec![LibSourceSpec::Host(name.to_owned())],
                 ),
+        }
+    }
+
+    /// Registers a statically-linked library under `name`, makes it the default
+    /// source for `verb`, and reads the supplied config library ids before the
+    /// host library is instantiated.
+    pub fn host_verb_with_config<F>(
+        self,
+        verb: &str,
+        name: &str,
+        config_libs: Vec<Symbol>,
+        factory: F,
+    ) -> Self
+    where
+        F: Fn(&RuntimeConfigState) -> Box<dyn Lib> + Send + Sync + 'static,
+    {
+        Self {
+            session: self
+                .session
+                .with_host_factory_with_config(name.to_owned(), factory)
+                .with_default_verb_sources(
+                    verb.to_owned(),
+                    vec![LibSourceSpec::Host(name.to_owned())],
+                )
+                .with_default_verb_config_libs(verb.to_owned(), config_libs),
         }
     }
 

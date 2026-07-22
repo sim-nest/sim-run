@@ -1,8 +1,8 @@
 use std::{fs, path::PathBuf};
 
 use sim_kernel::{
-    AbiVersion, CatalogSource, Cx, Error as KernelError, Export, Lib, LibLoader, LibManifest,
-    LibTarget, Linker, LoadCx, Symbol, Version,
+    AbiVersion, Cx, Error as KernelError, Export, Lib, LibLoader, LibManifest, LibTarget, Linker,
+    LoadCx, Symbol, Version,
     library::{LibSource as KernelLibSource, LibTarget::HostRegistered},
 };
 
@@ -91,45 +91,92 @@ struct ArtifactLoader;
 
 impl LibLoader for ArtifactLoader {
     fn can_load(&self, source: &KernelLibSource) -> bool {
-        matches!(source, KernelLibSource::Bytes(_) | KernelLibSource::Path(_))
+        sim_run_loaders::bytes_from_source(source).is_ok_and(|bytes| bytes.is_some())
+            || sim_run_loaders::path_from_source(source).is_ok_and(|path| path.is_some())
     }
 
     fn load(&self, _cx: &mut Cx, source: KernelLibSource) -> sim_kernel::Result<Box<dyn Lib>> {
-        let bytes = match source {
-            KernelLibSource::Bytes(bytes) => bytes,
-            KernelLibSource::Path(path) => {
-                fs::read(path).map_err(|err| KernelError::Lib(format!("read artifact: {err}")))?
-            }
-            _ => return Err(KernelError::Lib("unsupported fixture source".to_owned())),
-        };
-        match bytes.as_slice() {
-            b"codec-lisp" => Ok(Box::new(FixtureCodecLib::new(
-                "codec-lisp",
-                "lisp",
-                LibTarget::DataOnly,
-            ))),
-            b"codec-json" => Ok(Box::new(FixtureCodecLib::new(
-                "codec-json",
-                "json",
-                LibTarget::DataOnly,
-            ))),
-            b"codec-test-crate" => Ok(Box::new(FixtureCodecLib::new(
-                "codec-test-crate",
-                "test",
-                LibTarget::DataOnly,
-            ))),
-            b"codec-catalog" => Ok(Box::new(FixtureCodecLib::new(
-                "codec-catalog",
-                "lisp",
-                LibTarget::DataOnly,
-            ))),
-            b"ordinary-lib" => Ok(Box::new(FixtureValueLib::new(
-                "ordinary-lib",
-                "ordinary-value",
-                LibTarget::DataOnly,
-            ))),
-            _ => Err(KernelError::Lib("artifact rejected".to_owned())),
-        }
+        let bytes = artifact_bytes(source)?;
+        artifact_lib(&bytes)
+    }
+
+    fn inspect_manifest(
+        &self,
+        _cx: &mut Cx,
+        source: &KernelLibSource,
+    ) -> sim_kernel::Result<Option<LibManifest>> {
+        let bytes = artifact_bytes_ref(source)?;
+        Ok(Some(artifact_manifest(&bytes)?))
+    }
+}
+
+fn artifact_bytes(source: KernelLibSource) -> sim_kernel::Result<Vec<u8>> {
+    if let Some(bytes) = sim_run_loaders::bytes_from_source(&source)? {
+        return Ok(bytes);
+    }
+    if let Some(path) = sim_run_loaders::path_from_source(&source)? {
+        return fs::read(path).map_err(|err| KernelError::Lib(format!("read artifact: {err}")));
+    }
+    Err(KernelError::Lib("unsupported fixture source".to_owned()))
+}
+
+fn artifact_bytes_ref(source: &KernelLibSource) -> sim_kernel::Result<Vec<u8>> {
+    if let Some(bytes) = sim_run_loaders::bytes_from_source(source)? {
+        return Ok(bytes);
+    }
+    if let Some(path) = sim_run_loaders::path_from_source(source)? {
+        return fs::read(path).map_err(|err| KernelError::Lib(format!("read artifact: {err}")));
+    }
+    Err(KernelError::Lib("unsupported fixture source".to_owned()))
+}
+
+fn artifact_lib(bytes: &[u8]) -> sim_kernel::Result<Box<dyn Lib>> {
+    match bytes {
+        b"codec-lisp" => Ok(Box::new(FixtureCodecLib::new(
+            "codec-lisp",
+            "lisp",
+            LibTarget::DataOnly,
+        ))),
+        b"codec-json" => Ok(Box::new(FixtureCodecLib::new(
+            "codec-json",
+            "json",
+            LibTarget::DataOnly,
+        ))),
+        b"codec-test-crate" => Ok(Box::new(FixtureCodecLib::new(
+            "codec-test-crate",
+            "test",
+            LibTarget::DataOnly,
+        ))),
+        b"codec-catalog" => Ok(Box::new(FixtureCodecLib::new(
+            "codec-catalog",
+            "lisp",
+            LibTarget::DataOnly,
+        ))),
+        b"ordinary-lib" => Ok(Box::new(FixtureValueLib::new(
+            "ordinary-lib",
+            "ordinary-value",
+            LibTarget::DataOnly,
+        ))),
+        _ => Err(KernelError::Lib("artifact rejected".to_owned())),
+    }
+}
+
+fn artifact_manifest(bytes: &[u8]) -> sim_kernel::Result<LibManifest> {
+    match bytes {
+        b"codec-lisp" => Ok(codec_manifest("codec-lisp", "lisp", LibTarget::DataOnly)),
+        b"codec-json" => Ok(codec_manifest("codec-json", "json", LibTarget::DataOnly)),
+        b"codec-test-crate" => Ok(codec_manifest(
+            "codec-test-crate",
+            "test",
+            LibTarget::DataOnly,
+        )),
+        b"codec-catalog" => Ok(codec_manifest("codec-catalog", "lisp", LibTarget::DataOnly)),
+        b"ordinary-lib" => Ok(value_manifest(
+            "ordinary-lib",
+            "ordinary-value",
+            LibTarget::DataOnly,
+        )),
+        _ => Err(KernelError::Lib("artifact rejected".to_owned())),
     }
 }
 
@@ -259,7 +306,7 @@ fn explicit_host_codec_loads_before_other_sources() {
         .with_loader(ArtifactLoader)
         .with_catalog_source(
             "codec/test",
-            CatalogSource::Bytes(b"codec-catalog".to_vec()),
+            sim_run_loaders::catalog_bytes_source(b"codec-catalog".to_vec()),
         )
         .with_crates_io_resolver(resolver)
         .with_host_factory("codec/test", || {
@@ -292,6 +339,39 @@ fn explicit_host_codec_loads_before_other_sources() {
 }
 
 #[test]
+fn path_source_that_exports_requested_codec_boots_before_other_loads() {
+    let path = temp_artifact("path-codec");
+    fs::write(&path, b"codec-lisp").unwrap();
+    let boot = CliBoot {
+        loads: vec![
+            LibSourceSpec::Bytes(b"ordinary-lib".to_vec()),
+            LibSourceSpec::Path(path.clone()),
+        ],
+        ..CliBoot::default()
+    };
+    let mut session = LoadSession::new().with_loader(ArtifactLoader);
+
+    let receipts = session.load_boot(&boot).unwrap().to_vec();
+
+    assert_eq!(receipts.len(), 2);
+    assert_eq!(
+        receipts[0].role,
+        LoadReceiptRole::BootCodec {
+            name: "lisp".to_owned(),
+            symbol: "codec/lisp".to_owned(),
+        }
+    );
+    assert_eq!(
+        receipts[0].requested_source,
+        LibSourceSpec::Path(path.clone())
+    );
+    assert_eq!(receipts[0].manifest.id, Symbol::new("codec-lisp"));
+    assert_eq!(receipts[1].role, LoadReceiptRole::Library);
+    assert_eq!(receipts[1].manifest.id, Symbol::new("ordinary-lib"));
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn catalog_source_precedes_crates_io_and_host_fallbacks() {
     let cache = temp_cache("catalog-codec");
     let artifact = temp_artifact("catalog-codec");
@@ -305,7 +385,7 @@ fn catalog_source_precedes_crates_io_and_host_fallbacks() {
         .with_loader(ArtifactLoader)
         .with_catalog_source(
             "codec/lisp",
-            CatalogSource::Bytes(b"codec-catalog".to_vec()),
+            sim_run_loaders::catalog_bytes_source(b"codec-catalog".to_vec()),
         )
         .with_crates_io_resolver(resolver)
         .with_host_factory("codec/lisp", || {

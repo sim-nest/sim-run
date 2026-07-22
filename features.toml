@@ -1,0 +1,298 @@
+schema = "sim.features"
+
+[enforcement.audience]
+user = "strict"
+code = "strict"
+framework = "advisory"
+
+[enforcement.surface]
+cli = "strict"
+view = "strict"
+syntax = "advisory"
+wire = "advisory"
+site = "advisory"
+docs = "advisory"
+
+[enforcement.specimen]
+user = "strict"
+framework = "strict"
+code = "advisory"
+
+[enforcement.route]
+major_entrypoints = "advisory"
+frameworks = "advisory"
+
+[enforcement.overlap]
+default = "advisory"
+
+[[feature]]
+id = "feature/sim-run/index"
+title = "Repository index contract"
+summary = "Expose generated package, card, surface, and recipe facts as a checked SIM Index fragment."
+owner = "crate/xtask"
+audiences = ["code"]
+guidance = "Use this row when checking which generated index facts the repo exports."
+claims_anchors = [
+  "anchor/cli/xtask",
+  "anchor/crate/xtask",
+  "anchor/doc/generated/feature-map",
+  "anchor/doc/generated/sim-index-fragment",
+]
+claims_surfaces = [
+  "cli/xtask",
+  "docs/sim-run/generated",
+]
+claims_specimens = [
+  "recipe/sim-run/publish-readiness/package-list",
+]
+
+[[feature]]
+id = "feature/sim-run/bootloader"
+title = "Bootloader command dispatch"
+summary = "Start product commands through the shared bootloader and loaded runtime libraries."
+owner = "crate/sim-run-core"
+audiences = ["user", "code"]
+guidance = "Use this row when following how command verbs enter the runtime."
+claims_anchors = [
+  "anchor/cli/sim-run",
+  "anchor/crate/sim-run",
+  "anchor/crate/sim-run-core",
+  "anchor/export/sim-run-core/codec/lisp",
+  "anchor/export/sim-run/codec/lisp",
+  "anchor/rustdoc/sim-run-core/bootloader",
+  "anchor/rustdoc/sim-run-core/run_with_session",
+]
+claims_surfaces = [
+  "cli/sim-run",
+  "site/sim-run-core",
+]
+claims_specimens = [
+  "recipe/sim-run/01-basics/version",
+  "recipe/sim-run/02-scenarios/boot-lisp-eval",
+]
+
+[[feature]]
+id = "feature/sim-run/watch"
+title = "Watch command surface"
+summary = "Start modeled, imported, or live watch plans through the shared command bootloader."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use this row when checking the watch command entry point."
+claims_anchors = [
+  "anchor/cli/watch",
+  "anchor/export/sim-run/cli/main/watch",
+  "anchor/runtime-lib/sim-run/watch-boot-codec",
+  "anchor/runtime-lib/sim-run/watch-lib",
+]
+claims_surfaces = [
+  "cli/watch",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-run/tests/watch",
+]
+supports = [
+  "feature/sim-run/bootloader",
+]
+
+[[feature]]
+id = "feature/sim-run/glasses"
+title = "Glasses command surface"
+summary = "Start modeled or hardware-backed glasses plans through the shared command bootloader."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use this row when checking the glasses command entry point."
+claims_anchors = [
+  "anchor/cli/glasses",
+  "anchor/export/sim-run/cli/main/glasses",
+  "anchor/runtime-lib/sim-run/glasses-boot-codec",
+  "anchor/runtime-lib/sim-run/glasses-lib",
+]
+claims_surfaces = [
+  "cli/glasses",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-run/tests/glasses",
+]
+supports = [
+  "feature/sim-run/bootloader",
+]
+
+[[feature]]
+id = "feature/sim-run/repl"
+title = "Interactive REPL"
+summary = "Run a SIM read-eval-print loop through the loaded REPL library and command surface."
+owner = "crate/sim-lib-repl"
+audiences = ["user", "code"]
+guidance = "Use this row when starting an interactive local session."
+claims_anchors = [
+  "anchor/cli/repl",
+  "anchor/crate/sim-lib-repl",
+  "anchor/export/sim-lib-repl/cli/main/repl",
+  "anchor/runtime-lib/sim-lib-repl/repl-lib",
+]
+claims_surfaces = [
+  "cli/repl",
+]
+claims_specimens = [
+  "recipe/sim-run/01-basics/hello",
+]
+supports = [
+  "feature/sim-run/bootloader",
+]
+
+[[feature]]
+id = "feature/sim-run/runtime-index"
+title = "Runtime index exploration"
+summary = "Explore the merged SIM Index through the bootloader as stable Table/Dir rows and structured query output."
+owner = "crate/sim-lib-index"
+audiences = ["user", "code"]
+guidance = "Use this row when searching, tracing, or listing index facts from the sim command."
+claims_anchors = [
+  "anchor/cli/index",
+  "anchor/crate/sim-lib-index",
+  "anchor/export/sim-lib-index/cli/main/index",
+  "anchor/runtime-lib/sim-lib-index/index-lib",
+  "anchor/runtime-lib/sim-run/index-boot-codec",
+]
+claims_surfaces = [
+  "cli/index",
+]
+claims_specimens = [
+  "recipe/sim-run/02-scenarios/index-find-codec",
+  "recipe/sim-run/02-scenarios/index-trace-cli",
+  "recipe/sim-run/02-scenarios/index-list-languages",
+  "recipe/sim-run/02-scenarios/index-examples",
+]
+supports = [
+  "feature/sim-run/bootloader",
+  "feature/sim-run/index",
+]
+
+[[feature]]
+id = "feature/sim-run/loaders"
+title = "Loadable source libraries"
+summary = "Load native, source, and re-exported runtime libraries as bootloader inputs."
+owner = "crate/sim-run-loaders"
+audiences = ["code", "framework"]
+guidance = "Use this row when following how runtime libraries are discovered before command dispatch."
+claims_anchors = [
+  "anchor/crate/sim-run-loaders",
+  "anchor/runtime-lib/sim-run-loaders/loaded-native-lib",
+  "anchor/runtime-lib/sim-run-loaders/reexport-lib",
+  "anchor/runtime-lib/sim-run-loaders/source-lib",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-run-loaders/src/native/codec_proxy_tests",
+]
+supports = [
+  "feature/sim-run/bootloader",
+]
+
+[[feature]]
+id = "feature/sim-run/index-table-dir"
+title = "Index Table/Dir backend"
+summary = "Expose the embedded SIM Index as immutable Table/Dir collections for loaded runtime code."
+owner = "crate/sim-lib-index"
+audiences = ["code", "framework"]
+guidance = "Use this row when following how a runtime library provides table-backed index rows."
+claims_anchors = [
+  "anchor/rustdoc/sim-lib-index/index-dir",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-lib-index/src/dir",
+]
+supports = [
+  "feature/sim-run/runtime-index",
+]
+
+[[feature]]
+id = "feature/sim-run/terminal-surface"
+title = "Terminal view surface"
+summary = "Render and interpret terminal view intents through the loaded TTY surface library."
+owner = "crate/sim-view-tty"
+audiences = ["user", "code"]
+guidance = "Use this row when checking the terminal surface exported by sim-view-tty."
+claims_anchors = [
+  "anchor/crate/sim-view-tty",
+  "anchor/export/sim-view-tty/surface/tty/intent",
+  "anchor/export/sim-view-tty/surface/tty/render",
+  "anchor/runtime-lib/sim-view-tty/tty-view-lib",
+]
+claims_surfaces = [
+  "view/sim-view-tty",
+]
+claims_specimens = [
+  "recipe/sim-run/02-scenarios/host-verb",
+]
+supports = [
+  "feature/sim-run/bootloader",
+]
+
+[[route]]
+id = "route/start-a-sim-session"
+task = "Start an interactive SIM session"
+audiences = ["user"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader prepares the command runtime." },
+  { feature = "feature/sim-run/repl", why = "The REPL is the interactive entry point." },
+  { specimen = "recipe/sim-run/01-basics/version", why = "The first recipe confirms the command path." },
+]
+
+[[route]]
+id = "route/check-sim-run-index"
+task = "Check the sim-run index fragment"
+audiences = ["code"]
+steps = [
+  { feature = "feature/sim-run/index", why = "The index row owns the generated fragment." },
+  { feature = "feature/sim-run/runtime-index", why = "The runtime command reads the merged index." },
+  { specimen = "recipe/sim-run/publish-readiness/package-list", why = "The recipe exercises package metadata." },
+]
+
+[[route]]
+id = "route/find-code-behind-command"
+task = "Find code behind a command"
+audiences = ["code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader owns command dispatch into loaded libraries." },
+  { feature = "feature/sim-run/runtime-index", why = "The index trace command resolves command surfaces to owning crates and anchors." },
+  { specimen = "recipe/sim-run/02-scenarios/index-trace-cli", why = "The checked trace recipe follows a CLI surface back to code facts." },
+]
+
+[[route]]
+id = "route/start-a-watch-plan"
+task = "Start a watch plan"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader prepares the command runtime." },
+  { feature = "feature/sim-run/watch", why = "The watch row owns the watch command surface and loaded watch libraries." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/watch", why = "The checked command test exercises the watch entry point." },
+]
+
+[[route]]
+id = "route/start-a-glasses-plan"
+task = "Start a glasses plan"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader prepares the command runtime." },
+  { feature = "feature/sim-run/glasses", why = "The glasses row owns the glasses command surface and loaded glasses libraries." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/glasses", why = "The checked command test exercises the glasses entry point." },
+]
+
+[[route]]
+id = "route/load-runtime-surface"
+task = "Load a runtime surface"
+audiences = ["code", "framework"]
+steps = [
+  { feature = "feature/sim-run/loaders", why = "The loader row owns native, source, and re-exported runtime library discovery." },
+  { feature = "feature/sim-run/terminal-surface", why = "The terminal surface row shows a loadable view surface provided by a runtime library." },
+  { specimen = "recipe/sim-run/02-scenarios/host-verb", why = "The checked host-verb recipe exercises the terminal surface path." },
+]
+
+[[route]]
+id = "route/add-table-dir-backend"
+task = "Add a Table/Dir backend"
+audiences = ["code", "framework"]
+steps = [
+  { feature = "feature/sim-run/index-table-dir", why = "The IndexDir implementation shows a runtime table exposed as an immutable directory." },
+  { specimen = "recipe/sim-run/02-scenarios/index-examples", why = "The examples recipe exercises table-backed feature-to-specimen lookup." },
+]

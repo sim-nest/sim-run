@@ -48,19 +48,12 @@ pub(crate) fn manifest_to_expr(manifest: &LibManifest) -> Expr {
                     .exports
                     .iter()
                     .map(|export| {
-                        let (kind, symbol) = match export {
-                            Export::Class { symbol, .. } => ("class", symbol),
-                            Export::Function { symbol, .. } => ("function", symbol),
-                            Export::Macro { symbol, .. } => ("macro", symbol),
-                            Export::Shape { symbol, .. } => ("shape", symbol),
-                            Export::Codec { symbol, .. } => ("codec", symbol),
-                            Export::NumberDomain { symbol, .. } => ("number-domain", symbol),
-                            Export::Site { symbol, .. } => ("site", symbol),
-                            Export::Value { symbol } => ("value", symbol),
-                        };
                         Expr::Map(vec![
-                            symbol_entry("kind", Expr::String(kind.to_owned())),
-                            symbol_entry("symbol", Expr::Symbol(symbol.clone())),
+                            symbol_entry(
+                                "kind",
+                                Expr::String(export.kind_symbol().symbol().as_qualified_str()),
+                            ),
+                            symbol_entry("symbol", Expr::Symbol(export.symbol().clone())),
                         ])
                     })
                     .collect(),

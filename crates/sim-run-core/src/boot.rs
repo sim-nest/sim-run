@@ -35,7 +35,7 @@ impl CliBoot {
                 .payload
                 .args
                 .first()
-                .map(|arg| arg.to_string_lossy().into_owned()),
+                .and_then(|arg| arg.as_os_str().to_str().map(str::to_owned)),
             args: self.payload.args.clone(),
             eval: self.payload.eval.clone(),
             script: self.payload.script.clone(),

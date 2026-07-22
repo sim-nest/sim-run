@@ -1,9 +1,12 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 use sim_kernel::{
-    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, GrantSeat, Lib,
-    LibBootDependency, LibId, LibLoader, LibManifest, LibSource as KernelLibSource,
-    LibSourceSpec as KernelLibSourceSpec, LoadedLib, LoaderRegistry, NoopEvalPolicy, Symbol,
+    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, GrantSeat, Lib, LibId,
+    LibLoader, LibManifest, LibSource as KernelLibSource, LibSourceSpec as KernelLibSourceSpec,
+    LoaderRegistry, NoopEvalPolicy, Symbol,
 };
 use sim_lib_stream_host::native_audio_provider_capability;
 
@@ -13,6 +16,7 @@ use crate::{
     codec_boot::{boot_codec_name, codec_lib_symbol, explicit_codec_source_index},
     config::{RuntimeConfigState, load_config_sources},
     crates_io::fallback_spec_for_symbol,
+    host::{HostLibRegistry, HostSourceLoader, host_receipt},
     source::symbol_from_text,
 };
 
@@ -28,8 +32,33 @@ pub struct LoadSession {
     crates_io: CratesIoResolver,
     catalog_sources: BTreeMap<Symbol, LibSourceSpec>,
     default_verb_sources: BTreeMap<String, Vec<LibSourceSpec>>,
+    default_verb_config_libs: BTreeMap<String, Vec<Symbol>>,
     receipts: Vec<LoadReceipt>,
     config: RuntimeConfigState,
+    native_audio_provider_active: bool,
+}
+
+trait GrantOutcome {
+    fn expect_granted(self);
+}
+
+impl GrantOutcome for () {
+    fn expect_granted(self) {}
+}
+
+impl GrantOutcome for Result<(), KernelError> {
+    fn expect_granted(self) {
+        self.expect("load session grant seat grants into its own Cx");
+    }
+}
+
+macro_rules! expect_granted {
+    ($grant:expr) => {{
+        #[allow(clippy::let_unit_value)]
+        let grant_result = $grant;
+        #[allow(clippy::unit_arg)]
+        grant_result.expect_granted();
+    }};
 }
 
 impl LoadSession {
@@ -46,8 +75,10 @@ impl LoadSession {
             crates_io: CratesIoResolver::default(),
             catalog_sources: BTreeMap::new(),
             default_verb_sources: BTreeMap::new(),
+            default_verb_config_libs: BTreeMap::new(),
             receipts: Vec::new(),
             config: RuntimeConfigState::default(),
+            native_audio_provider_active: false,
         }
     }
 
@@ -85,6 +116,16 @@ impl LoadSession {
         self.hosts.add(name, factory);
     }
 
+    /// Adds a host library factory that can inspect the discovered effective
+    /// runtime config before it builds the library.
+    pub fn add_host_factory_with_config(
+        &mut self,
+        name: impl Into<String>,
+        factory: impl Fn(&RuntimeConfigState) -> Box<dyn Lib> + Send + Sync + 'static,
+    ) {
+        self.hosts.add_with_config(name, factory);
+    }
+
     /// Adds a host library factory, builder-style.
     pub fn with_host_factory(
         mut self,
@@ -92,6 +133,16 @@ impl LoadSession {
         factory: impl Fn() -> Box<dyn Lib> + Send + Sync + 'static,
     ) -> Self {
         self.add_host_factory(name, factory);
+        self
+    }
+
+    /// Adds a config-aware host library factory, builder-style.
+    pub fn with_host_factory_with_config(
+        mut self,
+        name: impl Into<String>,
+        factory: impl Fn(&RuntimeConfigState) -> Box<dyn Lib> + Send + Sync + 'static,
+    ) -> Self {
+        self.add_host_factory_with_config(name, factory);
         self
     }
 
@@ -117,7 +168,7 @@ impl LoadSession {
     /// host has granted it. This lets a composed `sim` build authorize the
     /// loaders it registers.
     pub fn with_capability(mut self, capability: CapabilityName) -> Self {
-        self.seat.grant(&mut self.cx, capability);
+        expect_granted!(self.seat.grant(&mut self.cx, capability));
         self
     }
 
@@ -130,6 +181,12 @@ impl LoadSession {
         self.default_verb_sources.insert(verb.into(), sources);
     }
 
+    /// Registers config libraries read when `verb` is selected without explicit
+    /// loads.
+    pub fn add_default_verb_config_libs(&mut self, verb: impl Into<String>, libs: Vec<Symbol>) {
+        self.default_verb_config_libs.insert(verb.into(), libs);
+    }
+
     /// Registers sources used when `verb` is selected without explicit loads,
     /// builder-style.
     pub fn with_default_verb_sources(
@@ -138,6 +195,17 @@ impl LoadSession {
         sources: Vec<LibSourceSpec>,
     ) -> Self {
         self.add_default_verb_sources(verb, sources);
+        self
+    }
+
+    /// Registers config libraries read when `verb` is selected without explicit
+    /// loads, builder-style.
+    pub fn with_default_verb_config_libs(
+        mut self,
+        verb: impl Into<String>,
+        libs: Vec<Symbol>,
+    ) -> Self {
+        self.add_default_verb_config_libs(verb, libs);
         self
     }
 
@@ -190,16 +258,26 @@ impl LoadSession {
         &mut self.config
     }
 
+    /// Returns whether the optional native audio provider loaded successfully.
+    pub fn native_audio_provider_active(&self) -> bool {
+        self.native_audio_provider_active
+    }
+
     /// Loads every requested library in the parsed boot controls.
     pub fn load_boot(&mut self, boot: &CliBoot) -> Result<&[LoadReceipt], CliError> {
+        self.native_audio_provider_active = false;
         let boot = self.boot_with_default_verb_sources(boot);
-        let config_libs = config_libs_for_boot(&boot);
-        self.config = load_config_sources(&mut self.cx, &boot.config, &config_libs);
-        self.load_native_audio_provider(&boot);
+        let config_libs = config_libs_for_boot(&boot, &self.default_verb_config_libs);
         let codec_name = boot_codec_name(&boot);
         let codec_symbol = codec_lib_symbol(codec_name);
-        let codec_index = explicit_codec_source_index(&boot, &codec_symbol);
+        let codec_index = self.boot_codec_source_index(&boot, &codec_symbol);
+        self.config = load_config_sources(&mut self.cx, &pre_site_config(&boot), &config_libs);
+        let preloaded_config_sources =
+            self.load_config_site_sources(&boot, codec_name, &codec_symbol, codec_index)?;
+        self.config = load_config_sources(&mut self.cx, &boot.config, &config_libs);
+        self.load_native_audio_provider(&boot);
         match codec_index {
+            Some(index) if preloaded_config_sources.contains(&index) => {}
             Some(index) => {
                 self.load_boot_codec_source(codec_name, &codec_symbol, &boot.loads[index])?;
             }
@@ -212,25 +290,59 @@ impl LoadSession {
             }
         }
         for (index, source) in boot.loads.iter().enumerate() {
-            if Some(index) != codec_index {
+            if Some(index) != codec_index && !preloaded_config_sources.contains(&index) {
                 self.load_source(source)?;
             }
         }
         Ok(&self.receipts)
     }
 
+    fn load_config_site_sources(
+        &mut self,
+        boot: &CliBoot,
+        codec_name: &str,
+        codec_symbol: &str,
+        codec_index: Option<usize>,
+    ) -> Result<BTreeSet<usize>, CliError> {
+        let mut preloaded = BTreeSet::new();
+        if boot.config.site_sources.is_empty() {
+            return Ok(preloaded);
+        }
+        for (index, source) in boot.loads.iter().enumerate() {
+            let Ok(manifest) = self.inspect_source_manifest(source) else {
+                continue;
+            };
+            if !manifest_exports_requested_site(&manifest, &boot.config.site_sources) {
+                continue;
+            }
+            if Some(index) == codec_index {
+                self.load_boot_codec_source(codec_name, codec_symbol, source)?;
+            } else {
+                self.load_source(source)?;
+            }
+            preloaded.insert(index);
+        }
+        Ok(preloaded)
+    }
+
     fn load_native_audio_provider(&mut self, boot: &CliBoot) {
         let Some(source) = boot.native_audio_provider.as_deref() else {
             return;
         };
-        self.seat
-            .grant(&mut self.cx, native_audio_provider_capability());
-        if self
-            .load_source_with_role(source, LoadReceiptRole::Library)
-            .is_err()
-        {
-            // Placement resolution keeps the modeled site live when a native
-            // provider is absent or rejected.
+        match self.load_source_with_role(source, LoadReceiptRole::Library) {
+            Ok(_) => {
+                expect_granted!(
+                    self.seat
+                        .grant(&mut self.cx, native_audio_provider_capability())
+                );
+                self.native_audio_provider_active = true;
+            }
+            Err(err) => {
+                self.config
+                    .push_diagnostic(format!("native audio provider skipped: {err}"));
+                // Placement resolution keeps the modeled site live when a
+                // native provider is absent or rejected.
+            }
         }
     }
 
@@ -254,9 +366,48 @@ impl LoadSession {
         boot
     }
 
+    fn boot_codec_source_index(&mut self, boot: &CliBoot, codec_symbol: &str) -> Option<usize> {
+        if let Some(index) = explicit_codec_source_index(boot, codec_symbol) {
+            return Some(index);
+        }
+
+        let codec_symbol = symbol_from_text(codec_symbol);
+        for (index, source) in boot.loads.iter().enumerate() {
+            // Best-effort manifest inspection lets path/bytes/crates.io sources
+            // supply the boot codec without blocking on unrelated load errors.
+            if self
+                .inspect_source_manifest(source)
+                .ok()
+                .is_some_and(|manifest| manifest_exports_codec(&manifest, &codec_symbol))
+            {
+                return Some(index);
+            }
+        }
+        None
+    }
+
     /// Loads one source through the kernel loader and records a receipt.
     pub fn load_source(&mut self, source: &LibSourceSpec) -> Result<LoadReceipt, CliError> {
         self.load_source_with_role(source, LoadReceiptRole::Library)
+    }
+
+    fn inspect_source_manifest(&mut self, source: &LibSourceSpec) -> Result<LibManifest, CliError> {
+        match source {
+            LibSourceSpec::Host(name) => self.hosts.inspect_manifest(name, &self.config),
+            LibSourceSpec::CratesIo(spec) => {
+                let resolved = self.crates_io.resolve(spec)?;
+                let data_source = sim_run_loaders::path_source_spec(resolved.artifact);
+                ensure_loadable_path(&data_source, source)?;
+                self.inspect_data_source_manifest(data_source)
+            }
+            _ => {
+                let data_source = source
+                    .to_kernel_data_source()
+                    .expect("non-host sources have data forms");
+                ensure_loadable_path(&data_source, source)?;
+                self.inspect_data_source_manifest(data_source)
+            }
+        }
     }
 
     fn load_boot_codec_source(
@@ -336,7 +487,7 @@ impl LoadSession {
         role: LoadReceiptRole,
     ) -> Result<LoadReceipt, CliError> {
         let resolved = self.crates_io.resolve(spec)?;
-        let data_source = KernelLibSourceSpec::Path(resolved.artifact);
+        let data_source = sim_run_loaders::path_source_spec(resolved.artifact);
         ensure_loadable_path(&data_source, source)?;
         let receipt = self
             .loaders
@@ -368,7 +519,7 @@ impl LoadSession {
         name: &str,
         role: LoadReceiptRole,
     ) -> Result<LoadReceipt, CliError> {
-        let lib = self.hosts.instantiate(name)?;
+        let lib = self.hosts.instantiate(name, &self.config)?;
         let lib_id = self
             .loaders
             .load_and_register(&mut self.cx, KernelLibSource::Host(lib))
@@ -389,13 +540,16 @@ impl LoadSession {
 
 fn catalog_source_spec(source: CatalogSource) -> LibSourceSpec {
     match source {
-        CatalogSource::Path(path) => LibSourceSpec::Path(path),
-        CatalogSource::Url(url) => LibSourceSpec::Url(url),
-        CatalogSource::Bytes(bytes) => LibSourceSpec::Bytes(bytes),
+        CatalogSource::Open { kind, payload } => {
+            LibSourceSpec::from_kernel_data_source(KernelLibSourceSpec::Open { kind, payload })
+        }
     }
 }
 
-fn config_libs_for_boot(boot: &CliBoot) -> Vec<Symbol> {
+fn config_libs_for_boot(
+    boot: &CliBoot,
+    default_verb_config_libs: &BTreeMap<String, Vec<Symbol>>,
+) -> Vec<Symbol> {
     let codec_name = boot_codec_name(boot);
     let mut libs = Vec::new();
     push_unique_symbol(&mut libs, symbol_from_text(&codec_lib_symbol(codec_name)));
@@ -408,6 +562,17 @@ fn config_libs_for_boot(boot: &CliBoot) -> Vec<Symbol> {
         && let Some(symbol) = config_lib_for_source(source)
     {
         push_unique_symbol(&mut libs, symbol);
+    }
+    if let Some(verb) = boot
+        .payload
+        .args
+        .first()
+        .and_then(|arg| arg.as_os_str().to_str().map(str::to_owned))
+        && let Some(symbols) = default_verb_config_libs.get(&verb)
+    {
+        for symbol in symbols {
+            push_unique_symbol(&mut libs, symbol.clone());
+        }
     }
     if let Some(request) = boot.config_report.as_ref() {
         match &request.kind {
@@ -438,6 +603,7 @@ fn config_lib_for_source(source: &LibSourceSpec) -> Option<Symbol> {
         LibSourceSpec::Path(_)
         | LibSourceSpec::Url(_)
         | LibSourceSpec::Bytes(_)
+        | LibSourceSpec::Open { .. }
         | LibSourceSpec::CratesIo(_) => None,
     }
 }
@@ -454,85 +620,13 @@ impl Default for LoadSession {
     }
 }
 
-#[derive(Default)]
-pub(crate) struct HostLibRegistry {
-    factories: BTreeMap<String, Box<dyn Fn() -> Box<dyn Lib> + Send + Sync>>,
-}
-
-impl HostLibRegistry {
-    fn add(
-        &mut self,
-        name: impl Into<String>,
-        factory: impl Fn() -> Box<dyn Lib> + Send + Sync + 'static,
-    ) {
-        self.factories.insert(name.into(), Box::new(factory));
-    }
-
-    pub(crate) fn instantiate(&self, name: &str) -> Result<Box<dyn Lib>, CliError> {
-        self.factories
-            .get(name)
-            .map(|factory| factory())
-            .ok_or_else(|| CliError::new(format!("unknown host library: {name}")))
-    }
-
-    fn contains(&self, name: &str) -> bool {
-        self.factories.contains_key(name)
-    }
-}
-
-struct HostSourceLoader;
-
-impl LibLoader for HostSourceLoader {
-    fn can_load(&self, source: &KernelLibSource) -> bool {
-        matches!(source, KernelLibSource::Host(_))
-    }
-
-    fn load(&self, _cx: &mut Cx, source: KernelLibSource) -> sim_kernel::Result<Box<dyn Lib>> {
-        match source {
-            KernelLibSource::Host(lib) => Ok(lib),
-            _ => Err(KernelError::Lib(
-                "host loader received a non-host source".to_owned(),
-            )),
-        }
-    }
-}
-
-fn host_receipt(
-    source: LibSourceSpec,
-    role: LoadReceiptRole,
-    loaded: LoadedLib,
-    loaded_libs: &[LoadedLib],
-) -> LoadReceipt {
-    let dependencies = loaded
-        .manifest
-        .requires
-        .iter()
-        .filter_map(|dependency| {
-            let loaded = loaded_libs
-                .iter()
-                .find(|candidate| candidate.manifest.id == dependency.id)?;
-            Some(LibBootDependency {
-                lib_id: loaded.id,
-                symbol: loaded.manifest.id.clone(),
-            })
-        })
-        .collect();
-    LoadReceipt {
-        lib_id: loaded.id,
-        role,
-        requested_source: source.clone(),
-        resolved_source: source,
-        manifest: loaded.manifest,
-        dependencies,
-        exports: loaded.exports,
-    }
-}
-
 fn ensure_loadable_path(
     data_source: &KernelLibSourceSpec,
     source: &LibSourceSpec,
 ) -> Result<(), CliError> {
-    if let KernelLibSourceSpec::Path(path) = data_source
+    if let KernelLibSourceSpec::Open { kind, payload } = data_source
+        && kind == &sim_run_loaders::path_source_kind()
+        && let Ok(path) = sim_run_loaders::path_from_payload(payload)
         && !path.exists()
     {
         return Err(CliError::new(format!(
@@ -551,4 +645,24 @@ fn no_codec_error(codec_name: &str, err: CliError) -> CliError {
     CliError::new(format!(
         "no codec '{codec_name}' available; provide one with --load ({err})"
     ))
+}
+
+fn manifest_exports_codec(manifest: &LibManifest, codec_symbol: &Symbol) -> bool {
+    manifest.exports.iter().any(|export| match export {
+        sim_kernel::Export::Codec { symbol, .. } => symbol == codec_symbol,
+        _ => false,
+    })
+}
+
+fn manifest_exports_requested_site(manifest: &LibManifest, sites: &[Symbol]) -> bool {
+    manifest.exports.iter().any(|export| match export {
+        sim_kernel::Export::Site { symbol, .. } => sites.iter().any(|site| site == symbol),
+        _ => false,
+    })
+}
+
+fn pre_site_config(boot: &CliBoot) -> crate::ConfigLoadOptions {
+    let mut config = boot.config.clone();
+    config.site_sources.clear();
+    config
 }

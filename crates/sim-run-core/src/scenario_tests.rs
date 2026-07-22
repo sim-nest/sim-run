@@ -1,9 +1,9 @@
 use std::{ffi::OsString, fs, path::PathBuf, sync::Arc};
 
 use sim_kernel::{
-    AbiVersion, Callable, CatalogSource, Cx, Error, Export, Lib, LibLoader, LibManifest, LibTarget,
-    Linker, LoadCx, Object, ObjectCompat, Symbol, Value, Version,
-    library::LibSource as KernelLibSource, object::Args,
+    AbiVersion, Callable, Cx, Error, Export, Lib, LibLoader, LibManifest, LibTarget, Linker,
+    LoadCx, Object, ObjectCompat, Symbol, Value, Version, library::LibSource as KernelLibSource,
+    object::Args,
 };
 
 use crate::{
@@ -58,8 +58,15 @@ impl ScenarioLib {
         }
     }
 
-    fn command(id: &str, entrypoint: ScenarioEntrypoint) -> Self {
-        let entrypoint_symbol = cli_main_entrypoint_symbol(id);
+    fn command_for_verb(id: &str, verb: &str, entrypoint: ScenarioEntrypoint) -> Self {
+        Self::command_for_symbol(id, cli_main_entrypoint_symbol(verb), entrypoint)
+    }
+
+    fn command_for_symbol(
+        id: &str,
+        entrypoint_symbol: Symbol,
+        entrypoint: ScenarioEntrypoint,
+    ) -> Self {
         Self {
             manifest: manifest(id, vec![cli_main_export(entrypoint_symbol.clone())]),
             codec: None,
@@ -171,7 +178,8 @@ struct ScenarioArtifactLoader;
 
 impl LibLoader for ScenarioArtifactLoader {
     fn can_load(&self, source: &KernelLibSource) -> bool {
-        matches!(source, KernelLibSource::Bytes(_) | KernelLibSource::Path(_))
+        sim_run_loaders::bytes_from_source(source).is_ok_and(|bytes| bytes.is_some())
+            || sim_run_loaders::path_from_source(source).is_ok_and(|path| path.is_some())
     }
 
     fn load(&self, _cx: &mut Cx, source: KernelLibSource) -> sim_kernel::Result<Box<dyn Lib>> {
@@ -233,8 +241,9 @@ fn scenario_load_host_lib_dispatches_verb() {
         ..CliBoot::default()
     };
     let mut session = scenario_session().with_host_factory("scenario/host", || {
-        Box::new(ScenarioLib::command(
+        Box::new(ScenarioLib::command_for_verb(
             "host-command",
+            "host-run",
             ScenarioEntrypoint::expecting(ExpectedEnvelope {
                 codec: "codec/test",
                 verb: "host-run",
@@ -349,8 +358,10 @@ fn scenario_server_verb_loads_from_catalog_without_baked_mode() {
         },
         ..CliBoot::default()
     };
-    let mut session = scenario_session()
-        .with_catalog_source("server", CatalogSource::Bytes(b"server-command".to_vec()));
+    let mut session = scenario_session().with_catalog_source(
+        "server",
+        sim_run_loaders::catalog_bytes_source(b"server-command".to_vec()),
+    );
 
     let code = session.run_loaded_boot(&boot).unwrap();
 
@@ -490,8 +501,9 @@ fn scenario_session() -> LoadSession {
 
 fn artifact_lib(bytes: &[u8]) -> sim_kernel::Result<Box<dyn Lib>> {
     match bytes {
-        b"bytes-command" => Ok(Box::new(ScenarioLib::command(
+        b"bytes-command" => Ok(Box::new(ScenarioLib::command_for_verb(
             "bytes-command",
+            "bytes-run",
             ScenarioEntrypoint::expecting(ExpectedEnvelope {
                 codec: "codec/test",
                 verb: "bytes-run",
@@ -501,8 +513,9 @@ fn artifact_lib(bytes: &[u8]) -> sim_kernel::Result<Box<dyn Lib>> {
                 stdin: "nil",
             }),
         ))),
-        b"crate-command" => Ok(Box::new(ScenarioLib::command(
+        b"crate-command" => Ok(Box::new(ScenarioLib::command_for_verb(
             "crate-command",
+            "crate-run",
             ScenarioEntrypoint::expecting(ExpectedEnvelope {
                 codec: "codec/test",
                 verb: "crate-run",
@@ -512,8 +525,9 @@ fn artifact_lib(bytes: &[u8]) -> sim_kernel::Result<Box<dyn Lib>> {
                 stdin: "nil",
             }),
         ))),
-        b"server-command" => Ok(Box::new(ScenarioLib::command(
+        b"server-command" => Ok(Box::new(ScenarioLib::command_for_verb(
             "server-command",
+            "server",
             ScenarioEntrypoint::expecting(ExpectedEnvelope {
                 codec: "codec/test",
                 verb: "server",
@@ -542,23 +556,23 @@ fn artifact_manifest(bytes: &[u8]) -> sim_kernel::Result<LibManifest> {
 }
 
 fn artifact_bytes(source: KernelLibSource) -> sim_kernel::Result<Vec<u8>> {
-    match source {
-        KernelLibSource::Bytes(bytes) => Ok(bytes),
-        KernelLibSource::Path(path) => {
-            fs::read(path).map_err(|err| Error::Lib(format!("read artifact: {err}")))
-        }
-        _ => Err(Error::Lib("unsupported scenario source".to_owned())),
+    if let Some(bytes) = sim_run_loaders::bytes_from_source(&source)? {
+        return Ok(bytes);
     }
+    if let Some(path) = sim_run_loaders::path_from_source(&source)? {
+        return fs::read(path).map_err(|err| Error::Lib(format!("read artifact: {err}")));
+    }
+    Err(Error::Lib("unsupported scenario source".to_owned()))
 }
 
 fn artifact_bytes_ref(source: &KernelLibSource) -> sim_kernel::Result<Vec<u8>> {
-    match source {
-        KernelLibSource::Bytes(bytes) => Ok(bytes.clone()),
-        KernelLibSource::Path(path) => {
-            fs::read(path).map_err(|err| Error::Lib(format!("read artifact: {err}")))
-        }
-        _ => Err(Error::Lib("unsupported scenario source".to_owned())),
+    if let Some(bytes) = sim_run_loaders::bytes_from_source(source)? {
+        return Ok(bytes);
     }
+    if let Some(path) = sim_run_loaders::path_from_source(source)? {
+        return fs::read(path).map_err(|err| Error::Lib(format!("read artifact: {err}")));
+    }
+    Err(Error::Lib("unsupported scenario source".to_owned()))
 }
 
 fn table_value(cx: &mut Cx, table: &Value, field: &str) -> sim_kernel::Result<Value> {

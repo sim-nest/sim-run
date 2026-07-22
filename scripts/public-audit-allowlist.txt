@@ -1,0 +1,8 @@
+# Public-surface audit allowlist.
+#
+# Format:
+# kind|path-glob|line-regex|reason
+
+private-network|crates/sim-run-core/src/git_registry.rs|localhost|sim-run git registry validation treats localhost as a loopback fixture value only.
+private-network|crates/sim-run-core/src/git_registry_tests.rs|127\.0\.0\.1|sim-run git registry tests bind loopback sockets only.
+private-network|crates/sim-run-core/src/load_tests.rs|127\.0\.0\.1|sim-run loader tests bind loopback sockets only.

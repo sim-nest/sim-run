@@ -9,9 +9,9 @@
 //! the in-process [`LoadSession::add_host_factory`] host loader: with no host
 //! factory and no injected artifact loader it can boot **no codec and no
 //! library**, so `run(["sim", "run"])` fails with `no codec 'lisp' available`.
-//! This is by design -- behavior lives in loadable libraries, not baked into the
-//! frame -- but until the constellation is published there is no default codec
-//! to load.
+//! This is by design: behavior lives in loadable libraries, not baked into the
+//! frame. The default frame loads a codec when an explicit source, cache
+//! artifact, registry resolver, or host factory supplies it.
 //!
 //! A working session therefore comes from one of:
 //!
@@ -34,11 +34,14 @@ mod bootloader;
 mod codec_boot;
 mod config;
 mod crates_io;
+mod device_host;
+pub mod device_options;
 mod envelope;
 mod exit;
 #[cfg(feature = "registry")]
 mod git_registry;
 mod handoff;
+mod host;
 mod introspect;
 mod load;
 mod receipt;
@@ -50,7 +53,11 @@ mod codec_boot_tests;
 #[cfg(test)]
 mod config_report_tests;
 #[cfg(test)]
+mod config_site_tests;
+#[cfg(test)]
 mod config_tests;
+#[cfg(test)]
+mod device_host_tests;
 #[cfg(test)]
 mod handoff_tests;
 #[cfg(test)]
@@ -71,6 +78,13 @@ pub use config::{
     run_config_probe,
 };
 pub use crates_io::{CratesIoResolver, CratesIoSpec, ResolvedCratesIoSource, VersionReq};
+pub use device_host::{
+    AdapterTick, DeviceAdapterLoopPlan, DeviceConsentPolicy, DeviceEdgeSession, DeviceHostSpec,
+    DeviceHostStalePolicy, DevicePlacement, DevicePlacementError, DeviceProfile, DeviceProvider,
+    DeviceProviderKind, DeviceRateClass, DeviceSession, DeviceSite, DeviceSiteLocality,
+    DeviceSurfaceHubJoin, RouteArg, StubProvider, StubSession, compose_device_host,
+    compose_device_host_with_provider, derive_device_rate_class, install_device_bases,
+};
 #[cfg(feature = "registry")]
 pub use git_registry::{GIT_REGISTRY_ENDPOINT_ENV, GitRegistryResolver};
 pub use handoff::{CLI_MAIN_ENTRYPOINT, CliEntrypoint, cli_main_entrypoint_symbol};

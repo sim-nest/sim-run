@@ -1,0 +1,9 @@
+id = "index-find-codec"
+title = "Index Find Codec"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 70
+tags = ["cli", "index", "codec", "offline", "deterministic"]
+requires = ["sim-run", "sim-lib-index"]
+network = false

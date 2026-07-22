@@ -1,0 +1,9 @@
+id = "index-trace-cli"
+title = "Index Trace CLI"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 71
+tags = ["cli", "index", "trace", "offline", "deterministic"]
+requires = ["sim-run", "sim-lib-index"]
+network = false

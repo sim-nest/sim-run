@@ -30,10 +30,12 @@
 #![deny(missing_docs)]
 
 mod caps;
+mod entrypoint;
 mod input;
 mod render;
 
 pub use caps::{cli_caps, tui_caps};
+pub use entrypoint::{TtyViewLib, tty_intent_symbol, tty_render_symbol};
 pub use input::{KeyInput, intent_from_key, palette_intent_from_colon};
 pub use render::{render_palette, render_scene};
 

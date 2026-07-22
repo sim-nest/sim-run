@@ -1,5 +1,7 @@
 use super::*;
-use sim_kernel::Expr;
+use std::sync::Arc;
+
+use sim_kernel::{Args, Cx, DefaultFactory, EagerPolicy, Export, Expr, Lib, NumberLiteral, Symbol};
 use sim_lib_intent::{intent_kind_of, validate_intent};
 use sim_lib_scene::build::{stack, text_node};
 use sim_lib_scene::node;
@@ -193,4 +195,108 @@ fn cli_and_tui_caps_differ_in_input_and_color() {
     // Both are keyboard surfaces and carry the requested client id.
     assert!(cli.input_flag("keyboard") && tui.input_flag("keyboard"));
     assert_eq!(cli.client_id, "tty.local.1");
+}
+
+#[test]
+fn tty_view_lib_manifest_exports_surface_functions() {
+    let manifest = TtyViewLib::new().manifest();
+
+    assert_eq!(manifest.id, Symbol::qualified("view", "tty"));
+    assert!(manifest.exports.iter().any(|export| matches!(
+        export,
+        Export::Function { symbol, .. } if symbol == &tty_render_symbol()
+    )));
+    assert!(manifest.exports.iter().any(|export| matches!(
+        export,
+        Export::Function { symbol, .. } if symbol == &tty_intent_symbol()
+    )));
+}
+
+#[test]
+fn loadable_render_function_wraps_render_scene() {
+    let mut cx = test_cx();
+    cx.load_lib(&TtyViewLib::new()).expect("tty view lib loads");
+    let scene = composed_scene();
+    let scene_value = cx.factory().expr(scene).expect("scene value");
+
+    let output = cx
+        .call_function(&tty_render_symbol(), Args::new(vec![scene_value]))
+        .expect("render call succeeds");
+
+    assert_eq!(
+        output.object().as_expr(&mut cx).expect("string result"),
+        Expr::String(
+            [
+                "Surfaces",
+                "name | kind",
+                "alpha | scene/text",
+                "beta | scene/button",
+                "[Run]",
+            ]
+            .join("\n")
+        )
+    );
+}
+
+#[test]
+fn loadable_intent_function_wraps_key_reduction() {
+    let mut cx = test_cx();
+    cx.load_lib(&TtyViewLib::new()).expect("tty view lib loads");
+    let key = cx
+        .factory()
+        .expr(Expr::Symbol(Symbol::qualified("key", "enter")))
+        .expect("key value");
+    let pane = cx.factory().string("main".to_owned()).expect("pane value");
+    let target = cx
+        .factory()
+        .string("node-1".to_owned())
+        .expect("target value");
+    let field = cx
+        .factory()
+        .string("value".to_owned())
+        .expect("field value");
+    let tick = cx.factory().expr(number("7")).expect("tick value");
+
+    let intent = cx
+        .call_function(
+            &tty_intent_symbol(),
+            Args::new(vec![key, pane, target, field, tick]),
+        )
+        .expect("intent call succeeds")
+        .object()
+        .as_expr(&mut cx)
+        .expect("intent expression");
+
+    validate_intent(&intent).expect("produced intent validates");
+    assert_eq!(intent_kind_name(&intent), "invoke");
+}
+
+#[test]
+fn loadable_intent_function_returns_nil_for_unmapped_key() {
+    let mut cx = test_cx();
+    cx.load_lib(&TtyViewLib::new()).expect("tty view lib loads");
+    let key = cx
+        .factory()
+        .expr(Expr::Symbol(Symbol::qualified("key", "backspace")))
+        .expect("key value");
+
+    let output = cx
+        .call_function(&tty_intent_symbol(), Args::new(vec![key]))
+        .expect("intent call succeeds");
+
+    assert_eq!(
+        output.object().as_expr(&mut cx).expect("nil result"),
+        Expr::Nil
+    );
+}
+
+fn test_cx() -> Cx {
+    Cx::new(Arc::new(EagerPolicy), Arc::new(DefaultFactory))
+}
+
+fn number(text: &str) -> Expr {
+    Expr::Number(NumberLiteral {
+        domain: Symbol::qualified("number", "i64"),
+        canonical: text.to_owned(),
+    })
 }

@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use sim_kernel::{CapabilityName, Cx, Lib, LibLoader, LibSource, Result};
 
+use crate::{bytes_from_source, path_from_source, url_from_source};
+
 const WASM_MAGIC: &[u8; 4] = b"\0asm";
 const WASM_LOAD_CAPABILITY: &str = "loader.wasm";
 
@@ -29,33 +31,38 @@ impl WasmLoader {
 
 impl LibLoader for WasmLoader {
     fn can_load(&self, source: &LibSource) -> bool {
-        match source {
-            LibSource::Path(path) => path.extension().is_some_and(|ext| ext == "wasm"),
-            LibSource::Bytes(bytes) => bytes.get(..4) == Some(WASM_MAGIC.as_slice()),
-            LibSource::Url(_) => false,
-            LibSource::Symbol(_) | LibSource::Host(_) => false,
+        if let Ok(Some(path)) = path_from_source(source) {
+            return path.extension().is_some_and(|ext| ext == "wasm");
         }
+        if let Ok(Some(bytes)) = bytes_from_source(source) {
+            return bytes.get(..4) == Some(WASM_MAGIC.as_slice());
+        }
+        false
     }
 
     fn load(&self, cx: &mut Cx, source: LibSource) -> Result<Box<dyn Lib>> {
         cx.require(&wasm_load_capability())?;
 
-        match source {
-            LibSource::Path(path) => Ok(Box::new(sim_wasm_abi::load_wasm_lib_from_file(
+        if let Some(path) = path_from_source(&source)? {
+            return Ok(Box::new(sim_wasm_abi::load_wasm_lib_from_file(
                 self.runtime.clone(),
                 path,
-            )?)),
-            LibSource::Bytes(bytes) => Ok(Box::new(sim_wasm_abi::load_wasm_lib_from_bytes(
+            )?));
+        }
+        if let Some(bytes) = bytes_from_source(&source)? {
+            return Ok(Box::new(sim_wasm_abi::load_wasm_lib_from_bytes(
                 self.runtime.clone(),
                 &bytes,
-            )?)),
-            LibSource::Url(url) => Err(sim_kernel::Error::HostError(format!(
-                "url loading is not implemented for wasm source {url}"
-            ))),
-            _ => Err(sim_kernel::Error::HostError(
-                "wasm loader received unsupported source".to_owned(),
-            )),
+            )?));
         }
+        if let Some(url) = url_from_source(&source)? {
+            return Err(sim_kernel::Error::HostError(format!(
+                "url loading is not implemented for wasm source {url}"
+            )));
+        }
+        Err(sim_kernel::Error::HostError(
+            "wasm loader received unsupported source".to_owned(),
+        ))
     }
 }
 
@@ -63,9 +70,7 @@ impl LibLoader for WasmLoader {
 mod tests {
     use std::sync::Arc;
 
-    use sim_kernel::{
-        AbiVersion, Args, Cx, DefaultFactory, Expr, LibLoader, LibSource, LibTarget, Symbol,
-    };
+    use sim_kernel::{AbiVersion, Args, Cx, DefaultFactory, Expr, LibLoader, LibTarget, Symbol};
     use sim_wasm_abi::{
         AbiValue, Frame, InMemoryWasmRuntime, WasmExport, WasmGuestModule, WasmManifest,
         decode_value_frame, encode_exports_frame, encode_manifest_frame, encode_value_frame,
@@ -111,7 +116,7 @@ mod tests {
             .register_module(WASM_SITE_BYTES, Arc::new(SiteGuest))
             .unwrap();
         let loader = WasmLoader::new(runtime);
-        let source = LibSource::Bytes(WASM_SITE_BYTES.to_vec());
+        let source = crate::bytes_source(WASM_SITE_BYTES.to_vec());
         assert!(loader.can_load(&source));
 
         let mut cx = Cx::new(
@@ -145,7 +150,7 @@ mod tests {
     fn wasm_loader_requires_wasm_load_capability() {
         let runtime = Arc::new(InMemoryWasmRuntime::new());
         let loader = WasmLoader::new(runtime);
-        let source = LibSource::Bytes(WASM_SITE_BYTES.to_vec());
+        let source = crate::bytes_source(WASM_SITE_BYTES.to_vec());
         let mut cx = Cx::new(
             Arc::new(sim_kernel::NoopEvalPolicy),
             Arc::new(DefaultFactory),
