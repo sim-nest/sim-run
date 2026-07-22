@@ -1,7 +1,19 @@
 {
   "generator": "xtask crate-catalog v1",
-  "package_count": 6,
+  "package_count": 7,
   "packages": [
+    {
+      "description": "Loadable SIM Index exploration library for the sim bootloader.",
+      "generated_readme": false,
+      "manifest": "crates/sim-lib-index/Cargo.toml",
+      "name": "sim-lib-index",
+      "publish": "true",
+      "readme": "crates/sim-lib-index/README.md",
+      "root": "crates/sim-lib-index",
+      "target_kinds": [
+        "lib"
+      ]
+    },
     {
       "description": "Loadable SIM command-line REPL library.",
       "generated_readme": false,

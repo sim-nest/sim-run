@@ -6,6 +6,7 @@ Generated from Cargo metadata by `xtask crate-catalog v1`.
 
 | Package | Publish | Targets | Description |
 | --- | --- | --- | --- |
+| `sim-lib-index` | `true` | `lib` | Loadable SIM Index exploration library for the sim bootloader. |
 | `sim-lib-repl` | `true` | `lib` | Loadable SIM command-line REPL library. |
 | `sim-run-core` | `true` | `lib` | Core command entry API for the SIM bootloader. |
 | `sim-run-loaders` | `true` | `lib` | Feature-composable SIM bootloader loaders. |
