@@ -4,6 +4,8 @@ use sim_kernel::{Cx, DefaultFactory, Expr, NoopEvalPolicy, ReadPolicy, Symbol, W
 
 use super::{NativeAbiCodecDecoder, NativeAbiCodecEncoder, NativeGuest};
 
+// conformance: native loader codec proxy preserves manifest and export payloads.
+
 // A stand-in guest decodes the marshaled frame and returns a canned response,
 // so the proxy's marshal/unmarshal bridge is exercised without a real dylib.
 struct MockGuest;

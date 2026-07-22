@@ -1,5 +1,7 @@
 use std::process::Command;
 
+// conformance: glasses command dry-runs modeled and hardware boot plans.
+
 #[test]
 fn glasses_both_dry_run_boots_co_use_plan() {
     let output = Command::new(env!("CARGO_BIN_EXE_sim"))

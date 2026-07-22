@@ -304,3 +304,43 @@ where
 fn immutable_error() -> Error {
     Error::Eval("SIM Index Dir is immutable".to_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use sim_index_core::Visibility;
+    use sim_kernel::{DefaultFactory, NoopEvalPolicy};
+
+    use super::*;
+
+    // conformance: index Table/Dir backend exposes immutable generated index rows.
+    #[test]
+    fn table_dir_exposes_known_collections() {
+        let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+        let dir = IndexDir::new(IndexDoc {
+            schema: "sim.index".to_owned(),
+            generated_by: "test".to_owned(),
+            visibility: Visibility::Public,
+            subjects: Vec::new(),
+            anchors: Vec::new(),
+            surfaces: Vec::new(),
+            specimens: Vec::new(),
+            drafts: Vec::new(),
+            features: Vec::new(),
+            routes: Vec::new(),
+            edges: Vec::new(),
+        });
+
+        assert_eq!(dir.len(&mut cx).unwrap(), 7);
+        assert!(dir.has(&mut cx, Symbol::new("features")).unwrap());
+        assert!(dir.is_dir(&mut cx, Symbol::new("specimens")).unwrap());
+        assert!(!dir.has(&mut cx, Symbol::new("missing")).unwrap());
+        assert_eq!(
+            dir.display(&mut cx).unwrap(),
+            "index-dir[subjects=0, features=0, specimens=0]"
+        );
+        let nil = cx.factory().nil().unwrap();
+        assert!(dir.set(&mut cx, Symbol::new("features"), nil).is_err());
+    }
+}

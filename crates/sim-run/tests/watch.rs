@@ -1,5 +1,7 @@
 use std::process::Command;
 
+// conformance: watch command dry-runs modeled and import boot plans.
+
 #[test]
 fn watch_modeled_dry_run_boots_headless() {
     let output = Command::new(env!("CARGO_BIN_EXE_sim"))
