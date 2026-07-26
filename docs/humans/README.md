@@ -23,6 +23,7 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `feature/sim-run/glasses` | `crate/sim-run` | 1 | Start modeled or hardware-backed glasses plans through the shared command bootloader. |
 | `feature/sim-run/repl` | `crate/sim-lib-repl` | 1 | Run a SIM read-eval-print loop through the loaded REPL library and command surface. |
 | `feature/sim-run/runtime-index` | `crate/sim-lib-index` | 4 | Explore the merged SIM Index through the bootloader as stable Table/Dir rows and structured query output. |
+| `feature/sim-run/compute` | `crate/sim-run` | 1 | Start modeled and automatic compute inspection through the shared command bootloader. |
 | `feature/sim-run/loaders` | `crate/sim-run-loaders` | 1 | Load native, source, and re-exported runtime libraries as bootloader inputs. |
 | `feature/sim-run/index-table-dir` | `crate/sim-lib-index` | 1 | Expose the embedded SIM Index as immutable Table/Dir collections for loaded runtime code. |
 | `feature/sim-run/terminal-surface` | `crate/sim-view-tty` | 1 | Render and interpret terminal view intents through the loaded TTY surface library. |
@@ -380,6 +381,79 @@ order = 73
 tags = ["cli", "index", "examples", "offline", "deterministic"]
 requires = ["sim-run", "sim-lib-index"]
 network = false
+```
+
+### `feature/sim-run/compute`
+
+Specimen `spec-test/sim-run/crates/sim-run/tests/compute` is checked by `cargo test`.
+
+Source `crates/sim-run/tests/compute.rs`:
+
+```rust
+use std::process::Command;
+
+// conformance: compute command boots through the shared loader and loadable compute CLI.
+
+#[test]
+fn compute_devices_boots_modeled_and_auto_headless() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sim"))
+        .args(["compute", "devices", "--json", "--max-devices", "8"])
+        .output()
+        .expect("run sim compute devices");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("\"site\":\"site/compute/model\""),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("\"site\":\"site/compute/auto\""),
+        "{stdout}"
+    );
+    assert!(stdout.contains("\"installed\":true"), "{stdout}");
+    assert!(
+        stdout.contains("\"site\":\"site/compute/cuda\""),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("\"site\":\"site/compute/rocm\""),
+        "{stdout}"
+    );
+    assert!(stdout.contains("\"status\":\"no-adapter\""), "{stdout}");
+}
+
+#[test]
+fn compute_profile_uses_headless_profile_store_policy() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sim"))
+        .args(["compute", "profile", "list", "--json"])
+        .output()
+        .expect("run sim compute profile list");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "{\"status\":\"no-profile-store\",\"keys\":[],\"decision\":null}\n"
+    );
+}
+
+#[test]
+fn explicit_loads_still_override_compute_default_sources() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sim"))
+        .args(["--load", "host:missing", "compute", "devices"])
+        .output()
+        .expect("run sim compute with explicit missing host");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .starts_with("sim: unknown host library: missing")
+    );
+}
 ```
 
 ### `feature/sim-run/loaders`
