@@ -48,6 +48,29 @@ fn compute_profile_uses_headless_profile_store_policy() {
 }
 
 #[test]
+fn compute_acceptance_verify_reports_artifact_defects() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sim"))
+        .args([
+            "compute",
+            "acceptance",
+            "verify",
+            "--source",
+            "0123456789abcdef0123456789abcdef01234567",
+            "/tmp/missing-sim-compute-acceptance.sx",
+        ])
+        .output()
+        .expect("run sim compute acceptance verify");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("read acceptance artifact"),
+    );
+}
+
+#[test]
 fn explicit_loads_still_override_compute_default_sources() {
     let output = Command::new(env!("CARGO_BIN_EXE_sim"))
         .args(["--load", "host:missing", "compute", "devices"])

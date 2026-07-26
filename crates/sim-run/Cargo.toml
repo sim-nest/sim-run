@@ -34,9 +34,9 @@ wasm = [
 sim-run-core = { version = "0.1.6", path = "../sim-run-core" }
 sim-run-loaders = { version = "0.1.4", path = "../sim-run-loaders", optional = true, default-features = false }
 sim-kernel = { version = "0.1.4" }
-sim-lib-compute-auto = { version = "0.2.0" }
-sim-lib-compute-cli = { version = "0.1.1" }
-sim-lib-compute-model = { version = "0.2.0" }
+sim-lib-compute-auto = { version = "0.2.0", path = "../../../sim-compute/crates/sim-lib-compute-auto" }
+sim-lib-compute-cli = { version = "0.1.1", path = "../../../sim-compute/crates/sim-lib-compute-cli" }
+sim-lib-compute-model = { version = "0.2.0", path = "../../../sim-compute/crates/sim-lib-compute-model" }
 sim-lib-index = { version = "0.1.0", path = "../sim-lib-index" }
 sim-lib-repl = { version = "0.1.0", path = "../sim-lib-repl", optional = true }
 sim-wasm-abi = { version = "0.1.1", optional = true }

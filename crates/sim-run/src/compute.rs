@@ -27,6 +27,7 @@ pub(crate) fn with_compute_if_selected(command: &CliCommand, session: LoadSessio
         .with_capability(sim_lib_compute_cli::compute_device_capability())
         .with_capability(sim_lib_compute_cli::compute_profile_read_capability())
         .with_capability(sim_lib_compute_cli::compute_profile_write_capability())
+        .with_capability(sim_lib_compute_cli::compute_acceptance_capability())
         .with_default_verb_sources(
             COMPUTE_VERB,
             vec![
