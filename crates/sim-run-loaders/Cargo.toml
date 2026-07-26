@@ -30,7 +30,7 @@ sim-kernel = { version = "0.1.4", features = ["test-support"] }
 sim-wasm-abi = { version = "0.1.1" }
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies]
-libloading = { version = "0.8", optional = true }
+libloading = { version = "0.9", optional = true }
 
 [lints.rust]
 unsafe_code = "deny"
