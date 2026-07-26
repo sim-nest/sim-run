@@ -166,6 +166,28 @@ supports = [
 ]
 
 [[feature]]
+id = "feature/sim-run/compute"
+title = "Compute command dispatch"
+summary = "Start modeled and automatic compute inspection through the shared command bootloader."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use this row when checking how the sim compute verb loads the sim-compute CLI and headless provider libraries."
+claims_anchors = [
+  "anchor/cli/sim-run",
+  "anchor/crate/sim-run",
+  "anchor/runtime-lib/sim-run/compute-boot-codec",
+]
+claims_surfaces = [
+  "cli/sim-run",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-run/tests/compute",
+]
+supports = [
+  "feature/sim-run/bootloader",
+]
+
+[[feature]]
 id = "feature/sim-run/loaders"
 title = "Loadable source libraries"
 summary = "Load native, source, and re-exported runtime libraries as bootloader inputs."
@@ -273,6 +295,16 @@ steps = [
   { feature = "feature/sim-run/bootloader", why = "The bootloader prepares the command runtime." },
   { feature = "feature/sim-run/glasses", why = "The glasses row owns the glasses command surface and loaded glasses libraries." },
   { specimen = "spec-test/sim-run/crates/sim-run/tests/glasses", why = "The checked command test exercises the glasses entry point." },
+]
+
+[[route]]
+id = "route/start-a-compute-command"
+task = "Start a compute command"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader prepares the command runtime." },
+  { feature = "feature/sim-run/compute", why = "The compute row owns dispatch into the loadable compute CLI and headless provider libraries." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/compute", why = "The checked command test exercises modeled and automatic compute boot." },
 ]
 
 [[route]]

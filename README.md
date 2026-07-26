@@ -26,6 +26,8 @@ the exact command grammar is under
 - `sim-run-core` provides the command entry API used by the binary.
 - `sim-run-loaders` provides source-kind helpers, source and binary lib loaders,
   and optional native/wasm loader mechanisms.
+- `sim-lib-compute-cli` is consumed as a published loadable command library for
+  `sim compute`, alongside headless modeled and automatic compute site providers.
 - `sim-lib-index` provides the loadable `cli/main/index` entry point and the
   immutable table view over the embedded public SIM Index snapshot.
 - `sim-lib-repl` provides the loadable `cli/main/repl` entry point and the
@@ -46,6 +48,7 @@ sim --version
 sim --codec lisp --load symbol:demo run --payload-for-loaded-libs
 sim --codec lisp --load symbol:demo -- run --payload-for-loaded-libs
 sim index find codec --audience code --json
+sim compute devices --json
 ```
 
 The parser accepts `--codec`, repeated `--load`, `--list`, `--inspect`,
@@ -70,6 +73,11 @@ or nil is `1`.
 SIM Index snapshot through `codec/index`, exports it as an immutable `index/dir`
 Table/Dir value, and provides `list`, `show`, `find`, `route`, `trace`, and `examples`
 queries for human and agent use.
+
+`sim compute` is also a host-registered runtime library dispatch. The binary
+registers the published compute CLI plus modeled and automatic site providers,
+then hands the payload to `cli/main/compute`; hardware provider capabilities
+remain optional and are supplied only by explicitly loaded hardware libraries.
 
 `crates.io:` resolution belongs to `sim-run-core`, not the kernel. The resolver
 checks a CLI-owned cache directory first: `SIM_CLI_CACHE_DIR` when set, then
