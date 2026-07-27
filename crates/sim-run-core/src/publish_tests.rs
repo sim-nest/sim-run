@@ -32,14 +32,14 @@ fn manifests_carry_publish_metadata_and_version_requirements() {
     );
     assert_dependency_version(&core, "sim-kernel", "0.1.4");
     assert_dependency_has_no_path(&core, "sim-kernel");
-    assert_dependency_version(&core, "sim-run-loaders", "0.1.4");
+    assert_dependency_matches_package_version(&core, "sim-run-loaders", &loaders);
     assert_dependency_path(&core, "sim-run-loaders", "../sim-run-loaders");
 
     assert_package_metadata(&binary, "sim-run", "SIM bootloader command line.");
     assert_eq_value(&binary, "bin", "name", "sim");
-    assert_dependency_version(&binary, "sim-run-core", "0.1.6");
+    assert_dependency_matches_package_version(&binary, "sim-run-core", &core);
     assert_dependency_path(&binary, "sim-run-core", "../sim-run-core");
-    assert_dependency_version(&binary, "sim-run-loaders", "0.1.4");
+    assert_dependency_matches_package_version(&binary, "sim-run-loaders", &loaders);
     assert_dependency_path(&binary, "sim-run-loaders", "../sim-run-loaders");
 
     assert_package_metadata(
@@ -211,6 +211,18 @@ fn assert_dependency_version(manifest: &Manifest, dependency: &str, expected: &s
         Some(expected),
         "dependency {dependency} must carry version {expected}"
     );
+}
+
+fn assert_dependency_matches_package_version(
+    manifest: &Manifest,
+    dependency: &str,
+    package_manifest: &Manifest,
+) {
+    let expected = package_manifest
+        .get("package", "version")
+        .map(unquote)
+        .unwrap_or_else(|| panic!("missing [package] version for dependency {dependency}"));
+    assert_dependency_version(manifest, dependency, expected);
 }
 
 fn assert_dependency_path(manifest: &Manifest, dependency: &str, expected: &str) {
