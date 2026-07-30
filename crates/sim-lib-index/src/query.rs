@@ -1,6 +1,6 @@
 //! Pure query helpers over the SIM Index graph.
 
-use sim_index_core::{DiscoveredSpecimen, FeatureRecord, IndexDoc};
+use sim_index_core::{DiscoveredSpecimen, FeatureRecord, IndexDoc, RouteRecord, RouteStep};
 
 use crate::IndexError;
 
@@ -106,48 +106,53 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
         }
     }
 
-    for subject in &doc.subjects {
-        if !subject_matches_filters(subject.id.as_str(), query) {
-            continue;
+    if query.audience.is_none() {
+        for subject in &doc.subjects {
+            if !subject_matches_filters(subject.id.as_str(), query) {
+                continue;
+            }
+            let text = [subject.id.as_str(), &subject.kind, &subject.title].join(" ");
+            if terms_match(&text, &terms) {
+                hits.push(Hit {
+                    kind: subject.kind.clone(),
+                    id: subject.id.to_string(),
+                    title: subject.title.clone(),
+                    summary: subject.kind.clone(),
+                    owner: subject.id.to_string(),
+                    surfaces: surfaces_for_subject(doc, subject.id.as_str()),
+                });
+            }
         }
-        let text = [subject.id.as_str(), &subject.kind, &subject.title].join(" ");
-        if terms_match(&text, &terms) {
-            hits.push(Hit {
-                kind: subject.kind.clone(),
-                id: subject.id.to_string(),
-                title: subject.title.clone(),
-                summary: subject.kind.clone(),
-                owner: subject.id.to_string(),
-                surfaces: surfaces_for_subject(doc, subject.id.as_str()),
-            });
-        }
-    }
 
-    for surface in &doc.surfaces {
-        if query
-            .surface_kind
-            .as_deref()
-            .is_some_and(|kind| kind != surface.kind)
-        {
-            continue;
-        }
-        if !subject_matches_filters(surface.subject.as_str(), query) {
-            continue;
-        }
-        let text = [surface.id.as_str(), &surface.kind, surface.subject.as_str()].join(" ");
-        if terms_match(&text, &terms) {
-            hits.push(Hit {
-                kind: "surface".to_owned(),
-                id: surface.id.to_string(),
-                title: surface.id.to_string(),
-                summary: surface.kind.clone(),
-                owner: surface.subject.to_string(),
-                surfaces: vec![surface.id.to_string()],
-            });
+        for surface in &doc.surfaces {
+            if query
+                .surface_kind
+                .as_deref()
+                .is_some_and(|kind| kind != surface.kind)
+            {
+                continue;
+            }
+            if !subject_matches_filters(surface.subject.as_str(), query) {
+                continue;
+            }
+            let text = [surface.id.as_str(), &surface.kind, surface.subject.as_str()].join(" ");
+            if terms_match(&text, &terms) {
+                hits.push(Hit {
+                    kind: "surface".to_owned(),
+                    id: surface.id.to_string(),
+                    title: surface.id.to_string(),
+                    summary: surface.kind.clone(),
+                    owner: surface.subject.to_string(),
+                    surfaces: vec![surface.id.to_string()],
+                });
+            }
         }
     }
 
     for specimen in &doc.specimens {
+        if !specimen_matches_audience(doc, specimen.id.as_str(), query.audience.as_deref()) {
+            continue;
+        }
         if query
             .language
             .as_deref()
@@ -165,7 +170,9 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
             specimen.subject.as_str(),
         ]
         .join(" ");
-        if terms_match(&text, &terms) {
+        if terms_match(&text, &terms)
+            || specimen_linked_feature_matches(doc, specimen.id.as_str(), query, &terms)
+        {
             hits.push(Hit {
                 kind: "specimen".to_owned(),
                 id: specimen.id.to_string(),
@@ -178,6 +185,9 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
     }
 
     for route in &doc.routes {
+        if !route_matches_audience(route, query.audience.as_deref()) {
+            continue;
+        }
         let mut text = format!("{} {}", route.id.as_str(), route.title);
         for audience in &route.audiences {
             text.push(' ');
@@ -378,6 +388,9 @@ fn terms_match(text: &str, terms: &[String]) -> bool {
 }
 
 fn matches_feature_filters(doc: &IndexDoc, feature: &FeatureRecord, query: &Query) -> bool {
+    if !feature_matches_audience(doc, feature.id.as_str(), query.audience.as_deref()) {
+        return false;
+    }
     if !subject_matches_filters(feature.subject.as_str(), query) {
         return false;
     }
@@ -416,6 +429,62 @@ fn matches_feature_filters(doc: &IndexDoc, feature: &FeatureRecord, query: &Quer
         return false;
     }
     true
+}
+
+fn feature_matches_audience(doc: &IndexDoc, feature_id: &str, audience: Option<&str>) -> bool {
+    let Some(audience) = audience else {
+        return true;
+    };
+    doc.routes.iter().any(|route| {
+        route.audiences.iter().any(|item| item == audience)
+            && route.steps.iter().any(|step| match step {
+                RouteStep::Feature { id, .. } => id.as_str() == feature_id,
+                RouteStep::Specimen { .. } => false,
+            })
+    })
+}
+
+fn specimen_matches_audience(doc: &IndexDoc, specimen_id: &str, audience: Option<&str>) -> bool {
+    let Some(audience) = audience else {
+        return true;
+    };
+    doc.routes.iter().any(|route| {
+        route.audiences.iter().any(|item| item == audience)
+            && route.steps.iter().any(|step| match step {
+                RouteStep::Feature { .. } => false,
+                RouteStep::Specimen { id, .. } => id.as_str() == specimen_id,
+            })
+    })
+}
+
+fn route_matches_audience(route: &RouteRecord, audience: Option<&str>) -> bool {
+    audience.is_none_or(|expected| route.audiences.iter().any(|item| item == expected))
+}
+
+fn specimen_linked_feature_matches(
+    doc: &IndexDoc,
+    specimen_id: &str,
+    query: &Query,
+    terms: &[String],
+) -> bool {
+    doc.features.iter().any(|feature| {
+        feature
+            .specimens
+            .iter()
+            .any(|id| id.as_str() == specimen_id)
+            && matches_feature_filters(doc, feature, query)
+            && terms_match(
+                &[
+                    feature.id.as_str(),
+                    feature.key.as_str(),
+                    feature.subject.as_str(),
+                    &feature.title,
+                    &feature.summary,
+                ]
+                .join(" "),
+                terms,
+            )
+    })
 }
 
 fn subject_matches_filters(subject: &str, query: &Query) -> bool {
@@ -458,4 +527,120 @@ fn anchors_for_subject(doc: &IndexDoc, subject: &str) -> Vec<String> {
         .filter(|anchor| anchor.subject.as_str() == subject)
         .map(|anchor| anchor.id.to_string())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use sim_index_core::{
+        CanonicalFeatureKey, DiscoveredSpecimen, DiscoveredSurface, FeatureId, FeatureRecord,
+        IndexDoc, RouteId, RouteRecord, RouteStep, SpecimenId, SubjectId, SubjectRecord, SurfaceId,
+        Visibility,
+    };
+
+    use super::*;
+
+    #[test]
+    fn audience_filter_matches_control_plane_route_reachability() {
+        let framework_feature = FeatureId::new("feature/demo/expression-tree");
+        let code_feature = FeatureId::new("feature/demo/expression-tree-command");
+        let specimen = SpecimenId::new("recipe/demo/open");
+        let doc = IndexDoc {
+            schema: "sim.index".to_owned(),
+            generated_by: "test".to_owned(),
+            visibility: Visibility::Public,
+            subjects: vec![SubjectRecord {
+                id: SubjectId::new("crate/expression-tree"),
+                kind: "crate".to_owned(),
+                title: "expression-tree".to_owned(),
+            }],
+            anchors: Vec::new(),
+            surfaces: vec![DiscoveredSurface {
+                id: SurfaceId::new("cli/expression-tree"),
+                subject: SubjectId::new("crate/expression-tree"),
+                kind: "cli".to_owned(),
+            }],
+            specimens: vec![DiscoveredSpecimen {
+                id: specimen.clone(),
+                subject: SubjectId::new("crate/expression-tree"),
+                kind: "recipe".to_owned(),
+                path: "recipes/open/recipe.toml".to_owned(),
+                language: None,
+                runnable: true,
+                checked: true,
+                checked_by: Some("cargo test".to_owned()),
+                doc_anchor: None,
+            }],
+            drafts: Vec::new(),
+            features: vec![
+                feature(
+                    framework_feature.clone(),
+                    "Loadable expression-tree framework",
+                    vec![specimen.clone()],
+                ),
+                feature(code_feature.clone(), "Expression-tree command", Vec::new()),
+            ],
+            routes: vec![
+                RouteRecord {
+                    id: RouteId::new("route/open-expression-tree"),
+                    title: "Open an expression tree".to_owned(),
+                    audiences: vec!["framework".to_owned()],
+                    steps: vec![
+                        RouteStep::Feature {
+                            id: framework_feature,
+                            why: "Use the framework.".to_owned(),
+                        },
+                        RouteStep::Specimen {
+                            id: specimen,
+                            why: "Run the checked example.".to_owned(),
+                        },
+                    ],
+                    doc_anchor: None,
+                },
+                RouteRecord {
+                    id: RouteId::new("route/start-expression-tree-command"),
+                    title: "Start an expression tree command".to_owned(),
+                    audiences: vec!["code".to_owned()],
+                    steps: vec![RouteStep::Feature {
+                        id: code_feature,
+                        why: "Use the command.".to_owned(),
+                    }],
+                    doc_anchor: None,
+                },
+            ],
+            edges: Vec::new(),
+        };
+        let rows = find(
+            &doc,
+            &Query {
+                terms: vec!["expression-tree".to_owned()],
+                audience: Some("framework".to_owned()),
+                ..Query::default()
+            },
+        );
+        let ids = rows.iter().map(|row| row.id.as_str()).collect::<Vec<_>>();
+
+        assert_eq!(
+            ids,
+            [
+                "feature/demo/expression-tree",
+                "recipe/demo/open",
+                "route/open-expression-tree",
+            ]
+        );
+    }
+
+    fn feature(id: FeatureId, title: &str, specimens: Vec<SpecimenId>) -> FeatureRecord {
+        FeatureRecord {
+            key: CanonicalFeatureKey::new(format!("crate/expression-tree/{}", id.as_str())),
+            id,
+            subject: SubjectId::new("crate/expression-tree"),
+            title: title.to_owned(),
+            summary: "Expression-tree capability.".to_owned(),
+            anchors: Vec::new(),
+            surfaces: Vec::new(),
+            specimens,
+            grammar_contracts: Vec::new(),
+            doc_anchor: None,
+        }
+    }
 }
