@@ -32,6 +32,7 @@ where
     session = crate::glasses::with_glasses_if_selected(&command, session);
     session = crate::index::with_index_if_selected(&command, session);
     session = crate::compute::with_compute_if_selected(&command, session);
+    session = crate::expr_tree::with_expr_tree_if_selected(&command, session);
     sim_run_core::run_command_with_session(command, &mut session)
 }
 

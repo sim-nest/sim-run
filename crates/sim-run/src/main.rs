@@ -15,6 +15,7 @@
 use std::process;
 
 mod compute;
+mod expr_tree;
 mod glasses;
 mod glasses_args;
 mod glasses_plan;
@@ -39,6 +40,7 @@ fn boot() -> Result<i32, sim_run_core::CliError> {
     session = glasses::with_glasses_if_selected(&command, session);
     session = index::with_index_if_selected(&command, session);
     session = compute::with_compute_if_selected(&command, session);
+    session = expr_tree::with_expr_tree_if_selected(&command, session);
     sim_run_core::run_command_with_session(command, &mut session)
 }
 

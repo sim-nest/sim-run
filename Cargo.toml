@@ -21,3 +21,16 @@ homepage = "https://github.com/sim-nest/sim-run"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+[patch.crates-io]
+sim-run-core = { path = "crates/sim-run-core" }
+sim-run-loaders = { path = "crates/sim-run-loaders" }
+sim-lib-server = { path = "../sim-agent-net/crates/sim-lib-server" }
+sim-lib-intent = { path = "../sim-web/crates/sim-lib-intent" }
+sim-lib-scene = { path = "../sim-web/crates/sim-lib-scene" }
+sim-lib-view = { path = "../sim-web/crates/sim-lib-view" }
+sim-lib-view-device = { path = "../sim-web/crates/sim-lib-view-device" }
+sim-lib-view-spatial = { path = "../sim-web/crates/sim-lib-view-spatial" }
+sim-lib-web-bridge = { path = "../sim-web/crates/sim-lib-web-bridge" }
+sim-web-shell = { path = "../sim-web/crates/sim-web-shell" }
+sim-lib-stream-fabric = { path = "../sim-agent-net/crates/sim-lib-stream-fabric" }
