@@ -10,8 +10,8 @@ repository = "https://github.com/sim-nest/sim-run"
 homepage = "https://github.com/sim-nest/sim-run"
 
 [dependencies]
-sim-kernel = { version = "0.1.0" }
-sim-value = { version = "0.1.0" }
+sim-kernel = { version = "0.2.0" }
+sim-value = { version = "0.2.0" }
 sim-lib-scene = { version = "0.2.0" }
 sim-lib-intent = { version = "0.2.0" }
 sim-lib-view = { version = "0.2.0" }
