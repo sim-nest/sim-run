@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 
-use sim_kernel::{Cx, Symbol, Value};
+use sim_kernel::{Cx, Error, Expr, Result as KernelResult, Symbol, Value};
 
 use crate::{CliEnvelope, CliError, source::symbol_from_text};
 
@@ -38,6 +38,33 @@ pub fn cli_envelope_value(cx: &mut Cx, envelope: &CliEnvelope) -> Result<Value, 
             (Symbol::new("stdin"), stdin),
         ])
         .map_err(envelope_error)
+}
+
+/// Extracts the UTF-8 payload arguments from a generic CLI envelope value.
+///
+/// Loaded command libraries use this instead of defining product-specific
+/// projections of the bootloader-owned envelope table.
+pub fn cli_envelope_args(cx: &mut Cx, envelope: &Value) -> KernelResult<Vec<String>> {
+    let Some(table) = envelope.object().as_table_impl() else {
+        return Err(Error::Eval("CLI envelope is not a table".to_owned()));
+    };
+    let value = table.get(cx, Symbol::new("args"))?;
+    let Expr::List(items) = value.object().as_expr(cx)? else {
+        return Err(Error::TypeMismatch {
+            expected: "argument list",
+            found: "non-list",
+        });
+    };
+    items
+        .into_iter()
+        .map(|item| match item {
+            Expr::String(value) => Ok(value),
+            _ => Err(Error::TypeMismatch {
+                expected: "string argument",
+                found: "non-string",
+            }),
+        })
+        .collect()
 }
 
 fn option_string(cx: &mut Cx, value: Option<&str>) -> Result<Value, CliError> {

@@ -85,6 +85,7 @@ pub use device_host::{
     DeviceSurfaceHubJoin, RouteArg, StubProvider, StubSession, compose_device_host,
     compose_device_host_with_provider, derive_device_rate_class, install_device_bases,
 };
+pub use envelope::cli_envelope_args;
 #[cfg(feature = "registry")]
 pub use git_registry::{GIT_REGISTRY_ENDPOINT_ENV, GitRegistryResolver};
 pub use handoff::{CLI_MAIN_ENTRYPOINT, CliEntrypoint, cli_main_entrypoint_symbol};

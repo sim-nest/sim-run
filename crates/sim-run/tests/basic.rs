@@ -9,10 +9,7 @@ fn version_flag_prints_binary_version() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(
-        stdout.starts_with("sim 0.1.") && stdout.ends_with('\n'),
-        "unexpected version line: {stdout:?}"
-    );
+    assert_eq!(stdout, format!("sim {}\n", env!("CARGO_PKG_VERSION")));
     assert!(output.stderr.is_empty());
 }
 

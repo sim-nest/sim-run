@@ -188,6 +188,27 @@ supports = [
 ]
 
 [[feature]]
+id = "feature/sim-run/expression-tree-command"
+title = "Expression-tree command dispatch"
+summary = "Load the standard expression-tree product recipe through the shared command bootloader."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use this row to trace sim expr-tree from the standard distribution into the exact sim-lib-expr-tree-serve composition shared with the standalone product binary. sim-run only selects the verb and delegates session composition; the serve library owns configuration, capability grants, codec setup, product behavior, and cli/main/expr-tree."
+supports = [
+  "feature/sim-run/bootloader",
+]
+claims_anchors = [
+  "anchor/cli/sim-run",
+  "anchor/crate/sim-run",
+]
+claims_surfaces = [
+  "cli/sim-run",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-run/tests/expr_tree",
+]
+
+[[feature]]
 id = "feature/sim-run/loaders"
 title = "Loadable source libraries"
 summary = "Load native, source, and re-exported runtime libraries as bootloader inputs."
@@ -305,6 +326,16 @@ steps = [
   { feature = "feature/sim-run/bootloader", why = "The bootloader prepares the command runtime." },
   { feature = "feature/sim-run/compute", why = "The compute row owns dispatch into the loadable compute CLI and headless provider libraries." },
   { specimen = "spec-test/sim-run/crates/sim-run/tests/compute", why = "The checked command test exercises modeled and automatic compute boot." },
+]
+
+[[route]]
+id = "route/start-an-expression-tree-command"
+task = "Start an expression tree command"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader prepares the standard command runtime." },
+  { feature = "feature/sim-run/expression-tree-command", why = "The command row selects expr-tree and delegates the complete host composition to sim-lib-expr-tree-serve." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/expr_tree", why = "The checked command specimen exercises the standard-distribution entry point." },
 ]
 
 [[route]]

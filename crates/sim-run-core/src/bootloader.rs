@@ -51,6 +51,17 @@ impl Bootloader {
         }
     }
 
+    /// Applies a reusable host composition to the underlying load session.
+    ///
+    /// Product libraries use this when a standalone product binary and the
+    /// standard `sim` distribution must install exactly the same host
+    /// factories, capabilities, context support, and runtime configuration.
+    pub fn configure_session(self, configure: impl FnOnce(LoadSession) -> LoadSession) -> Self {
+        Self {
+            session: configure(self.session),
+        }
+    }
+
     /// Registers a statically-linked library under `name` and makes it the default
     /// source for `verb`, so a bare `<verb> ARGS...` dispatches to the library's
     /// `cli/main/<verb>` entrypoint with no explicit `--load`.
