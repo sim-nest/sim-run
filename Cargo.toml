@@ -24,6 +24,7 @@ unsafe_code = "forbid"
 
 [patch.crates-io]
 sim-codec-index = { path = "../sim-codecs/crates/sim-codec-index" }
+sim-test-support = { path = "../sim-codecs/crates/sim-test-support" }
 sim-index-core = { path = "../sim-foundation/crates/sim-index-core" }
 sim-lib-compute-auto = { path = "../sim-compute/crates/sim-lib-compute-auto" }
 sim-lib-compute-cli = { path = "../sim-compute/crates/sim-lib-compute-cli" }
