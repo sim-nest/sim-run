@@ -49,7 +49,7 @@ title = "Bootloader command dispatch"
 summary = "Start product commands through the shared bootloader and loaded runtime libraries."
 owner = "crate/sim-run-core"
 audiences = ["user", "code"]
-guidance = "Use this row when following how command verbs enter the runtime."
+guidance = "Use this row when following how command verbs enter the runtime. Language profiles, including JavaScript, enter through generic codec/load/profile controls; the bootloader owns no language engine and adds no language-specific executable."
 claims_anchors = [
   "anchor/cli/sim-run",
   "anchor/crate/sim-run",
