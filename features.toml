@@ -49,7 +49,7 @@ title = "Bootloader command dispatch"
 summary = "Start product commands through the shared bootloader and loaded runtime libraries."
 owner = "crate/sim-run-core"
 audiences = ["user", "code"]
-guidance = "Use this row when following how command verbs enter the runtime."
+guidance = "TypeScript notation; does not type-check. Use `language/typescript-notation` when following the notation profile through generic codec/load/profile controls. The bootloader owns no language engine and adds no TypeScript executable, tsc, tsserver, or LSP service."
 claims_anchors = [
   "anchor/cli/sim-run",
   "anchor/crate/sim-run",
@@ -173,12 +173,7 @@ owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Use this row when checking how the sim compute verb loads the sim-compute CLI and headless provider libraries."
 claims_anchors = [
-  "anchor/cli/sim-run",
-  "anchor/crate/sim-run",
   "anchor/runtime-lib/sim-run/compute-boot-codec",
-]
-claims_surfaces = [
-  "cli/sim-run",
 ]
 claims_specimens = [
   "spec-test/sim-run/crates/sim-run/tests/compute",
@@ -196,13 +191,6 @@ audiences = ["user", "code"]
 guidance = "Use this row to trace sim expr-tree from the standard distribution into the exact sim-lib-expr-tree-serve composition shared with the standalone product binary. sim-run only selects the verb and delegates session composition; the serve library owns configuration, capability grants, codec setup, product behavior, and cli/main/expr-tree."
 supports = [
   "feature/sim-run/bootloader",
-]
-claims_anchors = [
-  "anchor/cli/sim-run",
-  "anchor/crate/sim-run",
-]
-claims_surfaces = [
-  "cli/sim-run",
 ]
 claims_specimens = [
   "spec-test/sim-run/crates/sim-run/tests/expr_tree",

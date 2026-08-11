@@ -14,6 +14,9 @@
 
 use std::process;
 
+const TYPESCRIPT_NOTATION_HELP: &str =
+    "Language profile: language/typescript-notation — TypeScript notation; does not type-check.\n";
+
 mod compute;
 mod expr_tree;
 mod glasses;
@@ -26,6 +29,12 @@ mod watch;
 mod watch_args;
 
 fn main() {
+    if std::env::args_os()
+        .skip(1)
+        .any(|arg| arg == "--help" || arg == "-h")
+    {
+        print!("{TYPESCRIPT_NOTATION_HELP}");
+    }
     let code = boot().unwrap_or_else(|err| {
         eprintln!("sim: {err}");
         2

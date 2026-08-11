@@ -24,6 +24,8 @@ fn help_flag_prints_usage() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("Usage: sim [OPTIONS] [PAYLOAD...]"));
     assert!(stdout.contains("--version"));
+    assert!(stdout.contains("language/typescript-notation"));
+    assert!(stdout.contains("TypeScript notation; does not type-check"));
     assert!(output.stderr.is_empty());
 }
 
