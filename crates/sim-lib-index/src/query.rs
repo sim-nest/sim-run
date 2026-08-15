@@ -3,6 +3,7 @@
 use sim_index_core::{DiscoveredSpecimen, FeatureRecord, IndexDoc, RouteRecord, RouteStep};
 
 use crate::IndexError;
+pub use crate::source_facts::{DeclarationHit, ProtocolRelationHit};
 
 /// Search terms and optional structured filters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -23,19 +24,14 @@ pub struct Query {
     pub package: Option<String>,
     /// Required anchor id filter.
     pub anchor: Option<String>,
-}
-
-impl Query {
-    /// Returns true when no structured filter is present.
-    pub fn is_unfiltered(&self) -> bool {
-        self.audience.is_none()
-            && self.surface_kind.is_none()
-            && self.language.is_none()
-            && self.grammar.is_none()
-            && self.repo.is_none()
-            && self.package.is_none()
-            && self.anchor.is_none()
-    }
+    /// Public declaration role filter.
+    pub declaration_kind: Option<String>,
+    /// Implemented protocol spelling or resolved identity filter.
+    pub implements: Option<String>,
+    /// Protocol resolution filter (`true` for resolved).
+    pub resolved: Option<bool>,
+    /// Feature id or canonical key owning the source fact.
+    pub feature: Option<String>,
 }
 
 /// One search result row.
@@ -53,6 +49,10 @@ pub struct Hit {
     pub owner: String,
     /// Claimed or discovered surface ids.
     pub surfaces: Vec<String>,
+    /// Declaration facts attached to an anchor result.
+    pub declarations: Vec<DeclarationHit>,
+    /// Protocol relations attached to an anchor result.
+    pub protocol_relations: Vec<ProtocolRelationHit>,
 }
 
 /// A traced graph neighborhood for one id.
@@ -82,6 +82,8 @@ pub struct Trace {
 pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
     let terms: Vec<String> = query.terms.iter().map(|term| term.to_lowercase()).collect();
     let mut hits = Vec::new();
+    let fact_filter_active = crate::source_facts::filter_active(query);
+    let selected_anchors = crate::source_facts::selected_anchors(doc, query, &terms);
 
     for feature in &doc.features {
         if !matches_feature_filters(doc, feature, query) {
@@ -94,7 +96,12 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
             feature.subject.as_str(),
         ]
         .join(" ");
-        if terms_match(&text, &terms) {
+        if (!fact_filter_active && terms_match(&text, &terms))
+            || feature
+                .anchors
+                .iter()
+                .any(|anchor| selected_anchors.contains(anchor))
+        {
             hits.push(Hit {
                 kind: "feature".to_owned(),
                 id: feature.id.to_string(),
@@ -102,6 +109,8 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
                 summary: feature.summary.clone(),
                 owner: feature.subject.to_string(),
                 surfaces: feature.surfaces.iter().map(ToString::to_string).collect(),
+                declarations: Vec::new(),
+                protocol_relations: Vec::new(),
             });
         }
     }
@@ -112,16 +121,33 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
                 continue;
             }
             let text = [subject.id.as_str(), &subject.kind, &subject.title].join(" ");
-            if terms_match(&text, &terms) {
+            if (!fact_filter_active && terms_match(&text, &terms))
+                || doc.anchors.iter().any(|anchor| {
+                    anchor.subject == subject.id && selected_anchors.contains(&anchor.id)
+                })
+            {
                 hits.push(Hit {
-                    kind: subject.kind.clone(),
+                    kind: if fact_filter_active && subject.kind == "crate" {
+                        "package".to_owned()
+                    } else {
+                        subject.kind.clone()
+                    },
                     id: subject.id.to_string(),
                     title: subject.title.clone(),
                     summary: subject.kind.clone(),
                     owner: subject.id.to_string(),
                     surfaces: surfaces_for_subject(doc, subject.id.as_str()),
+                    declarations: Vec::new(),
+                    protocol_relations: Vec::new(),
                 });
             }
+        }
+
+        for anchor in &doc.anchors {
+            if !selected_anchors.contains(&anchor.id) {
+                continue;
+            }
+            hits.push(crate::source_facts::anchor_hit(doc, anchor));
         }
 
         for surface in &doc.surfaces {
@@ -144,6 +170,8 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
                     summary: surface.kind.clone(),
                     owner: surface.subject.to_string(),
                     surfaces: vec![surface.id.to_string()],
+                    declarations: Vec::new(),
+                    protocol_relations: Vec::new(),
                 });
             }
         }
@@ -170,8 +198,20 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
             specimen.subject.as_str(),
         ]
         .join(" ");
-        if terms_match(&text, &terms)
-            || specimen_linked_feature_matches(doc, specimen.id.as_str(), query, &terms)
+        let linked_to_selected = doc.features.iter().any(|feature| {
+            feature
+                .specimens
+                .iter()
+                .any(|id| id.as_str() == specimen.id.as_str())
+                && feature
+                    .anchors
+                    .iter()
+                    .any(|id| selected_anchors.contains(id))
+        });
+        if (!fact_filter_active
+            && (terms_match(&text, &terms)
+                || specimen_linked_feature_matches(doc, specimen.id.as_str(), query, &terms)))
+            || linked_to_selected
         {
             hits.push(Hit {
                 kind: "specimen".to_owned(),
@@ -180,6 +220,8 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
                 summary: specimen.path.clone(),
                 owner: specimen.subject.to_string(),
                 surfaces: Vec::new(),
+                declarations: Vec::new(),
+                protocol_relations: Vec::new(),
             });
         }
     }
@@ -199,7 +241,7 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
             text.push(' ');
             text.push_str(step.why());
         }
-        if terms_match(&text, &terms) {
+        if !fact_filter_active && terms_match(&text, &terms) {
             hits.push(Hit {
                 kind: "route".to_owned(),
                 id: route.id.to_string(),
@@ -207,11 +249,17 @@ pub fn find(doc: &IndexDoc, query: &Query) -> Vec<Hit> {
                 summary: format!("{} steps", route.steps.len()),
                 owner: "route".to_owned(),
                 surfaces: Vec::new(),
+                declarations: Vec::new(),
+                protocol_relations: Vec::new(),
             });
         }
     }
 
-    hits.sort_by(|left, right| left.id.cmp(&right.id));
+    if fact_filter_active {
+        hits.sort_by(|left, right| (&left.kind, &left.id).cmp(&(&right.kind, &right.id)));
+    } else {
+        hits.sort_by(|left, right| left.id.cmp(&right.id));
+    }
     hits
 }
 
@@ -379,7 +427,7 @@ fn describe_target(doc: &IndexDoc, id: &str) -> Option<TargetDescription> {
         })
 }
 
-fn terms_match(text: &str, terms: &[String]) -> bool {
+pub(crate) fn terms_match(text: &str, terms: &[String]) -> bool {
     if terms.is_empty() {
         return true;
     }
@@ -608,6 +656,8 @@ mod tests {
                 },
             ],
             edges: Vec::new(),
+            declarations: Vec::new(),
+            protocol_relations: Vec::new(),
         };
         let rows = find(
             &doc,

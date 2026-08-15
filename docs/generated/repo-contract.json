@@ -507,10 +507,10 @@
     "generated_by": "cargo run -p xtask -- simdoc",
     "generation_timestamp": "2026-07-16T03:56:38+02:00",
     "generator": "xtask repo-contract v1",
-    "git_commit": "28143588f8da95b371b5527a16f556a10dd111bf",
+    "git_commit": "1c89888319676ae4a72de608cdb32440a5a780b3",
     "repo": "sim-run",
     "schema": "sim.provenance.v1",
-    "source_commit": "28143588f8da95b371b5527a16f556a10dd111bf",
+    "source_commit": "1c89888319676ae4a72de608cdb32440a5a780b3",
     "source_remote": "https://github.com/sim-nest/sim-run",
     "validation_commands": [
       "cargo fmt --all --check",
@@ -523,9 +523,9 @@
       "cargo run -p xtask -- validation-matrix --check --repo .",
       "cargo run -p xtask -- crate-catalog --check --repo ."
     ],
-    "workspace_hash": "6c50458e6822ccab",
+    "workspace_hash": "d4fc0155243532b6",
     "workspace_hash_algorithm": "fnv1a64",
-    "workspace_hash_input_count": 121,
+    "workspace_hash_input_count": 122,
     "workspace_hash_inputs": [
       "Cargo.toml",
       "crates/sim-lib-index/Cargo.toml",
@@ -538,6 +538,7 @@
       "crates/sim-lib-index/src/render.rs",
       "crates/sim-lib-index/src/route.rs",
       "crates/sim-lib-index/src/snapshot.rs",
+      "crates/sim-lib-index/src/source_facts.rs",
       "crates/sim-lib-index/src/verb.rs",
       "crates/sim-lib-repl/Cargo.toml",
       "crates/sim-lib-repl/src/entrypoint.rs",

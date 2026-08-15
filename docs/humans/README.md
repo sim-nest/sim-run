@@ -22,7 +22,7 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `feature/sim-run/watch` | `crate/sim-run` | 1 | Start modeled, imported, or live watch plans through the shared command bootloader. |
 | `feature/sim-run/glasses` | `crate/sim-run` | 1 | Start modeled or hardware-backed glasses plans through the shared command bootloader. |
 | `feature/sim-run/repl` | `crate/sim-lib-repl` | 1 | Run a SIM read-eval-print loop through the loaded REPL library and command surface. |
-| `feature/sim-run/runtime-index` | `crate/sim-lib-index` | 4 | Explore the merged SIM Index through the bootloader as stable Table/Dir rows and structured query output. |
+| `feature/sim-run/runtime-index` | `crate/sim-lib-index` | 4 | Explore merged SIM Index graph and public source facts through the bootloader as stable Table/Dir rows and structured query output. |
 | `feature/sim-run/compute` | `crate/sim-run` | 1 | Start modeled and automatic compute inspection through the shared command bootloader. |
 | `feature/sim-run/expression-tree-command` | `crate/sim-run` | 1 | Load the standard expression-tree product recipe through the shared command bootloader. |
 | `feature/sim-run/loaders` | `crate/sim-run-loaders` | 1 | Load native, source, and re-exported runtime libraries as bootloader inputs. |
@@ -1071,6 +1071,8 @@ mod tests {
             features: Vec::new(),
             routes: Vec::new(),
             edges: Vec::new(),
+            declarations: Vec::new(),
+            protocol_relations: Vec::new(),
         });
 
         assert_eq!(dir.len(&mut cx).unwrap(), 7);

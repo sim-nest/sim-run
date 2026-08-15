@@ -140,10 +140,10 @@ supports = [
 [[feature]]
 id = "feature/sim-run/runtime-index"
 title = "Runtime index exploration"
-summary = "Explore the merged SIM Index through the bootloader as stable Table/Dir rows and structured query output."
+summary = "Explore merged SIM Index graph and public source facts through the bootloader as stable Table/Dir rows and structured query output."
 owner = "crate/sim-lib-index"
 audiences = ["user", "code"]
-guidance = "Use this row when searching, tracing, or listing index facts from the sim command."
+guidance = "Use this row when searching, tracing, or listing index facts from the sim command, including declaration-kind, protocol-implementation, resolution-state, and owning-feature filters that match the control-plane query."
 claims_anchors = [
   "anchor/cli/index",
   "anchor/crate/sim-lib-index",

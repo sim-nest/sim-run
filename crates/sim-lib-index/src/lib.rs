@@ -16,6 +16,7 @@ mod query;
 mod render;
 mod route;
 mod snapshot;
+mod source_facts;
 mod verb;
 
 pub use args::{Collection, IndexCommand, OutputMode, parse_index_args};

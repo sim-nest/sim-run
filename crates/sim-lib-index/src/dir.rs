@@ -330,6 +330,8 @@ mod tests {
             features: Vec::new(),
             routes: Vec::new(),
             edges: Vec::new(),
+            declarations: Vec::new(),
+            protocol_relations: Vec::new(),
         });
 
         assert_eq!(dir.len(&mut cx).unwrap(), 7);

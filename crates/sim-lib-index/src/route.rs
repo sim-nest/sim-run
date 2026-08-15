@@ -191,6 +191,8 @@ mod tests {
                 doc_anchor: None,
             }],
             edges: Vec::new(),
+            declarations: Vec::new(),
+            protocol_relations: Vec::new(),
         };
 
         let rows = route(&doc, "write a parser");
