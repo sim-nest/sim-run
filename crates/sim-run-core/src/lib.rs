@@ -168,9 +168,17 @@ impl fmt::Display for CliError {
 
 impl std::error::Error for CliError {}
 
-/// Returns the version line printed by `sim --version`.
+/// Returns the version line for the `sim-run-core` package.
+///
+/// Product binaries whose package version can differ from the core crate use
+/// [`version_line_for`] through [`run_command_with_session_at_version`].
 pub fn version_line() -> String {
-    format!("sim {}\n", env!("CARGO_PKG_VERSION"))
+    version_line_for(env!("CARGO_PKG_VERSION"))
+}
+
+/// Returns the `sim --version` line for the binary-owned `version`.
+pub fn version_line_for(version: &str) -> String {
+    format!("sim {version}\n")
 }
 
 /// Runs the command entry API with process arguments.
@@ -205,13 +213,26 @@ pub fn run_command_with_session(
     command: CliCommand,
     session: &mut LoadSession,
 ) -> Result<i32, CliError> {
+    run_command_with_session_at_version(command, session, env!("CARGO_PKG_VERSION"))
+}
+
+/// Runs an already-parsed command using the product binary's own `version`.
+///
+/// The version belongs to the executable, not to this reusable core crate. This
+/// entry point keeps `--version` correct when the two packages release on
+/// independent schedules.
+pub fn run_command_with_session_at_version(
+    command: CliCommand,
+    session: &mut LoadSession,
+    version: &str,
+) -> Result<i32, CliError> {
     match command {
         CliCommand::Help => {
             print!("{HELP}");
             Ok(0)
         }
         CliCommand::Version => {
-            print!("{}", version_line());
+            print!("{}", version_line_for(version));
             Ok(0)
         }
         CliCommand::Boot(boot) => session.run_loaded_boot(&boot),
@@ -228,6 +249,11 @@ mod tests {
             version_line(),
             format!("sim {}\n", env!("CARGO_PKG_VERSION"))
         );
+    }
+
+    #[test]
+    fn version_line_accepts_product_binary_version() {
+        assert_eq!(version_line_for("7.8.9"), "sim 7.8.9\n");
     }
 
     #[test]

@@ -9,23 +9,23 @@ use sim_run_core::{
     compose_device_host,
 };
 
+use crate::boot_codec::{BOOT_CODEC_HOST, BootCodec};
 use crate::watch_args::{WatchArgs, WatchPlan};
 
 const WATCH_VERB: &str = "watch";
 const WATCH_APP_HOST: &str = "app/watch";
-const WATCH_BOOT_CODEC_HOST: &str = "codec/lisp";
 
 pub(crate) fn with_watch_if_selected(command: &CliCommand, session: LoadSession) -> LoadSession {
     if !is_watch_command(command) {
         return session;
     }
     session
-        .with_host_factory(WATCH_BOOT_CODEC_HOST, || Box::new(WatchBootCodec))
+        .with_host_factory(BOOT_CODEC_HOST, || Box::new(BootCodec))
         .with_host_factory(WATCH_APP_HOST, || Box::new(WatchLib))
         .with_default_verb_sources(
             WATCH_VERB,
             vec![
-                LibSourceSpec::Host(WATCH_BOOT_CODEC_HOST.to_owned()),
+                LibSourceSpec::Host(BOOT_CODEC_HOST.to_owned()),
                 LibSourceSpec::Host(WATCH_APP_HOST.to_owned()),
             ],
         )
@@ -40,30 +40,6 @@ fn is_watch_command(command: &CliCommand) -> bool {
         .first()
         .and_then(|arg| arg.to_str())
         .is_some_and(|verb| verb == WATCH_VERB)
-}
-
-struct WatchBootCodec;
-
-impl Lib for WatchBootCodec {
-    fn manifest(&self) -> LibManifest {
-        LibManifest {
-            id: Symbol::qualified("codec", "lisp"),
-            version: Version(env!("CARGO_PKG_VERSION").to_owned()),
-            abi: AbiVersion { major: 0, minor: 1 },
-            target: LibTarget::HostRegistered,
-            requires: Vec::new(),
-            capabilities: Vec::new(),
-            exports: vec![Export::Codec {
-                symbol: Symbol::qualified("codec", "lisp"),
-                codec_id: None,
-            }],
-        }
-    }
-
-    fn load(&self, cx: &mut LoadCx, linker: &mut Linker<'_>) -> Result<()> {
-        linker.codec_value(Symbol::qualified("codec", "lisp"), cx.factory().bool(true)?)?;
-        Ok(())
-    }
 }
 
 struct WatchLib;

@@ -17,6 +17,7 @@ use std::process;
 const TYPESCRIPT_NOTATION_HELP: &str =
     "Language profile: language/typescript-notation — TypeScript notation; does not type-check.\n";
 
+mod boot_codec;
 mod compute;
 mod expr_tree;
 mod glasses;
@@ -52,7 +53,11 @@ fn boot() -> Result<i32, sim_run_core::CliError> {
     session = jvm::with_jvm_if_selected(&command, session);
     session = compute::with_compute_if_selected(&command, session);
     session = expr_tree::with_expr_tree_if_selected(&command, session);
-    sim_run_core::run_command_with_session(command, &mut session)
+    sim_run_core::run_command_with_session_at_version(
+        command,
+        &mut session,
+        env!("CARGO_PKG_VERSION"),
+    )
 }
 
 #[cfg(any(feature = "dynamic-native", feature = "wasm"))]

@@ -6,6 +6,8 @@ use sim_kernel::{
 };
 use sim_run_core::{CliCommand, LibSourceSpec, LoadSession, cli_main_entrypoint_symbol};
 
+use crate::boot_codec::{BOOT_CODEC_HOST, BootCodec};
+
 const JVM_VERB: &str = "jvm";
 const JVM_RUNTIME_HOST: &str = "lib/lang-jvm";
 const JVM_CLI_HOST: &str = "lib/lang-jvm-cli";
@@ -15,6 +17,7 @@ pub(crate) fn with_jvm_if_selected(command: &CliCommand, session: LoadSession) -
         return session;
     }
     session
+        .with_host_factory(BOOT_CODEC_HOST, || Box::new(BootCodec))
         .with_host_factory(JVM_RUNTIME_HOST, || {
             Box::new(sim_lib_lang_jvm::JvmLanguageLib::default())
         })
@@ -24,6 +27,7 @@ pub(crate) fn with_jvm_if_selected(command: &CliCommand, session: LoadSession) -
         .with_default_verb_sources(
             JVM_VERB,
             vec![
+                LibSourceSpec::Host(BOOT_CODEC_HOST.to_owned()),
                 LibSourceSpec::Host(JVM_RUNTIME_HOST.to_owned()),
                 LibSourceSpec::Host(JVM_CLI_HOST.to_owned()),
             ],
@@ -63,7 +67,8 @@ impl Lib for JvmCliLib {
         linker.function_value(
             cli_main_entrypoint_symbol(JVM_VERB),
             cx.factory().opaque(Arc::new(JvmEntrypoint))?,
-        )
+        )?;
+        Ok(())
     }
 }
 

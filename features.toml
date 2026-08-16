@@ -78,7 +78,7 @@ guidance = "Use this row when checking the watch command entry point."
 claims_anchors = [
   "anchor/cli/watch",
   "anchor/export/sim-run/cli/main/watch",
-  "anchor/runtime-lib/sim-run/watch-boot-codec",
+  "anchor/runtime-lib/sim-run/boot-codec",
   "anchor/runtime-lib/sim-run/watch-lib",
 ]
 claims_surfaces = [
@@ -101,7 +101,7 @@ guidance = "Use this row when checking the glasses command entry point."
 claims_anchors = [
   "anchor/cli/glasses",
   "anchor/export/sim-run/cli/main/glasses",
-  "anchor/runtime-lib/sim-run/glasses-boot-codec",
+  "anchor/runtime-lib/sim-run/boot-codec",
   "anchor/runtime-lib/sim-run/glasses-lib",
 ]
 claims_surfaces = [
@@ -149,7 +149,7 @@ claims_anchors = [
   "anchor/crate/sim-lib-index",
   "anchor/export/sim-lib-index/cli/main/index",
   "anchor/runtime-lib/sim-lib-index/index-lib",
-  "anchor/runtime-lib/sim-run/index-boot-codec",
+  "anchor/runtime-lib/sim-run/boot-codec",
 ]
 claims_surfaces = [
   "cli/index",
@@ -173,7 +173,7 @@ owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Use this row when checking how the sim compute verb loads the sim-compute CLI and headless provider libraries."
 claims_anchors = [
-  "anchor/runtime-lib/sim-run/compute-boot-codec",
+  "anchor/runtime-lib/sim-run/boot-codec",
 ]
 claims_specimens = [
   "spec-test/sim-run/crates/sim-run/tests/compute",
@@ -347,6 +347,7 @@ claims_anchors = [
   "anchor/bin/sim",
   "anchor/cli/jvm",
   "anchor/export/sim-run/cli/main/jvm",
+  "anchor/runtime-lib/sim-run/boot-codec",
   "anchor/runtime-lib/sim-run/jvm-cli-lib",
 ]
 claims_surfaces = ["cli/sim", "cli/jvm"]
