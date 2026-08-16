@@ -336,6 +336,32 @@ steps = [
   { specimen = "recipe/sim-run/02-scenarios/host-verb", why = "The checked host-verb recipe exercises the terminal surface path." },
 ]
 
+[[feature]]
+id = "feature/sim-run/jvm-command"
+title = "JVM product command"
+summary = "Run the published JVM specimen through a host-registered JVM library and cli/main/jvm adapter in the standard bootloader session."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Invoke sim jvm. The binary selects host factories and capabilities, then the one sim-run-core bootloader loads sim-lib-lang-jvm and dispatches cli/main/jvm; it never constructs a Cx or embeds JVM semantics."
+claims_anchors = ["anchor/bin/sim"]
+claims_surfaces = ["cli/sim"]
+claims_specimens = [
+  "recipe/sim-run/02-scenarios/jvm-product",
+  "spec-test/sim-run/crates/sim-run/tests/jvm_product",
+]
+presents = ["feature/sim-runtime/jvm-loadable-profile"]
+
+[[route]]
+id = "route/run-jvm-command"
+task = "Run the JVM product specimen"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The standard bootloader owns the runtime session and verb handoff." },
+  { feature = "feature/sim-run/jvm-command", why = "The JVM command contributes only host factories, capabilities, and the loadable CLI adapter." },
+  { specimen = "recipe/sim-run/02-scenarios/jvm-product", why = "The runnable recipe enters through the published sim command." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/jvm_product", why = "The published sim binary loads authorized bytes and reports static, object, array, exception, and concat outcomes." },
+]
+
 [[route]]
 id = "route/add-table-dir-backend"
 task = "Add a Table/Dir backend"
