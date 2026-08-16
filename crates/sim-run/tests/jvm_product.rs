@@ -1,3 +1,5 @@
+// conformance: the published bootloader reaches the host-registered JVM product specimen.
+
 use std::process::Command;
 
 #[test]

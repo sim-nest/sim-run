@@ -287,6 +287,16 @@
           "kind": [
             "test"
           ],
+          "name": "jvm_product",
+          "src": "crates/sim-run/tests/jvm_product.rs"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "test"
+          ],
           "name": "native_dynamic_lisp",
           "src": "crates/sim-run/tests/native_dynamic_lisp.rs"
         },
@@ -507,10 +517,10 @@
     "generated_by": "cargo run -p xtask -- simdoc",
     "generation_timestamp": "2026-07-16T03:56:38+02:00",
     "generator": "xtask repo-contract v1",
-    "git_commit": "1c89888319676ae4a72de608cdb32440a5a780b3",
+    "git_commit": "5602e3be1873118b57f54bd80e0a5f123534116f",
     "repo": "sim-run",
     "schema": "sim.provenance.v1",
-    "source_commit": "1c89888319676ae4a72de608cdb32440a5a780b3",
+    "source_commit": "5602e3be1873118b57f54bd80e0a5f123534116f",
     "source_remote": "https://github.com/sim-nest/sim-run",
     "validation_commands": [
       "cargo fmt --all --check",
@@ -523,9 +533,9 @@
       "cargo run -p xtask -- validation-matrix --check --repo .",
       "cargo run -p xtask -- crate-catalog --check --repo ."
     ],
-    "workspace_hash": "d4fc0155243532b6",
+    "workspace_hash": "ff5b8158c35b3604",
     "workspace_hash_algorithm": "fnv1a64",
-    "workspace_hash_input_count": 122,
+    "workspace_hash_input_count": 125,
     "workspace_hash_inputs": [
       "Cargo.toml",
       "crates/sim-lib-index/Cargo.toml",
@@ -551,6 +561,7 @@
       "crates/sim-run/src/glasses_args.rs",
       "crates/sim-run/src/glasses_plan.rs",
       "crates/sim-run/src/index.rs",
+      "crates/sim-run/src/jvm.rs",
       "crates/sim-run/src/loader_boot.rs",
       "crates/sim-run/src/main.rs",
       "crates/sim-run/src/watch.rs",
@@ -561,6 +572,7 @@
       "crates/sim-run/tests/config_report.rs",
       "crates/sim-run/tests/expr_tree.rs",
       "crates/sim-run/tests/glasses.rs",
+      "crates/sim-run/tests/jvm_product.rs",
       "crates/sim-run/tests/native_dynamic_lisp.rs",
       "crates/sim-run/tests/native_dynamic_repl.rs",
       "crates/sim-run/tests/support/feature_build.rs",
@@ -643,6 +655,7 @@
       "recipes/02-scenarios/index-list-languages/recipe.toml",
       "recipes/02-scenarios/index-trace-cli/recipe.toml",
       "recipes/02-scenarios/inspect-manifest/recipe.toml",
+      "recipes/02-scenarios/jvm-product/recipe.toml",
       "recipes/02-scenarios/loadable-site/recipe.toml",
       "recipes/02-scenarios/placement-report/recipe.toml",
       "recipes/02-scenarios/server-verb/recipe.toml",
@@ -659,7 +672,7 @@
       "card_id": "cookbook/sim-run",
       "group": "workspace",
       "package": "sim-run",
-      "recipe_count": 18,
+      "recipe_count": 19,
       "recipes": [
         {
           "card_id": "sim-run/01-basics/hello",
@@ -772,6 +785,14 @@
           "package": "sim-run",
           "recipe_toml": "recipes/02-scenarios/inspect-manifest/recipe.toml",
           "title": "Inspect manifest"
+        },
+        {
+          "card_id": "sim-run/02-scenarios/jvm-product",
+          "codec": "",
+          "id": "jvm-product",
+          "package": "sim-run",
+          "recipe_toml": "recipes/02-scenarios/jvm-product/recipe.toml",
+          "title": "Run the bounded JVM product specimen"
         },
         {
           "card_id": "sim-run/02-scenarios/loadable-site",
