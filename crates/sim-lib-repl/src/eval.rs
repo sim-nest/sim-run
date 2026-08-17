@@ -9,8 +9,8 @@ use sim_kernel::{
     macro_expand_eval_capability, read_eval_capability,
 };
 use sim_lib_core::{
-    ReadEvalBroker, ReadEvalRequest, ReadEvalSource, RequestOrigin, install_read_eval_broker,
-    read_eval_broker_symbol,
+    ReadEvalBroker, ReadEvalRequest, ReadEvalSource, RequestOrigin, SourceAuthority,
+    install_read_eval_broker, read_eval_broker_symbol,
 };
 use sim_shape::AnyShape;
 
@@ -66,18 +66,19 @@ pub fn eval_requested_text_with_options(
 ) -> Result<String, String> {
     let expr = decode_eval_expr(cx, codec, source)?;
     let broker = broker(cx).map_err(|err| format!("{err:?}"))?;
+    let authority =
+        SourceAuthority::new(trusted_read_eval_policy(), options.requires, options.allow)
+            .map_err(|err| format!("{err:?}"))?;
     let value = broker
         .admit(
             cx,
-            ReadEvalRequest {
-                origin: RequestOrigin::new(Symbol::new("repl")),
-                codec: codec.clone(),
-                source: ReadEvalSource::Expr(expr),
-                read_policy: trusted_read_eval_policy(),
-                requires: options.requires,
-                allow: options.allow,
-                expected_shape: options.expected_shape,
-            },
+            ReadEvalRequest::new(
+                RequestOrigin::new(Symbol::new("repl")),
+                codec.clone(),
+                ReadEvalSource::Expr(expr),
+                authority,
+                options.expected_shape,
+            ),
         )
         .map_err(|err| format!("{err:?}"))?;
     let expr = value

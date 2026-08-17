@@ -2,6 +2,23 @@
 
 use crate::IndexError;
 
+impl crate::Query {
+    /// Returns true when no structured filter is present.
+    pub fn is_unfiltered(&self) -> bool {
+        self.audience.is_none()
+            && self.surface_kind.is_none()
+            && self.language.is_none()
+            && self.grammar.is_none()
+            && self.repo.is_none()
+            && self.package.is_none()
+            && self.anchor.is_none()
+            && self.declaration_kind.is_none()
+            && self.implements.is_none()
+            && self.resolved.is_none()
+            && self.feature.is_none()
+    }
+}
+
 /// Output encoding requested by the command.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OutputMode {
@@ -87,7 +104,7 @@ pub enum IndexCommand {
     /// Search the graph.
     Find {
         /// Query terms and filters.
-        query: crate::Query,
+        query: Box<crate::Query>,
         /// Output encoding.
         output: OutputMode,
     },
@@ -229,6 +246,30 @@ fn parse_find(args: &[String]) -> Result<IndexCommand, IndexError> {
             "--repo" => query.repo = Some(take_value(args, &mut i, "--repo")?),
             "--package" => query.package = Some(take_value(args, &mut i, "--package")?),
             "--anchor" => query.anchor = Some(take_value(args, &mut i, "--anchor")?),
+            "--declaration-kind" => {
+                let value = take_value(args, &mut i, "--declaration-kind")?;
+                if !matches!(
+                    value.as_str(),
+                    "const"
+                        | "enum"
+                        | "function"
+                        | "module"
+                        | "re-export"
+                        | "static"
+                        | "struct"
+                        | "trait"
+                        | "type-alias"
+                ) {
+                    return Err(IndexError::new(format!(
+                        "unknown declaration kind: {value}"
+                    )));
+                }
+                query.declaration_kind = Some(value);
+            }
+            "--implements" => query.implements = Some(take_value(args, &mut i, "--implements")?),
+            "--resolved" => set_resolution(&mut query, true)?,
+            "--unresolved" => set_resolution(&mut query, false)?,
+            "--feature" => query.feature = Some(take_value(args, &mut i, "--feature")?),
             value if value.starts_with('-') => {
                 return Err(IndexError::new(format!("unknown find option: {value}")));
             }
@@ -239,7 +280,19 @@ fn parse_find(args: &[String]) -> Result<IndexCommand, IndexError> {
     if query.terms.is_empty() && query.is_unfiltered() {
         return Err(IndexError::new("find requires a term or filter"));
     }
-    Ok(IndexCommand::Find { query, output })
+    Ok(IndexCommand::Find {
+        query: Box::new(query),
+        output,
+    })
+}
+
+fn set_resolution(query: &mut crate::Query, resolved: bool) -> Result<(), IndexError> {
+    if query.resolved.replace(resolved).is_some() {
+        return Err(IndexError::new(
+            "choose only one of --resolved and --unresolved",
+        ));
+    }
+    Ok(())
 }
 
 fn take_value(args: &[String], i: &mut usize, flag: &str) -> Result<String, IndexError> {
@@ -293,5 +346,30 @@ mod tests {
         };
         assert_eq!(task, "write a parser");
         assert_eq!(output, OutputMode::Json);
+    }
+
+    #[test]
+    fn parses_source_fact_filters() {
+        let args = vec![
+            "find",
+            "--declaration-kind",
+            "trait",
+            "--implements",
+            "demo::Protocol",
+            "--resolved",
+            "--feature",
+            "feature/demo/runtime",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+
+        let IndexCommand::Find { query, .. } = parse_index_args(&args).unwrap() else {
+            panic!("expected find");
+        };
+        assert_eq!(query.declaration_kind.as_deref(), Some("trait"));
+        assert_eq!(query.implements.as_deref(), Some("demo::Protocol"));
+        assert_eq!(query.resolved, Some(true));
+        assert_eq!(query.feature.as_deref(), Some("feature/demo/runtime"));
     }
 }

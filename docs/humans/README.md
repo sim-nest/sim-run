@@ -22,12 +22,13 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `feature/sim-run/watch` | `crate/sim-run` | 1 | Start modeled, imported, or live watch plans through the shared command bootloader. |
 | `feature/sim-run/glasses` | `crate/sim-run` | 1 | Start modeled or hardware-backed glasses plans through the shared command bootloader. |
 | `feature/sim-run/repl` | `crate/sim-lib-repl` | 1 | Run a SIM read-eval-print loop through the loaded REPL library and command surface. |
-| `feature/sim-run/runtime-index` | `crate/sim-lib-index` | 4 | Explore the merged SIM Index through the bootloader as stable Table/Dir rows and structured query output. |
+| `feature/sim-run/runtime-index` | `crate/sim-lib-index` | 4 | Explore merged SIM Index graph and public source facts through the bootloader as stable Table/Dir rows and structured query output. |
 | `feature/sim-run/compute` | `crate/sim-run` | 1 | Start modeled and automatic compute inspection through the shared command bootloader. |
 | `feature/sim-run/expression-tree-command` | `crate/sim-run` | 1 | Load the standard expression-tree product recipe through the shared command bootloader. |
 | `feature/sim-run/loaders` | `crate/sim-run-loaders` | 1 | Load native, source, and re-exported runtime libraries as bootloader inputs. |
 | `feature/sim-run/index-table-dir` | `crate/sim-lib-index` | 1 | Expose the embedded SIM Index as immutable Table/Dir collections for loaded runtime code. |
 | `feature/sim-run/terminal-surface` | `crate/sim-view-tty` | 1 | Render and interpret terminal view intents through the loaded TTY surface library. |
+| `feature/sim-run/jvm-command` | `crate/sim-run` | 2 | Run the published JVM specimen through a host-registered JVM library and cli/main/jvm adapter in the standard bootloader session. |
 
 ## Surfaces
 
@@ -35,7 +36,9 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | --- | --- | --- |
 | `cli/glasses` | `cli` | `crate/sim-run` |
 | `cli/index` | `cli` | `crate/sim-lib-index` |
+| `cli/jvm` | `cli` | `crate/sim-run` |
 | `cli/repl` | `cli` | `crate/sim-lib-repl` |
+| `cli/sim` | `cli` | `crate/sim-run` |
 | `cli/sim-run` | `cli` | `crate/sim-run` |
 | `cli/watch` | `cli` | `crate/sim-run` |
 | `cli/xtask` | `cli` | `crate/xtask` |
@@ -90,6 +93,9 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 - `recipes/02-scenarios/inspect-manifest/purpose.md`
 - `recipes/02-scenarios/inspect-manifest/recipe.toml`
 - `recipes/02-scenarios/inspect-manifest/setup.sh`
+- `recipes/02-scenarios/jvm-product/purpose.md`
+- `recipes/02-scenarios/jvm-product/recipe.toml`
+- `recipes/02-scenarios/jvm-product/setup.sh`
 - `recipes/02-scenarios/loadable-site/purpose.md`
 - `recipes/02-scenarios/loadable-site/recipe.toml`
 - `recipes/02-scenarios/loadable-site/setup.sh`
@@ -1071,6 +1077,8 @@ mod tests {
             features: Vec::new(),
             routes: Vec::new(),
             edges: Vec::new(),
+            declarations: Vec::new(),
+            protocol_relations: Vec::new(),
         });
 
         assert_eq!(dir.len(&mut cx).unwrap(), 7);
@@ -1103,4 +1111,43 @@ order = 20
 tags = ["cli", "host", "verb", "offline", "deterministic"]
 requires = ["sim-run-core", "host:scenario/host"]
 network = false
+```
+
+### `feature/sim-run/jvm-command`
+
+Specimen `recipe/sim-run/02-scenarios/jvm-product` is checked by `xtask check-recipes`.
+
+Source `recipes/02-scenarios/jvm-product/recipe.toml`:
+
+```toml
+title = "Run the bounded JVM product specimen"
+kind = "shell"
+entry = "setup.sh"
+```
+
+Specimen `spec-test/sim-run/crates/sim-run/tests/jvm_product` is checked by `cargo test`.
+
+Source `crates/sim-run/tests/jvm_product.rs`:
+
+```rust
+// conformance: the published bootloader reaches the host-registered JVM product specimen.
+
+use std::process::Command;
+
+#[test]
+fn published_binary_runs_jvm_product_specimen() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sim"))
+        .arg("jvm")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("static=14 object=true array=17"));
+    assert!(stdout.contains("exception=java/lang/NegativeArraySizeException"));
+    assert!(stdout.contains("concat=SIM JVM"));
+}
 ```

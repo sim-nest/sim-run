@@ -42,6 +42,9 @@
 {"kind":"recipe","path":"recipes/02-scenarios/inspect-manifest/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/inspect-manifest/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/inspect-manifest/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/jvm-product/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/jvm-product/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/jvm-product/setup.sh"}
 {"kind":"recipe","path":"recipes/02-scenarios/loadable-site/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/loadable-site/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/loadable-site/setup.sh"}

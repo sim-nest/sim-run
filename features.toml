@@ -56,6 +56,7 @@ claims_anchors = [
   "anchor/crate/sim-run-core",
   "anchor/export/sim-run-core/codec/lisp",
   "anchor/export/sim-run/codec/lisp",
+  "anchor/runtime-lib/sim-run/boot-codec",
   "anchor/rustdoc/sim-run-core/bootloader",
   "anchor/rustdoc/sim-run-core/run_with_session",
 ]
@@ -78,7 +79,6 @@ guidance = "Use this row when checking the watch command entry point."
 claims_anchors = [
   "anchor/cli/watch",
   "anchor/export/sim-run/cli/main/watch",
-  "anchor/runtime-lib/sim-run/watch-boot-codec",
   "anchor/runtime-lib/sim-run/watch-lib",
 ]
 claims_surfaces = [
@@ -101,7 +101,6 @@ guidance = "Use this row when checking the glasses command entry point."
 claims_anchors = [
   "anchor/cli/glasses",
   "anchor/export/sim-run/cli/main/glasses",
-  "anchor/runtime-lib/sim-run/glasses-boot-codec",
   "anchor/runtime-lib/sim-run/glasses-lib",
 ]
 claims_surfaces = [
@@ -140,16 +139,15 @@ supports = [
 [[feature]]
 id = "feature/sim-run/runtime-index"
 title = "Runtime index exploration"
-summary = "Explore the merged SIM Index through the bootloader as stable Table/Dir rows and structured query output."
+summary = "Explore merged SIM Index graph and public source facts through the bootloader as stable Table/Dir rows and structured query output."
 owner = "crate/sim-lib-index"
 audiences = ["user", "code"]
-guidance = "Use this row when searching, tracing, or listing index facts from the sim command."
+guidance = "Use this row when searching, tracing, or listing index facts from the sim command, including declaration-kind, protocol-implementation, resolution-state, and owning-feature filters that match the control-plane query."
 claims_anchors = [
   "anchor/cli/index",
   "anchor/crate/sim-lib-index",
   "anchor/export/sim-lib-index/cli/main/index",
   "anchor/runtime-lib/sim-lib-index/index-lib",
-  "anchor/runtime-lib/sim-run/index-boot-codec",
 ]
 claims_surfaces = [
   "cli/index",
@@ -172,9 +170,6 @@ summary = "Start modeled and automatic compute inspection through the shared com
 owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Use this row when checking how the sim compute verb loads the sim-compute CLI and headless provider libraries."
-claims_anchors = [
-  "anchor/runtime-lib/sim-run/compute-boot-codec",
-]
 claims_specimens = [
   "spec-test/sim-run/crates/sim-run/tests/compute",
 ]
@@ -334,6 +329,37 @@ steps = [
   { feature = "feature/sim-run/loaders", why = "The loader row owns native, source, and re-exported runtime library discovery." },
   { feature = "feature/sim-run/terminal-surface", why = "The terminal surface row shows a loadable view surface provided by a runtime library." },
   { specimen = "recipe/sim-run/02-scenarios/host-verb", why = "The checked host-verb recipe exercises the terminal surface path." },
+]
+
+[[feature]]
+id = "feature/sim-run/jvm-command"
+title = "JVM product command"
+summary = "Run the published JVM specimen through a host-registered JVM library and cli/main/jvm adapter in the standard bootloader session."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Invoke sim jvm. The binary selects host factories and capabilities, then the one sim-run-core bootloader loads sim-lib-lang-jvm and dispatches cli/main/jvm; it never constructs a Cx or embeds JVM semantics."
+claims_anchors = [
+  "anchor/bin/sim",
+  "anchor/cli/jvm",
+  "anchor/export/sim-run/cli/main/jvm",
+  "anchor/runtime-lib/sim-run/jvm-cli-lib",
+]
+claims_surfaces = ["cli/sim", "cli/jvm"]
+claims_specimens = [
+  "recipe/sim-run/02-scenarios/jvm-product",
+  "spec-test/sim-run/crates/sim-run/tests/jvm_product",
+]
+presents = ["feature/sim-runtime/jvm-loadable-profile"]
+
+[[route]]
+id = "route/run-jvm-command"
+task = "Run the JVM product specimen"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The standard bootloader owns the runtime session and verb handoff." },
+  { feature = "feature/sim-run/jvm-command", why = "The JVM command contributes only host factories, capabilities, and the loadable CLI adapter." },
+  { specimen = "recipe/sim-run/02-scenarios/jvm-product", why = "The runnable recipe enters through the published sim command." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/jvm_product", why = "The published sim binary loads authorized bytes and reports static, object, array, exception, and concat outcomes." },
 ]
 
 [[route]]

@@ -1,23 +1,21 @@
-use sim_kernel::{
-    AbiVersion, Export, Lib, LibManifest, LibTarget, Linker, LoadCx, Result, Symbol, Version,
-};
 use sim_run_core::{CliCommand, LibSourceSpec, LoadSession};
+
+use crate::boot_codec::{BOOT_CODEC_HOST, BootCodec};
 
 const INDEX_VERB: &str = "index";
 const INDEX_APP_HOST: &str = "lib/index";
-const INDEX_BOOT_CODEC_HOST: &str = "codec/lisp";
 
 pub(crate) fn with_index_if_selected(command: &CliCommand, session: LoadSession) -> LoadSession {
     if !is_index_command(command) {
         return session;
     }
     session
-        .with_host_factory(INDEX_BOOT_CODEC_HOST, || Box::new(IndexBootCodec))
+        .with_host_factory(BOOT_CODEC_HOST, || Box::new(BootCodec))
         .with_host_factory(INDEX_APP_HOST, || Box::new(sim_lib_index::IndexLib::new()))
         .with_default_verb_sources(
             INDEX_VERB,
             vec![
-                LibSourceSpec::Host(INDEX_BOOT_CODEC_HOST.to_owned()),
+                LibSourceSpec::Host(BOOT_CODEC_HOST.to_owned()),
                 LibSourceSpec::Host(INDEX_APP_HOST.to_owned()),
             ],
         )
@@ -32,30 +30,6 @@ fn is_index_command(command: &CliCommand) -> bool {
         .first()
         .and_then(|arg| arg.to_str())
         .is_some_and(|verb| verb == INDEX_VERB)
-}
-
-struct IndexBootCodec;
-
-impl Lib for IndexBootCodec {
-    fn manifest(&self) -> LibManifest {
-        LibManifest {
-            id: Symbol::qualified("codec", "lisp"),
-            version: Version(env!("CARGO_PKG_VERSION").to_owned()),
-            abi: AbiVersion { major: 0, minor: 1 },
-            target: LibTarget::HostRegistered,
-            requires: Vec::new(),
-            capabilities: Vec::new(),
-            exports: vec![Export::Codec {
-                symbol: Symbol::qualified("codec", "lisp"),
-                codec_id: None,
-            }],
-        }
-    }
-
-    fn load(&self, cx: &mut LoadCx, linker: &mut Linker<'_>) -> Result<()> {
-        linker.codec_value(Symbol::qualified("codec", "lisp"), cx.factory().bool(true)?)?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]

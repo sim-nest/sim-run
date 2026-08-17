@@ -27,7 +27,9 @@ Usage: sim index <verb> [OPTIONS]
 Verbs:
   list [subjects|anchors|surfaces|specimens|features|routes|edges|all] [--json]
   show <id> [--json]
-  find <term...> [--audience X] [--surface-kind X] [--language X] [--json]
+  find <term...> [--audience X] [--surface-kind X] [--language X]
+       [--declaration-kind X] [--implements X] [--resolved|--unresolved]
+       [--feature X] [--json]
   route <task...> [--json]
   trace <id> [--json]
   examples <feature-id> [--json]
@@ -92,9 +94,24 @@ fn render_find(doc: &IndexDoc, query: &Query, output: OutputMode) -> Result<Stri
                 "repo": query.repo,
                 "package": query.package,
                 "anchor": query.anchor
+                ,"declaration_kind": query.declaration_kind
+                ,"implements": query.implements
+                ,"resolved": query.resolved.map(|value| if value { "resolved" } else { "unresolved" })
+                ,"feature": query.feature
             },
             "matches": hits_json(&matches)
         }));
+    }
+    if query.declaration_kind.is_some()
+        || query.implements.is_some()
+        || query.resolved.is_some()
+        || query.feature.is_some()
+    {
+        let mut out = String::new();
+        for hit in matches {
+            out.push_str(&format!("{}\t{}\t{}\n", hit.kind, hit.id, hit.title));
+        }
+        return Ok(out);
     }
     let mut out = String::from("kind\tid\ttitle\towner\tsurfaces\n");
     for hit in matches {
@@ -376,14 +393,51 @@ fn hits_json(rows: &[Hit]) -> JsonValue {
     json!(
         rows.iter()
             .map(|row| {
-                json!({
+                let mut value = json!({
                     "kind": row.kind,
                     "id": row.id,
                     "title": row.title,
                     "summary": row.summary,
                     "owner": row.owner,
                     "surfaces": row.surfaces
-                })
+                });
+                if !row.declarations.is_empty() {
+                    value["declarations"] = json!(
+                        row.declarations
+                            .iter()
+                            .map(|fact| json!({
+                                "kind": fact.kind,
+                                "module_path": fact.module_path,
+                                "location": fact.location,
+                            }))
+                            .collect::<Vec<_>>()
+                    );
+                }
+                if !row.protocol_relations.is_empty() {
+                    value["protocol_relations"] = json!(
+                        row.protocol_relations
+                            .iter()
+                            .map(|relation| {
+                                let mut value = json!({
+                                    "implementor": relation.implementor,
+                                    "source_spelling": relation.source_spelling,
+                                    "resolution": relation.resolution,
+                                });
+                                if let Some(protocol) = &relation.protocol {
+                                    value["protocol"] = json!(protocol);
+                                }
+                                if let Some(reason) = &relation.unresolved_reason {
+                                    value["unresolved_reason"] = json!(reason);
+                                }
+                                if !relation.candidates.is_empty() {
+                                    value["candidates"] = json!(relation.candidates);
+                                }
+                                value
+                            })
+                            .collect::<Vec<_>>()
+                    );
+                }
+                value
             })
             .collect::<Vec<_>>()
     )

@@ -1,6 +1,6 @@
 [package]
 name = "sim-lib-repl"
-version = "0.3.0"
+version = "0.3.1"
 edition.workspace = true
 license.workspace = true
 description = "Loadable SIM command-line REPL library."
@@ -10,16 +10,16 @@ repository = "https://github.com/sim-nest/sim-run"
 homepage = "https://github.com/sim-nest/sim-run"
 
 [dependencies]
-sim-run-core = { version = "0.3.0", path = "../sim-run-core" }
+sim-run-core = { version = "0.3.1", path = "../sim-run-core" }
 sim-codec = { version = "0.1.8" }
-sim-kernel = { version = "0.2.0" }
-sim-lib-core = { version = "0.1.4" }
-sim-shape = { version = "0.2.1" }
+sim-kernel = { version = "0.2.1" }
+sim-lib-core = { version = "0.2.0" }
+sim-shape = { version = "0.2.3" }
 sim-value = { version = "0.2.0" }
 
 [dev-dependencies]
 sim-codec-lisp = { version = "0.2.0" }
-sim-kernel = { version = "0.2.0", features = ["test-support"] }
+sim-kernel = { version = "0.2.1", features = ["test-support"] }
 sim-lib-numbers-prelude = { version = "0.3.0" }
 sim-test-support = { version = "0.1.0" }
 

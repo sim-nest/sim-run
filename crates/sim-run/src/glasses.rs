@@ -10,25 +10,25 @@ use sim_run_core::{
 };
 
 use crate::{
+    boot_codec::{BOOT_CODEC_HOST, BootCodec},
     glasses_args::GlassesArgs,
     glasses_plan::{GlassesDevicePlan, GlassesPlan},
 };
 
 const GLASSES_VERB: &str = "glasses";
 const GLASSES_APP_HOST: &str = "app/glasses";
-const GLASSES_BOOT_CODEC_HOST: &str = "codec/lisp";
 
 pub(crate) fn with_glasses_if_selected(command: &CliCommand, session: LoadSession) -> LoadSession {
     if !is_glasses_command(command) {
         return session;
     }
     session
-        .with_host_factory(GLASSES_BOOT_CODEC_HOST, || Box::new(GlassesBootCodec))
+        .with_host_factory(BOOT_CODEC_HOST, || Box::new(BootCodec))
         .with_host_factory(GLASSES_APP_HOST, || Box::new(GlassesLib))
         .with_default_verb_sources(
             GLASSES_VERB,
             vec![
-                LibSourceSpec::Host(GLASSES_BOOT_CODEC_HOST.to_owned()),
+                LibSourceSpec::Host(BOOT_CODEC_HOST.to_owned()),
                 LibSourceSpec::Host(GLASSES_APP_HOST.to_owned()),
             ],
         )
@@ -43,30 +43,6 @@ fn is_glasses_command(command: &CliCommand) -> bool {
         .first()
         .and_then(|arg| arg.to_str())
         .is_some_and(|verb| verb == GLASSES_VERB)
-}
-
-struct GlassesBootCodec;
-
-impl Lib for GlassesBootCodec {
-    fn manifest(&self) -> LibManifest {
-        LibManifest {
-            id: Symbol::qualified("codec", "lisp"),
-            version: Version(env!("CARGO_PKG_VERSION").to_owned()),
-            abi: AbiVersion { major: 0, minor: 1 },
-            target: LibTarget::HostRegistered,
-            requires: Vec::new(),
-            capabilities: Vec::new(),
-            exports: vec![Export::Codec {
-                symbol: Symbol::qualified("codec", "lisp"),
-                codec_id: None,
-            }],
-        }
-    }
-
-    fn load(&self, cx: &mut LoadCx, linker: &mut Linker<'_>) -> Result<()> {
-        linker.codec_value(Symbol::qualified("codec", "lisp"), cx.factory().bool(true)?)?;
-        Ok(())
-    }
 }
 
 struct GlassesLib;
