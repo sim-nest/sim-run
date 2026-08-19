@@ -24,6 +24,7 @@ mod glasses;
 mod glasses_args;
 mod glasses_plan;
 mod index;
+#[cfg(not(any(feature = "dynamic-native", feature = "wasm")))]
 mod jvm;
 #[cfg(any(feature = "dynamic-native", feature = "wasm"))]
 mod loader_boot;

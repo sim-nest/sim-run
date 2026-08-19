@@ -1132,6 +1132,8 @@ Source `crates/sim-run/tests/jvm_product.rs`:
 ```rust
 // conformance: the published bootloader reaches the host-registered JVM product specimen.
 
+#![cfg(not(any(feature = "dynamic-native", feature = "wasm")))]
+
 use std::process::Command;
 
 #[test]

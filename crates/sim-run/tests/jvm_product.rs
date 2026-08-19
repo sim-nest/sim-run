@@ -1,5 +1,7 @@
 // conformance: the published bootloader reaches the host-registered JVM product specimen.
 
+#![cfg(not(any(feature = "dynamic-native", feature = "wasm")))]
+
 use std::process::Command;
 
 #[test]
