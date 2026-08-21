@@ -371,3 +371,13 @@ steps = [
   { feature = "feature/sim-run/index-table-dir", why = "The IndexDir implementation shows a runtime table exposed as an immutable directory." },
   { specimen = "recipe/sim-run/02-scenarios/index-examples", why = "The examples recipe exercises table-backed feature-to-specimen lookup." },
 ]
+
+[[feature]]
+id = "feature/sim-run/platform-command"
+title = "Loadable platform command"
+summary = "Dispatch platform show, require, doctor, and attest-verify through cli/main/platform."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Invoke sim platform with a supported subcommand. The product library registers one host command adapter; the binary remains a one-call process membrane."
+claims_anchors = ["anchor/bin/sim"]
+presents = ["feature/sim-platform/product-membrane"]
