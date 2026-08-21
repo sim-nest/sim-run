@@ -195,10 +195,10 @@ claims_specimens = [
 [[feature]]
 id = "feature/sim-run/loaders"
 title = "Loadable source libraries"
-summary = "Load native, source, and re-exported runtime libraries as bootloader inputs."
+summary = "Load exact native, wasm, source, re-exported, and AOT artifacts through the run-owned object-safe LoaderPort."
 owner = "crate/sim-run-loaders"
 audiences = ["code", "framework"]
-guidance = "Use this row when following how runtime libraries are discovered before command dispatch."
+guidance = "Compose an installed platform LoaderPort and bind each advertised LoaderKind through PortLoader. Bundle descriptors select exact artifacts and kinds; use StaticRegistry for AOT factories without changing LibManifest or ordinary Lib call and unload behavior."
 claims_anchors = [
   "anchor/crate/sim-run-loaders",
   "anchor/runtime-lib/sim-run-loaders/loaded-native-lib",

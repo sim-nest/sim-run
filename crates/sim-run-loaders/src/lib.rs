@@ -28,6 +28,7 @@ mod native_macro;
 mod native_number;
 #[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
 mod native_site;
+mod port;
 mod reexport;
 #[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
 mod shape;
@@ -54,6 +55,10 @@ pub use native::{
 };
 #[cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
 pub use native_macro::NativeAbiMacro;
+pub use port::{
+    LoadOutcome, LoadRequest, LoaderKind, LoaderPort, PortLoader, STATIC_SOURCE_KIND,
+    StaticRegistry, is_static_source, static_artifact, static_source,
+};
 #[cfg(all(feature = "codec-lisp", feature = "shape"))]
 pub use reexport::SourceTemplateMacro;
 pub use reexport::{ReexportKind, ReexportSpec};
