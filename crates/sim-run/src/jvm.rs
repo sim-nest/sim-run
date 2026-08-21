@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use sim_kernel::{
-    AbiVersion, Args, Callable, Cx, Export, Lib, LibManifest, LibTarget, Linker, LoadCx, Object,
-    ObjectCompat, Result, Symbol, Value, Version,
+    AbiVersion, Args, Callable, Cx, Error, Export, Expr, Lib, LibManifest, LibTarget, Linker,
+    LoadCx, Object, ObjectCompat, Result, Symbol, Value, Version,
 };
 use sim_run_core::{CliCommand, LibSourceSpec, LoadSession, cli_main_entrypoint_symbol};
 
@@ -91,18 +91,90 @@ impl ObjectCompat for JvmEntrypoint {
 }
 
 impl Callable for JvmEntrypoint {
-    fn call(&self, cx: &mut Cx, _args: Args) -> Result<Value> {
-        let report = sim_lib_lang_jvm::run_product_specimen(cx)?;
-        println!(
-            "JVM specimen: static={} object={} array={} exception={} concat={}",
-            report.static_result,
-            report.object_allocated,
-            report.array_result,
-            report.exception_class,
-            report.concat_result
-        );
+    fn call(&self, cx: &mut Cx, args: Args) -> Result<Value> {
+        let envelope = args
+            .values()
+            .first()
+            .ok_or_else(|| Error::Eval("missing JVM envelope".into()))?;
+        let args = envelope_args(cx, envelope)?;
+        let request = parse_jvm_args(&args)?;
+        let outcome = sim_lib_lang_jvm::JvmSurface::new(1 << 20).execute_i32(cx, request);
+        match outcome {
+            sim_lib_lang_jvm::JvmExecutionOutcome::Value(value) => println!("JVM value: {value}"),
+            sim_lib_lang_jvm::JvmExecutionOutcome::Throwable(throwable) => {
+                println!("JVM throwable: {:?}", throwable.condition())
+            }
+            sim_lib_lang_jvm::JvmExecutionOutcome::Refusal(reason) => {
+                println!("JVM refusal: {reason}")
+            }
+        }
         cx.factory().bool(true)
     }
+}
+
+fn parse_jvm_args(args: &[String]) -> Result<sim_lib_lang_jvm::JvmExecutionRequest> {
+    let args = args.strip_prefix(&[JVM_VERB.to_owned()]).unwrap_or(args);
+    let [classfile, class, member, descriptor, arguments @ ..] = args else {
+        return Err(Error::Eval(
+            "usage: sim jvm HEX_CLASSFILE CLASS MEMBER DESCRIPTOR [I32 ...]".into(),
+        ));
+    };
+    let classfile = decode_hex(classfile)?;
+    let arguments = arguments
+        .iter()
+        .map(|arg| {
+            arg.parse::<i32>()
+                .map_err(|_| Error::Eval(format!("invalid JVM integer argument: {arg}")))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(sim_lib_lang_jvm::JvmExecutionRequest {
+        classfile,
+        class: class.clone(),
+        member: member.clone(),
+        descriptor: descriptor.clone(),
+        arguments,
+    })
+}
+
+fn decode_hex(input: &str) -> Result<Vec<u8>> {
+    if input.len() % 2 != 0 {
+        return Err(Error::Eval(
+            "JVM classfile hex must contain complete bytes".into(),
+        ));
+    }
+    input
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let text = std::str::from_utf8(pair).expect("hex is ASCII-sized");
+            u8::from_str_radix(text, 16)
+                .map_err(|_| Error::Eval("JVM classfile is not hexadecimal".into()))
+        })
+        .collect()
+}
+
+fn envelope_args(cx: &mut Cx, envelope: &Value) -> Result<Vec<String>> {
+    let table = envelope
+        .object()
+        .as_table_impl()
+        .ok_or_else(|| Error::Eval("JVM CLI envelope is not a table".into()))?;
+    let value = table.get(cx, Symbol::new("args"))?;
+    let Expr::List(items) = value.object().as_expr(cx)? else {
+        return Err(Error::TypeMismatch {
+            expected: "argument list",
+            found: "non-list",
+        });
+    };
+    items
+        .into_iter()
+        .map(|item| match item {
+            Expr::String(value) => Ok(value),
+            _ => Err(Error::TypeMismatch {
+                expected: "string argument",
+                found: "non-string",
+            }),
+        })
+        .collect()
 }
 
 #[cfg(test)]

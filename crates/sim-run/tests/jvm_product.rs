@@ -5,9 +5,10 @@
 use std::process::Command;
 
 #[test]
-fn published_binary_runs_jvm_product_specimen() {
+fn published_binary_runs_caller_selected_bytecode() {
+    let hex = include_str!("fixtures/StaticInt.hex").trim();
     let output = Command::new(env!("CARGO_BIN_EXE_sim"))
-        .arg("jvm")
+        .args(["jvm", &hex, "StaticInt", "wholePipeline", "(II)I", "5", "6"])
         .output()
         .unwrap();
     assert!(
@@ -16,7 +17,5 @@ fn published_binary_runs_jvm_product_specimen() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("static=14 object=true array=17"));
-    assert!(stdout.contains("exception=java/lang/NegativeArraySizeException"));
-    assert!(stdout.contains("concat=SIM JVM"));
+    assert!(stdout.contains("JVM value: 22"), "{stdout}");
 }

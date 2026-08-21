@@ -334,10 +334,10 @@ steps = [
 [[feature]]
 id = "feature/sim-run/jvm-command"
 title = "JVM product command"
-summary = "Run the published JVM specimen through a host-registered JVM library and cli/main/jvm adapter in the standard bootloader session."
+summary = "Run caller-supplied classfile bytes, exact class, member, descriptor, and integer arguments through the host-registered JVM library and cli/main/jvm adapter."
 owner = "crate/sim-run"
 audiences = ["user", "code"]
-guidance = "Invoke sim jvm. The binary selects host factories and capabilities, then the one sim-run-core bootloader loads sim-lib-lang-jvm and dispatches cli/main/jvm; it never constructs a Cx or embeds JVM semantics."
+guidance = "Invoke sim jvm HEX_CLASSFILE CLASS MEMBER DESCRIPTOR [I32 ...]. The binary selects host factories and capabilities, then the one sim-run-core bootloader loads sim-lib-lang-jvm and dispatches cli/main/jvm; it only parses the caller envelope and renders value, Java throwable, or refusal, and never constructs a Cx, reads an ambient classpath, or embeds JVM semantics."
 claims_anchors = [
   "anchor/bin/sim",
   "anchor/cli/jvm",
