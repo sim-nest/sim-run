@@ -59,6 +59,7 @@ claims_anchors = [
   "anchor/runtime-lib/sim-run/boot-codec",
   "anchor/rustdoc/sim-run-core/bootloader",
   "anchor/rustdoc/sim-run-core/run_with_session",
+  "anchor/rustdoc/sim-run-core/run_supplied_bootstrap",
 ]
 claims_surfaces = [
   "cli/sim-run",

@@ -49,6 +49,8 @@ mod report;
 mod source;
 
 #[cfg(test)]
+mod bootstrap_tests;
+#[cfg(test)]
 mod codec_boot_tests;
 #[cfg(test)]
 mod config_report_tests;
@@ -99,6 +101,7 @@ pub use report::{
     format_config_status_json, format_effective_config, format_effective_config_json,
     render_config_report,
 };
+pub use sim_platform_bootstrap::{BootstrapEnvelope, BootstrappedCapsule};
 pub use source::LibSourceSpec;
 
 const HELP: &str = "\
@@ -208,6 +211,67 @@ where
     S: Into<OsString>,
 {
     run_command_with_session(parse_args(args)?, session)
+}
+
+/// Runs from a host-supplied bootstrap envelope and already-admitted capsule.
+///
+/// This entrypoint performs no argv, current-directory, environment, config,
+/// target, or registry discovery. The capsule was resolved by the bounded
+/// platform rind; this pure consumer only installs it and transfers owned
+/// envelope frames into the existing loaded-library handoff.
+///
+/// # Errors
+/// Returns an error when the supplied capsule cannot be installed, standard
+/// input is not textual, or the selected loaded entrypoint rejects the boot.
+pub fn run_supplied_bootstrap(
+    bootstrapped: BootstrappedCapsule,
+    session: &mut LoadSession,
+) -> Result<i32, CliError> {
+    use sim_config::ConfigRoots;
+
+    let BootstrapEnvelope {
+        argv,
+        stdio,
+        bundle_identity: _,
+        capsule_card: _,
+        preopened_roots,
+        kernel_seed: _,
+    } = bootstrapped.envelope;
+    session.install_supplied_capsule(bootstrapped.capsule)?;
+    let mut args = argv;
+    if !args.is_empty() {
+        args.remove(0);
+    }
+    let stdin = if stdio.stdin.is_empty() {
+        None
+    } else {
+        Some(
+            String::from_utf8(stdio.stdin)
+                .map_err(|_| CliError::new("bootstrap stdin is not valid UTF-8"))?,
+        )
+    };
+    let work_root = preopened_roots.first().cloned().unwrap_or_default();
+    let boot = CliBoot {
+        codec: None,
+        loads: Vec::new(),
+        native_audio_provider: None,
+        config: ConfigLoadOptions {
+            roots: ConfigRoots::new(None, work_root),
+            read_files: false,
+            single_file: None,
+            site_sources: Vec::new(),
+        },
+        list: false,
+        inspect: None,
+        config_report: None,
+        payload: Payload {
+            args,
+            eval: None,
+            script: None,
+            stdin,
+        },
+    };
+    session.run_loaded_boot(&boot)
 }
 
 /// Runs an already-parsed command with an injected loader session.

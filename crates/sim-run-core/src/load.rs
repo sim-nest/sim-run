@@ -87,6 +87,14 @@ impl LoadSession {
         self.loaders.add_loader(loader);
     }
 
+    /// Installs the single capsule already admitted by the platform bootstrap.
+    /// No source resolution or alternate loader is consulted.
+    pub fn install_supplied_capsule(&mut self, capsule: Box<dyn Lib>) -> Result<LibId, CliError> {
+        self.cx
+            .load_lib(capsule.as_ref())
+            .map_err(|error| CliError::new(format!("install supplied capsule: {error}")))
+    }
+
     /// Registers a catalog source for a library symbol.
     pub fn add_catalog_source(&mut self, symbol: impl AsRef<str>, source: CatalogSource) {
         let symbol = symbol_from_text(symbol.as_ref());
