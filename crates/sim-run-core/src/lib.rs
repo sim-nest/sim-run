@@ -235,6 +235,7 @@ pub fn run_supplied_bootstrap(
         bundle_identity: _,
         capsule_card: _,
         preopened_roots,
+        config_roots,
         kernel_seed: _,
     } = bootstrapped.envelope;
     session.install_supplied_capsule(bootstrapped.capsule)?;
@@ -250,13 +251,13 @@ pub fn run_supplied_bootstrap(
                 .map_err(|_| CliError::new("bootstrap stdin is not valid UTF-8"))?,
         )
     };
-    let work_root = preopened_roots.first().cloned().unwrap_or_default();
+    let _supplied_mounts = preopened_roots;
     let boot = CliBoot {
         codec: None,
         loads: Vec::new(),
         native_audio_provider: None,
         config: ConfigLoadOptions {
-            roots: ConfigRoots::new(None, work_root),
+            roots: ConfigRoots::new(config_roots.home, config_roots.work),
             read_files: false,
             single_file: None,
             site_sources: Vec::new(),
