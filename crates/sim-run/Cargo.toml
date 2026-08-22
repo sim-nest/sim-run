@@ -38,6 +38,8 @@ sim-lib-compute-auto = { version = "0.3.0" }
 sim-lib-compute-cli = { version = "0.2.0" }
 sim-lib-compute-model = { version = "0.3.0" }
 sim-lib-expr-tree-serve = { version = "0.1.1" }
+sim-lib-estate-book = { version = "0.1.0" }
+sim-lib-estate-serve = { version = "0.1.0" }
 sim-lib-index = { version = "0.3.0", path = "../sim-lib-index" }
 sim-lib-lang-jvm = { version = "0.1.0" }
 sim-platform-core = { version = "0.1.0" }

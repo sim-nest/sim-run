@@ -2,6 +2,10 @@
 
 sim-run is the command-line bootloader repository for SIM.
 
+The loadable `sim estate` verb exposes `discover`, `plan`, `preview`, `review`,
+`apply`, `watch`, `verify`, `reconcile`, `history`, and `doctor`. The bootloader
+selects this library by verb only; it contains no provider matcher.
+
 ## Run it
 
 Installing the `sim-run` crate gives you the `sim` command: a bootloader that

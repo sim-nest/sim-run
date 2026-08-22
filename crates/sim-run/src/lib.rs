@@ -19,6 +19,7 @@ const TYPESCRIPT_NOTATION_HELP: &str =
 
 mod boot_codec;
 mod compute;
+mod estate;
 mod expr_tree;
 mod glasses;
 mod glasses_args;
@@ -73,6 +74,7 @@ fn boot(
     session = platform::with_platform_if_selected(&command, session);
     session = jvm::with_jvm_if_selected(&command, session);
     session = compute::with_compute_if_selected(&command, session);
+    session = estate::with_estate_if_selected(&command, session);
     session = expr_tree::with_expr_tree_if_selected(&command, session);
     sim_run_core::run_command_with_session_at_version(
         command,

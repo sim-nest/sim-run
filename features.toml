@@ -381,3 +381,17 @@ audiences = ["user", "code"]
 guidance = "Invoke sim platform with a supported subcommand. The product library registers one host command adapter; the binary remains a one-call process membrane."
 claims_anchors = ["anchor/bin/sim"]
 presents = ["feature/sim-platform/product-membrane"]
+[[feature]]
+id = "feature/sim-run/estate-command"
+title = "Loadable estate command"
+summary = "The sim bootloader selects the estate command library only for the estate verb and forwards fixed subcommands as typed organ calls."
+owner = "crate/sim-run"
+audience = "application"
+guidance = "Use sim estate discover, plan, preview, review, apply, watch, verify, reconcile, history, or doctor; arguments never select a provider implementation or executable text."
+claims_anchors = ["anchor/crate/sim-run"]
+
+[[route]]
+id = "route/operate-estate-from-terminal"
+task = "Operate the estate from a terminal"
+audience = "application"
+steps = [{ feature = "feature/sim-run/estate-command", why = "Boot the loadable command and emit the same typed calls used by other surfaces." }]
