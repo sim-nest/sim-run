@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    env, fmt, fs,
+    fmt, fs,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -197,23 +197,6 @@ impl CratesIoResolver {
         }
     }
 
-    /// Returns the default cache directory.
-    ///
-    /// Honors `SIM_CLI_CACHE_DIR`, then `XDG_CACHE_HOME`, then `HOME`, and
-    /// falls back to the system temporary directory.
-    pub fn default_cache_dir() -> PathBuf {
-        if let Ok(path) = env::var("SIM_CLI_CACHE_DIR") {
-            return PathBuf::from(path);
-        }
-        if let Ok(path) = env::var("XDG_CACHE_HOME") {
-            return PathBuf::from(path).join("sim").join("libs");
-        }
-        if let Ok(path) = env::var("HOME") {
-            return PathBuf::from(path).join(".cache").join("sim").join("libs");
-        }
-        env::temp_dir().join("sim").join("libs")
-    }
-
     /// Returns the cache directory this resolver reads from.
     pub fn cache_dir(&self) -> &Path {
         &self.cache_dir
@@ -265,6 +248,22 @@ impl CratesIoResolver {
         endpoint: impl Into<String>,
     ) -> Result<Self, CliError> {
         let resolver = GitRegistryResolver::new(endpoint, self.cache_dir.clone())?;
+        self.add_git_registry_resolver(resolver);
+        Ok(self)
+    }
+
+    /// Builds a git registry resolver with platform-supplied cleartext policy.
+    #[cfg(feature = "registry")]
+    pub fn with_git_registry_endpoint_policy(
+        mut self,
+        endpoint: impl Into<String>,
+        allow_insecure_remote: bool,
+    ) -> Result<Self, CliError> {
+        let resolver = GitRegistryResolver::with_policy(
+            endpoint,
+            self.cache_dir.clone(),
+            allow_insecure_remote,
+        )?;
         self.add_git_registry_resolver(resolver);
         Ok(self)
     }
@@ -437,7 +436,7 @@ impl CratesIoResolver {
 
 impl Default for CratesIoResolver {
     fn default() -> Self {
-        Self::new(Self::default_cache_dir())
+        Self::new(PathBuf::from(".sim/cache/libs"))
     }
 }
 
@@ -637,9 +636,6 @@ mod tests {
     }
 
     fn temp_dir(label: &str) -> PathBuf {
-        env::temp_dir().join(format!(
-            "sim-run-core-crates-{}-{label}",
-            std::process::id()
-        ))
+        PathBuf::from("target/model-fixtures").join(format!("sim-run-core-crates-{label}"))
     }
 }

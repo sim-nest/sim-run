@@ -144,6 +144,18 @@ fn rejects_non_loopback_insecure_endpoint() {
 }
 
 #[test]
+fn admits_non_loopback_only_from_explicit_policy() {
+    let resolver = GitRegistryResolver::with_policy(
+        "http://forge.example/sim",
+        PathBuf::from("model-cache"),
+        true,
+    )
+    .unwrap();
+    assert_eq!(resolver.endpoint(), "http://forge.example/sim");
+    assert_eq!(resolver.cache_dir(), Path::new("model-cache"));
+}
+
+#[test]
 fn registry_rejects_overflowing_chunk_size() {
     let err = decode_git_registry_chunked(b"fffffffffffffffe\r\n", usize::MAX)
         .expect_err("overflowing chunk size must error, not panic")

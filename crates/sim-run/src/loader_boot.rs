@@ -1,18 +1,29 @@
-use sim_run_core::{CliCommand, CliError, LoadSession};
 #[cfg(feature = "registry")]
-use sim_run_core::{CratesIoResolver, GIT_REGISTRY_ENDPOINT_ENV};
-use std::ffi::OsString;
+use sim_run_core::CratesIoResolver;
+use sim_run_core::{CliCommand, CliError, LoadSession};
+use std::path::PathBuf;
 
-pub(crate) fn run<I, S>(args: I) -> Result<i32, CliError>
-where
-    I: IntoIterator<Item = S>,
-    S: Into<OsString>,
-{
-    let command = sim_run_core::parse_args(args)?;
-    let mut session = loader_session(&command)?;
+pub(crate) fn run(
+    envelope: sim_platform_ubuntu_pc::UbuntuProcessEnvelope,
+) -> Result<i32, CliError> {
+    let command = sim_run_core::parse_args(envelope.argv)?;
+    let cache = envelope
+        .cache_root
+        .clone()
+        .unwrap_or_else(|| envelope.work_root.join(".sim/cache/libs"));
+    #[cfg(feature = "registry")]
+    let endpoint = envelope.registry_endpoint;
+    #[cfg(not(feature = "registry"))]
+    let endpoint = None;
+    #[cfg(feature = "registry")]
+    let allow_insecure = envelope.allow_insecure_registry;
+    #[cfg(not(feature = "registry"))]
+    let allow_insecure = false;
+    let mut session = loader_session(&command, cache, endpoint, allow_insecure)?;
     session = crate::watch::with_watch_if_selected(&command, session);
     session = crate::glasses::with_glasses_if_selected(&command, session);
     session = crate::index::with_index_if_selected(&command, session);
+    session = crate::platform::with_platform_if_selected(&command, session);
     session = crate::compute::with_compute_if_selected(&command, session);
     session = crate::expr_tree::with_expr_tree_if_selected(&command, session);
     sim_run_core::run_command_with_session_at_version(
@@ -22,12 +33,17 @@ where
     )
 }
 
-fn loader_session(command: &CliCommand) -> Result<LoadSession, CliError> {
-    let session = LoadSession::new();
+fn loader_session(
+    command: &CliCommand,
+    cache: PathBuf,
+    endpoint: Option<String>,
+    allow_insecure: bool,
+) -> Result<LoadSession, CliError> {
+    let session = LoadSession::with_cache_root(cache);
     #[cfg(any(feature = "dynamic-native", feature = "wasm"))]
     let session = with_platform_loaders(session);
     #[cfg(feature = "registry")]
-    let session = with_git_registry(session)?;
+    let session = with_git_registry(session, endpoint, allow_insecure)?;
     let _ = command;
     Ok(session)
 }
@@ -53,11 +69,15 @@ fn with_platform_loaders(session: LoadSession) -> LoadSession {
 }
 
 #[cfg(feature = "registry")]
-fn with_git_registry(session: LoadSession) -> Result<LoadSession, CliError> {
-    let Some(endpoint) = std::env::var_os(GIT_REGISTRY_ENDPOINT_ENV) else {
+fn with_git_registry(
+    session: LoadSession,
+    endpoint: Option<String>,
+    allow_insecure: bool,
+) -> Result<LoadSession, CliError> {
+    let Some(endpoint) = endpoint else {
         return Ok(session);
     };
-    let resolver = CratesIoResolver::default()
-        .with_git_registry_endpoint(endpoint.to_string_lossy().into_owned())?;
+    let resolver = CratesIoResolver::new(session.crates_io_cache_root().to_path_buf())
+        .with_git_registry_endpoint_policy(endpoint, allow_insecure)?;
     Ok(session.with_crates_io_resolver(resolver))
 }

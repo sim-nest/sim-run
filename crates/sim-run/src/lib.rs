@@ -34,13 +34,24 @@ mod watch_args;
 
 /// Runs the complete product process adapter; binaries delegate here in one call.
 pub fn process_main() {
-    if std::env::args_os()
+    let envelope = sim_platform_ubuntu_pc::UbuntuProcessEnvelope::capture().unwrap_or_else(|err| {
+        eprintln!("sim: capture process envelope: {err}");
+        process::exit(2);
+    });
+    process_main_with(envelope);
+}
+
+/// Runs the bootloader from process facts supplied by a platform capsule.
+pub fn process_main_with(envelope: sim_platform_ubuntu_pc::UbuntuProcessEnvelope) {
+    if envelope
+        .argv
+        .iter()
         .skip(1)
         .any(|arg| arg == "--help" || arg == "-h")
     {
         print!("{TYPESCRIPT_NOTATION_HELP}");
     }
-    let code = boot().unwrap_or_else(|err| {
+    let code = boot(envelope).unwrap_or_else(|err| {
         eprintln!("sim: {err}");
         2
     });
@@ -48,9 +59,15 @@ pub fn process_main() {
 }
 
 #[cfg(not(any(feature = "dynamic-native", feature = "wasm")))]
-fn boot() -> Result<i32, sim_run_core::CliError> {
-    let command = sim_run_core::parse_args(std::env::args_os())?;
-    let mut session = watch::with_watch_if_selected(&command, sim_run_core::LoadSession::new());
+fn boot(
+    envelope: sim_platform_ubuntu_pc::UbuntuProcessEnvelope,
+) -> Result<i32, sim_run_core::CliError> {
+    let command = sim_run_core::parse_args(envelope.argv)?;
+    let cache = envelope
+        .cache_root
+        .unwrap_or_else(|| envelope.work_root.join(".sim/cache/libs"));
+    let mut session =
+        watch::with_watch_if_selected(&command, sim_run_core::LoadSession::with_cache_root(cache));
     session = glasses::with_glasses_if_selected(&command, session);
     session = index::with_index_if_selected(&command, session);
     session = platform::with_platform_if_selected(&command, session);
@@ -65,6 +82,8 @@ fn boot() -> Result<i32, sim_run_core::CliError> {
 }
 
 #[cfg(any(feature = "dynamic-native", feature = "wasm"))]
-fn boot() -> Result<i32, sim_run_core::CliError> {
-    loader_boot::run(std::env::args_os())
+fn boot(
+    envelope: sim_platform_ubuntu_pc::UbuntuProcessEnvelope,
+) -> Result<i32, sim_run_core::CliError> {
+    loader_boot::run(envelope)
 }

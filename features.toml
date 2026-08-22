@@ -28,7 +28,7 @@ title = "Repository index contract"
 summary = "Expose generated package, card, surface, and recipe facts as a checked SIM Index fragment."
 owner = "crate/xtask"
 audiences = ["code"]
-guidance = "Use this row when checking which generated index facts the repo exports."
+guidance = "Use this host-tool row when checking generated Index facts or standalone packaging evidence. It is structurally outside every product closure."
 claims_anchors = [
   "anchor/cli/xtask",
   "anchor/crate/xtask",
@@ -49,7 +49,7 @@ title = "Bootloader command dispatch"
 summary = "Start product commands through the shared bootloader and loaded runtime libraries."
 owner = "crate/sim-run-core"
 audiences = ["user", "code"]
-guidance = "TypeScript notation; does not type-check. Use `language/typescript-notation` when following the notation profile through generic codec/load/profile controls. The bootloader owns no language engine and adds no TypeScript executable, tsc, tsserver, or LSP service."
+guidance = "TypeScript notation; does not type-check. The one-call sim frame consumes an UbuntuProcessEnvelope; argv, work/cache roots, and registry policy are captured by the platform capsule. Use `language/typescript-notation` through generic codec/load/profile controls. The bootloader owns no language engine or host discovery."
 claims_anchors = [
   "anchor/cli/sim-run",
   "anchor/crate/sim-run",

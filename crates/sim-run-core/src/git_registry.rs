@@ -47,7 +47,17 @@ pub struct GitRegistryResolver {
 impl GitRegistryResolver {
     /// Builds a resolver from a git registry artifact endpoint and cache root.
     pub fn new(endpoint: impl Into<String>, cache_dir: PathBuf) -> Result<Self, CliError> {
-        let endpoint = normalize_endpoint(endpoint.into())?;
+        Self::with_policy(endpoint, cache_dir, false)
+    }
+
+    /// Builds a resolver with an explicit cleartext-remote policy supplied by
+    /// the platform envelope.
+    pub fn with_policy(
+        endpoint: impl Into<String>,
+        cache_dir: PathBuf,
+        allow_insecure_remote: bool,
+    ) -> Result<Self, CliError> {
+        let endpoint = normalize_endpoint(endpoint.into(), allow_insecure_remote)?;
         Ok(Self {
             endpoint,
             cache_dir,
@@ -138,7 +148,7 @@ impl GitRegistryResolver {
     }
 }
 
-fn normalize_endpoint(endpoint: String) -> Result<String, CliError> {
+fn normalize_endpoint(endpoint: String, allow_insecure_remote: bool) -> Result<String, CliError> {
     let endpoint = endpoint.trim().trim_end_matches('/').to_owned();
     if endpoint.is_empty() {
         return Err(CliError::new("git registry endpoint is empty"));
@@ -152,7 +162,7 @@ fn normalize_endpoint(endpoint: String) -> Result<String, CliError> {
     // cleartext. Confine it to loopback by default; reaching a remote host over
     // insecure http:// requires an explicit opt-in.
     let url = HttpUrl::parse(&endpoint)?;
-    if !host_is_loopback(&url.host) && !insecure_remote_allowed() {
+    if !host_is_loopback(&url.host) && !allow_insecure_remote {
         return Err(CliError::new(format!(
             "git registry endpoint host {} is not loopback; refusing an unauthenticated http:// \
              fetch to a remote host (set {} to override)",
@@ -169,10 +179,6 @@ fn host_is_loopback(host: &str) -> bool {
     host.parse::<std::net::IpAddr>()
         .map(|ip| ip.is_loopback())
         .unwrap_or(false)
-}
-
-fn insecure_remote_allowed() -> bool {
-    std::env::var_os(GIT_REGISTRY_ALLOW_INSECURE_ENV).is_some_and(|value| !value.is_empty())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

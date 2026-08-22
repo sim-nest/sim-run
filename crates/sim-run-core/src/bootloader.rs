@@ -34,7 +34,7 @@ use crate::{
 /// // library's `cli/main/serve` entrypoint. No Cx::new in the binary.
 /// let code = Bootloader::standard()
 ///     .host_verb("serve", "lib/my-server", || Box::new(MyServeLib::new()))
-///     .run(std::iter::once("serve".into()).chain(std::env::args_os().skip(1)))?;
+///     .run(["serve"])?;
 /// std::process::exit(code);
 /// # Ok::<(), sim_run_core::CliError>(())
 /// ```

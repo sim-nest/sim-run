@@ -64,6 +64,11 @@ macro_rules! expect_granted {
 impl LoadSession {
     /// Builds a loader session with an empty static host catalog.
     pub fn new() -> Self {
+        Self::with_cache_root(std::path::PathBuf::from(".sim/cache/libs"))
+    }
+
+    /// Builds a loader session with an explicit artifact-cache root.
+    pub fn with_cache_root(cache_root: std::path::PathBuf) -> Self {
         let mut loaders = LoaderRegistry::new();
         loaders.add_loader(HostSourceLoader);
         let (cx, seat) = Cx::new_seated(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
@@ -72,7 +77,7 @@ impl LoadSession {
             seat,
             loaders,
             hosts: HostLibRegistry::default(),
-            crates_io: CratesIoResolver::default(),
+            crates_io: CratesIoResolver::new(cache_root),
             catalog_sources: BTreeMap::new(),
             default_verb_sources: BTreeMap::new(),
             default_verb_config_libs: BTreeMap::new(),
@@ -80,6 +85,11 @@ impl LoadSession {
             config: RuntimeConfigState::default(),
             native_audio_provider_active: false,
         }
+    }
+
+    /// Returns the explicitly supplied artifact-cache root.
+    pub fn crates_io_cache_root(&self) -> &std::path::Path {
+        self.crates_io.cache_dir()
     }
 
     /// Adds a kernel loader to the session.
