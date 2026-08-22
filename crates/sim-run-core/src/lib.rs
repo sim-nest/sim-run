@@ -44,6 +44,7 @@ mod handoff;
 mod host;
 mod introspect;
 mod load;
+mod platform_bundle;
 mod receipt;
 mod report;
 mod source;
@@ -94,6 +95,7 @@ pub use envelope::cli_envelope_args;
 pub use git_registry::{GIT_REGISTRY_ENDPOINT_ENV, GitRegistryResolver};
 pub use handoff::{CLI_MAIN_ENTRYPOINT, CliEntrypoint, cli_main_entrypoint_symbol};
 pub use load::LoadSession;
+pub use platform_bundle::{BootLoadRequest, boot_load_requests};
 pub use receipt::{LoadReceipt, LoadReceiptRole};
 pub use report::{
     ConfigReportKind, ConfigReportRequest, ConfigSourceReport, LoadedLibReport, LoadedStateReport,
