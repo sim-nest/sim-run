@@ -4,9 +4,9 @@ use std::{
 };
 
 use sim_kernel::{
-    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, GrantSeat, Lib, LibId,
-    LibLoader, LibManifest, LibSource as KernelLibSource, LibSourceSpec as KernelLibSourceSpec,
-    LoaderRegistry, NoopEvalPolicy, Symbol,
+    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, GrantSeat, HandleSeed,
+    Lib, LibId, LibLoader, LibManifest, LibSource as KernelLibSource,
+    LibSourceSpec as KernelLibSourceSpec, LoaderRegistry, NoopEvalPolicy, Symbol,
 };
 use sim_lib_stream_host::native_audio_provider_capability;
 
@@ -71,7 +71,11 @@ impl LoadSession {
     pub fn with_cache_root(cache_root: std::path::PathBuf) -> Self {
         let mut loaders = LoaderRegistry::new();
         loaders.add_loader(HostSourceLoader);
-        let (cx, seat) = Cx::new_seated(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+        let (cx, seat) = Cx::new_seated(
+            Arc::new(NoopEvalPolicy),
+            Arc::new(DefaultFactory),
+            HandleSeed::new(1),
+        );
         Self {
             cx,
             seat,
