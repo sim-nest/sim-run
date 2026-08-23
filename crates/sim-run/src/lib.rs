@@ -30,6 +30,7 @@ mod jvm;
 #[cfg(any(feature = "dynamic-native", feature = "wasm"))]
 mod loader_boot;
 mod platform;
+mod provider;
 mod watch;
 mod watch_args;
 
@@ -71,6 +72,7 @@ fn boot(
         watch::with_watch_if_selected(&command, sim_run_core::LoadSession::with_cache_root(cache));
     session = glasses::with_glasses_if_selected(&command, session);
     session = index::with_index_if_selected(&command, session);
+    session = provider::with_provider_if_selected(&command, session);
     session = platform::with_platform_if_selected(&command, session);
     session = jvm::with_jvm_if_selected(&command, session);
     session = compute::with_compute_if_selected(&command, session);
