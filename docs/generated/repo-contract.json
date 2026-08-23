@@ -113,7 +113,7 @@
       ]
     },
     {
-      "crate_name": "sim",
+      "crate_name": "sim_run",
       "dependencies": [
         {
           "kind": "normal",
@@ -207,9 +207,20 @@
       "rustdoc_summary": "The sim bootloader binary.",
       "target_kinds": [
         "bin",
+        "lib",
         "test"
       ],
       "targets": [
+        {
+          "crate_types": [
+            "lib"
+          ],
+          "kind": [
+            "lib"
+          ],
+          "name": "sim_run",
+          "src": "crates/sim-run/src/lib.rs"
+        },
         {
           "crate_types": [
             "bin"
@@ -517,10 +528,10 @@
     "generated_by": "cargo run -p xtask -- simdoc",
     "generation_timestamp": "2026-07-16T03:56:38+02:00",
     "generator": "xtask repo-contract v1",
-    "git_commit": "403acbf5297c21c30a6a8cd2e36ecd5c330a41b3",
+    "git_commit": "6b348be3ef4bab34ea508f10c8725cf2974d5287",
     "repo": "sim-run",
     "schema": "sim.provenance.v1",
-    "source_commit": "403acbf5297c21c30a6a8cd2e36ecd5c330a41b3",
+    "source_commit": "6b348be3ef4bab34ea508f10c8725cf2974d5287",
     "source_remote": "https://github.com/sim-nest/sim-run",
     "validation_commands": [
       "cargo fmt --all --check",
@@ -533,9 +544,9 @@
       "cargo run -p xtask -- validation-matrix --check --repo .",
       "cargo run -p xtask -- crate-catalog --check --repo ."
     ],
-    "workspace_hash": "2fa5bac0eec210f7",
+    "workspace_hash": "b325fa77f2c4bdce",
     "workspace_hash_algorithm": "fnv1a64",
-    "workspace_hash_input_count": 127,
+    "workspace_hash_input_count": 135,
     "workspace_hash_inputs": [
       "Cargo.toml",
       "crates/sim-lib-index/Cargo.toml",
@@ -557,14 +568,18 @@
       "crates/sim-run/Cargo.toml",
       "crates/sim-run/src/boot_codec.rs",
       "crates/sim-run/src/compute.rs",
+      "crates/sim-run/src/estate.rs",
       "crates/sim-run/src/expr_tree.rs",
       "crates/sim-run/src/glasses.rs",
       "crates/sim-run/src/glasses_args.rs",
       "crates/sim-run/src/glasses_plan.rs",
       "crates/sim-run/src/index.rs",
       "crates/sim-run/src/jvm.rs",
+      "crates/sim-run/src/lib.rs",
       "crates/sim-run/src/loader_boot.rs",
       "crates/sim-run/src/main.rs",
+      "crates/sim-run/src/platform.rs",
+      "crates/sim-run/src/provider.rs",
       "crates/sim-run/src/watch.rs",
       "crates/sim-run/src/watch_args.rs",
       "crates/sim-run/tests/basic.rs",
@@ -585,6 +600,7 @@
       "crates/sim-run-core/src/args.rs",
       "crates/sim-run-core/src/boot.rs",
       "crates/sim-run-core/src/bootloader.rs",
+      "crates/sim-run-core/src/bootstrap_tests.rs",
       "crates/sim-run-core/src/codec_boot.rs",
       "crates/sim-run-core/src/codec_boot_tests.rs",
       "crates/sim-run-core/src/config.rs",
@@ -609,6 +625,7 @@
       "crates/sim-run-core/src/lib_tests.rs",
       "crates/sim-run-core/src/load.rs",
       "crates/sim-run-core/src/load_tests.rs",
+      "crates/sim-run-core/src/platform_bundle.rs",
       "crates/sim-run-core/src/publish_tests.rs",
       "crates/sim-run-core/src/receipt.rs",
       "crates/sim-run-core/src/report.rs",
@@ -630,6 +647,7 @@
       "crates/sim-run-loaders/src/native_macro.rs",
       "crates/sim-run-loaders/src/native_number.rs",
       "crates/sim-run-loaders/src/native_site.rs",
+      "crates/sim-run-loaders/src/port.rs",
       "crates/sim-run-loaders/src/reexport.rs",
       "crates/sim-run-loaders/src/shape.rs",
       "crates/sim-run-loaders/src/shared.rs",
@@ -662,6 +680,7 @@
       "recipes/02-scenarios/placement-report/recipe.toml",
       "recipes/02-scenarios/server-verb/recipe.toml",
       "recipes/book.toml",
+      "recipes/estate-reviewed-model/recipe.toml",
       "recipes/publish-readiness/package-list/recipe.toml",
       "xtask/Cargo.toml"
     ]
@@ -674,7 +693,7 @@
       "card_id": "cookbook/sim-run",
       "group": "workspace",
       "package": "sim-run",
-      "recipe_count": 19,
+      "recipe_count": 20,
       "recipes": [
         {
           "card_id": "sim-run/01-basics/hello",
@@ -819,6 +838,14 @@
           "package": "sim-run",
           "recipe_toml": "recipes/02-scenarios/server-verb/recipe.toml",
           "title": "Server verb from loaded library"
+        },
+        {
+          "card_id": "sim-run/recipes/estate-reviewed-model",
+          "codec": "",
+          "id": "estate-reviewed-model",
+          "package": "sim-run",
+          "recipe_toml": "recipes/estate-reviewed-model/recipe.toml",
+          "title": "Review a modeled estate change from the terminal"
         },
         {
           "card_id": "sim-run/publish-readiness/package-list",

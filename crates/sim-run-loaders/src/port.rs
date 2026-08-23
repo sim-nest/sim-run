@@ -158,11 +158,12 @@ fn clone_data_source(source: &LibSource) -> Result<LibSource> {
 }
 
 /// Data-backed AOT registry using the same manifest and call behavior as every other loader.
+type StaticLibFactory = Arc<dyn Fn() -> Box<dyn Lib> + Send + Sync>;
+
+/// Thread-safe registry of statically linked library factories.
 #[derive(Default)]
 pub struct StaticRegistry {
-    entries: std::sync::RwLock<
-        std::collections::BTreeMap<Symbol, Arc<dyn Fn() -> Box<dyn Lib> + Send + Sync>>,
-    >,
+    entries: std::sync::RwLock<std::collections::BTreeMap<Symbol, StaticLibFactory>>,
 }
 
 #[cfg(test)]

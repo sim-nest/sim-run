@@ -156,31 +156,6 @@ fn admits_non_loopback_only_from_explicit_policy() {
 }
 
 #[test]
-fn registry_rejects_overflowing_chunk_size() {
-    let err = decode_git_registry_chunked(b"fffffffffffffffe\r\n", usize::MAX)
-        .expect_err("overflowing chunk size must error, not panic")
-        .to_string();
-    assert!(err.contains("overflow"), "unexpected error: {err}");
-}
-
-#[test]
-fn registry_rejects_oversized_content_length() {
-    let response = b"HTTP/1.1 200 OK\r\nContent-Length: 4096\r\nConnection: close\r\n\r\n";
-    let err = parse_http_response("http://loopback/index.txt", response, 16)
-        .expect_err("body length past the cap must error")
-        .to_string();
-    assert!(err.contains("exceeds 16 bytes"), "unexpected error: {err}");
-}
-
-#[test]
-fn registry_caps_chunked_decoded_length() {
-    let err = decode_git_registry_chunked(b"8\r\nAAAAAAAA\r\n0\r\n", 4)
-        .expect_err("decoded length past the cap must error")
-        .to_string();
-    assert!(err.contains("exceeds 4 bytes"), "unexpected error: {err}");
-}
-
-#[test]
 fn rejects_unsafe_artifact_file_names() {
     assert_eq!(
         index_artifact(&format!(

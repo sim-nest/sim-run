@@ -16,7 +16,7 @@
       "summary": "Loadable command-line REPL library for SIM."
     },
     {
-      "crate_name": "sim",
+      "crate_name": "sim_run",
       "group": "workspace",
       "manifest": "crates/sim-run/Cargo.toml",
       "package": "sim-run",

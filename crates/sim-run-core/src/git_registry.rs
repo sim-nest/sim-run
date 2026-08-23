@@ -1,8 +1,5 @@
 use std::{
-    collections::BTreeMap,
     fs,
-    io::{Read, Write},
-    net::TcpStream,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -161,12 +158,14 @@ fn normalize_endpoint(endpoint: String, allow_insecure_remote: bool) -> Result<S
     // F8: this build has no TLS client, so the fetch is unauthenticated
     // cleartext. Confine it to loopback by default; reaching a remote host over
     // insecure http:// requires an explicit opt-in.
-    let url = HttpUrl::parse(&endpoint)?;
-    if !host_is_loopback(&url.host) && !allow_insecure_remote {
+    let url = sim_lib_net_http::Url::parse(&endpoint)
+        .map_err(|error| CliError::new(format!("git registry URL: {error}")))?;
+    if !host_is_loopback(url.host()) && !allow_insecure_remote {
         return Err(CliError::new(format!(
             "git registry endpoint host {} is not loopback; refusing an unauthenticated http:// \
              fetch to a remote host (set {} to override)",
-            url.host, GIT_REGISTRY_ALLOW_INSECURE_ENV
+            url.host(),
+            GIT_REGISTRY_ALLOW_INSECURE_ENV
         )));
     }
     Ok(endpoint)
@@ -350,155 +349,41 @@ fn url_path_component(component: &str) -> Result<String, CliError> {
 }
 
 fn http_get(url: &str, cap: usize) -> Result<Vec<u8>, CliError> {
-    let parsed = HttpUrl::parse(url)?;
-    let mut stream = TcpStream::connect((parsed.host.as_str(), parsed.port)).map_err(|err| {
-        CliError::new(format!(
-            "connect git registry {}:{}: {err}",
-            parsed.host, parsed.port
-        ))
-    })?;
-    stream
-        .set_read_timeout(Some(Duration::from_secs(10)))
-        .map_err(|err| CliError::new(format!("set git registry read timeout: {err}")))?;
-    let request = format!(
-        "GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: sim-run-core/{}\r\nConnection: close\r\n\r\n",
-        parsed.path,
-        parsed.host_header(),
-        env!("CARGO_PKG_VERSION")
-    );
-    stream
-        .write_all(request.as_bytes())
-        .map_err(|err| CliError::new(format!("write git registry request: {err}")))?;
-    // F18: bound the whole response (headers + body). `take(cap + 1)` lets us
-    // detect an over-cap stream without reading it unboundedly into memory.
-    let mut response = Vec::new();
-    stream
-        .take((cap as u64).saturating_add(1))
-        .read_to_end(&mut response)
-        .map_err(|err| CliError::new(format!("read git registry response: {err}")))?;
-    if response.len() > cap {
-        return Err(CliError::new(format!(
-            "git registry response from {url} exceeds {cap} bytes"
-        )));
-    }
-    parse_http_response(url, &response, cap)
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct HttpUrl {
-    host: String,
-    port: u16,
-    path: String,
-}
-
-impl HttpUrl {
-    fn parse(url: &str) -> Result<Self, CliError> {
-        let rest = url
-            .strip_prefix("http://")
-            .ok_or_else(|| CliError::new("git registry URL must use http://"))?;
-        let (authority, path) = match rest.split_once('/') {
-            Some((authority, path)) => (authority, format!("/{path}")),
-            None => (rest, "/".to_owned()),
-        };
-        if authority.is_empty() {
-            return Err(CliError::new("git registry URL has no host"));
-        }
-        let (host, port) = match authority.rsplit_once(':') {
-            Some((host, port)) if !host.is_empty() => {
-                let port = port.parse::<u16>().map_err(|err| {
-                    CliError::new(format!("git registry URL has invalid port: {err}"))
-                })?;
-                (host.to_owned(), port)
-            }
-            _ => (authority.to_owned(), 80),
-        };
-        Ok(Self { host, port, path })
-    }
-
-    fn host_header(&self) -> String {
-        if self.port == 80 {
-            self.host.clone()
-        } else {
-            format!("{}:{}", self.host, self.port)
-        }
-    }
-}
-
-fn parse_http_response(url: &str, response: &[u8], cap: usize) -> Result<Vec<u8>, CliError> {
-    let Some(split) = response.windows(4).position(|window| window == b"\r\n\r\n") else {
-        return Err(CliError::new(format!(
-            "git registry response from {url} has no header terminator"
-        )));
+    use sim_lib_net_http::{
+        Cancellation, Client, Header, Method, Policy, Request, RequestBody, TcpConnector, Url,
     };
-    let headers = std::str::from_utf8(&response[..split]).map_err(|err| {
-        CliError::new(format!(
-            "git registry response headers are not UTF-8: {err}"
-        ))
-    })?;
-    let mut lines = headers.lines();
-    let status = lines
-        .next()
-        .ok_or_else(|| CliError::new("git registry response has no status line"))?;
-    let code = status
-        .split_ascii_whitespace()
-        .nth(1)
-        .ok_or_else(|| CliError::new("git registry response status has no code"))?
-        .parse::<u16>()
-        .map_err(|err| CliError::new(format!("git registry status code is invalid: {err}")))?;
-    if code != 200 {
+    let policy = Policy {
+        connect_timeout: Duration::from_secs(10),
+        read_timeout: Duration::from_secs(10),
+        write_timeout: Duration::from_secs(10),
+        total_timeout: Duration::from_secs(30),
+        max_response_bytes: cap,
+        ..Policy::default()
+    };
+    let response = Client::new(TcpConnector, policy)
+        .execute(Request {
+            method: Method::get(),
+            url: Url::parse(url)
+                .map_err(|error| CliError::new(format!("git registry URL: {error}")))?,
+            headers: vec![
+                Header::new(
+                    "User-Agent",
+                    format!("sim-run-core/{}", env!("CARGO_PKG_VERSION")),
+                )
+                .expect("static header name is valid"),
+            ],
+            body: RequestBody::Empty,
+            deadline: None,
+            cancellation: Cancellation::default(),
+        })
+        .map_err(|error| CliError::new(format!("git registry GET {url}: {error}")))?;
+    if response.status != 200 {
         return Err(CliError::new(format!(
-            "git registry GET {url} returned HTTP {code}"
+            "git registry GET {url} returned HTTP {}",
+            response.status
         )));
     }
-    let header_map = lines
-        .filter_map(|line| {
-            let (name, value) = line.split_once(':')?;
-            Some((name.trim().to_ascii_lowercase(), value.trim().to_owned()))
-        })
-        .collect::<BTreeMap<_, _>>();
-    let body = &response[split + 4..];
-    if header_map
-        .get("transfer-encoding")
-        .is_some_and(|value| value.eq_ignore_ascii_case("chunked"))
-    {
-        return decode_git_registry_chunked(body, cap);
-    }
-    if let Some(length) = header_map.get("content-length") {
-        let length = length.parse::<usize>().map_err(|err| {
-            CliError::new(format!("git registry content length is invalid: {err}"))
-        })?;
-        if length > cap {
-            return Err(CliError::new(format!(
-                "git registry response body length {length} exceeds {cap} bytes"
-            )));
-        }
-        if body.len() < length {
-            return Err(CliError::new("git registry response body is truncated"));
-        }
-        return Ok(body[..length].to_vec());
-    }
-    Ok(body.to_vec())
-}
-
-fn decode_git_registry_chunked(body: &[u8], cap: usize) -> Result<Vec<u8>, CliError> {
-    sim_lib_net_core::decode_chunked(body, cap).map_err(map_git_registry_chunked_error)
-}
-
-fn map_git_registry_chunked_error(error: sim_lib_net_core::NetError) -> CliError {
-    use sim_lib_net_core::NetError;
-    match error {
-        NetError::InvalidChunkSize(detail) => CliError::new(format!(
-            "chunked git registry body has invalid chunk size: {detail}"
-        )),
-        NetError::TruncatedChunk => CliError::new("chunked git registry body is truncated"),
-        NetError::InvalidChunkDelimiter => {
-            CliError::new("chunked git registry body has a bad delimiter")
-        }
-        NetError::OversizeBody(cap) => {
-            CliError::new(format!("chunked git registry body exceeds {cap} bytes"))
-        }
-        other => CliError::new(format!("chunked git registry body is invalid: {other}")),
-    }
+    Ok(response.into_body())
 }
 
 #[cfg(test)]
