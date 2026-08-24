@@ -392,6 +392,26 @@ audiences = ["user", "code"]
 guidance = "Invoke sim platform with a supported subcommand. The product library registers one host command adapter; the binary remains a one-call process membrane."
 claims_anchors = ["anchor/bin/sim"]
 presents = ["feature/sim-platform/product-membrane"]
+
+[[feature]]
+id = "feature/sim-run/search-command"
+title = "Loadable search command"
+summary = "Select the search verb and delegate canonical query, fetch, research, and show behavior to sim-lib-search."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use sim search; the bootloader contributes only the host factory and verb source, while SearchCommandLib owns all configuration, records, policy, and rendering."
+claims_anchors = ["anchor/bin/sim", "anchor/crate/sim-run"]
+presents = ["feature/sim-agent-net/search-product"]
+
+[[route]]
+id = "route/run-search-command"
+task = "Run canonical search from the terminal"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The standard bootloader owns command dispatch." },
+  { feature = "feature/sim-run/search-command", why = "The command row selects the shared search product without implementing search." },
+  { specimen = "recipe/sim-agent-net/crates/sim-lib-search/01-fixture/cli-mcp-parity", why = "The shared specimen proves the same record through CLI and MCP." },
+]
 [[feature]]
 id = "feature/sim-run/estate-command"
 title = "Loadable estate command"

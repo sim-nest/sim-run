@@ -2,6 +2,10 @@
 
 sim-run is the command-line bootloader repository for SIM.
 
+The standard distribution also selects the loadable `sim search` behavior.
+Use `sim search query|fetch|research|show INPUT`; `--json` emits its canonical
+Shape record, while live-fake, cassette, and offline modes remain explicit.
+
 The default bootloader selects the loadable observatory with
 `sim model-test <verb>`. It contributes source selection only: command behavior
 stays in `sim-lib-model-test`, generic lifecycle and decisions stay in

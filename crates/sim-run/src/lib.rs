@@ -32,6 +32,7 @@ mod loader_boot;
 mod model_test;
 mod platform;
 mod provider;
+mod search;
 mod study;
 mod watch;
 mod watch_args;
@@ -75,6 +76,7 @@ fn boot(
     session = glasses::with_glasses_if_selected(&command, session);
     session = index::with_index_if_selected(&command, session);
     session = provider::with_provider_if_selected(&command, session);
+    session = search::with_search_if_selected(&command, session);
     session = model_test::with_model_test_if_selected(&command, session);
     session = platform::with_platform_if_selected(&command, session);
     session = jvm::with_jvm_if_selected(&command, session);

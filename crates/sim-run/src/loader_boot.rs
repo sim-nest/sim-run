@@ -24,6 +24,7 @@ pub(crate) fn run(
     session = crate::glasses::with_glasses_if_selected(&command, session);
     session = crate::index::with_index_if_selected(&command, session);
     session = crate::provider::with_provider_if_selected(&command, session);
+    session = crate::search::with_search_if_selected(&command, session);
     session = crate::platform::with_platform_if_selected(&command, session);
     session = crate::compute::with_compute_if_selected(&command, session);
     session = crate::expr_tree::with_expr_tree_if_selected(&command, session);
