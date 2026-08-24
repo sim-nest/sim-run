@@ -234,6 +234,25 @@ claims_specimens = [
 ]
 
 [[feature]]
+id = "feature/sim-run/immutable-native-build"
+title = "Immutable sandboxed native build"
+summary = "Build one locked offline cdylib from sealed mounts and publish verified bytes by content identity."
+owner = "crate/sim-lib-hotload"
+audiences = ["code", "framework"]
+guidance = "Compose NativeBuilder with a boot-selected sim-lib-exec launcher and preopened source, target, and artifact mounts. Callers supply identities and policy records, never argv or host paths."
+claims_anchors = [
+  "anchor/crate/sim-lib-hotload",
+  "anchor/rustdoc/sim-lib-hotload",
+]
+claims_surfaces = ["site/sim-lib-hotload"]
+claims_specimens = ["spec-test/sim-run/crates/sim-lib-hotload/src/build"]
+supports = [
+  "feature/sim-run/loaders",
+  "feature/sim-runtime/sandboxed-execution",
+  "feature/sim-storage/durable-journal",
+]
+
+[[feature]]
 id = "feature/sim-run/loaders"
 title = "Loadable source libraries"
 summary = "Load exact native, wasm, source, re-exported, and AOT artifacts through the run-owned object-safe LoaderPort."
