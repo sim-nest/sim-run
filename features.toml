@@ -71,6 +71,17 @@ claims_specimens = [
 ]
 
 [[feature]]
+id = "feature/sim-run/study-command"
+title = "Generic study command surface"
+summary = "Dispatch the loadable study product through sim study without adding study behavior to the bootloader."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use sim study with an explicit graph and one of plan, seal, run, resume, cancel, status, show, verify, report, decide, select, or export. The bootloader only selects sim-lib-study and the boot codec; lifecycle, effects, reports, and decisions remain in the loaded library."
+claims_anchors = ["anchor/export/sim-lib-study/cli/main/study"]
+claims_surfaces = ["cli/study"]
+supports = ["feature/sim-run/bootloader", "feature/sim-runtime/domain-free-study-lifecycle"]
+
+[[feature]]
 id = "feature/sim-run/watch"
 title = "Watch command surface"
 summary = "Start modeled, imported, or live watch plans through the shared command bootloader."

@@ -31,6 +31,7 @@ mod jvm;
 mod loader_boot;
 mod platform;
 mod provider;
+mod study;
 mod watch;
 mod watch_args;
 
@@ -78,6 +79,7 @@ fn boot(
     session = compute::with_compute_if_selected(&command, session);
     session = estate::with_estate_if_selected(&command, session);
     session = expr_tree::with_expr_tree_if_selected(&command, session);
+    session = study::with_study_if_selected(&command, session);
     sim_run_core::run_command_with_session_at_version(
         command,
         &mut session,
