@@ -235,17 +235,22 @@ claims_specimens = [
 
 [[feature]]
 id = "feature/sim-run/immutable-native-build"
-title = "Immutable sandboxed native build"
-summary = "Build one locked offline cdylib from sealed mounts and publish verified bytes by content identity."
+title = "Immutable native build and isolated admission"
+summary = "Build one locked offline cdylib, publish verified bytes by content identity, and admit compatible candidates through an isolated loader preflight."
 owner = "crate/sim-lib-hotload"
 audiences = ["code", "framework"]
-guidance = "Compose NativeBuilder with a boot-selected sim-lib-exec launcher and preopened source, target, and artifact mounts. Callers supply identities and policy records, never argv or host paths."
+guidance = "Compose NativeBuilder with a boot-selected sim-lib-exec launcher and preopened source, target, and artifact mounts. Pass its ArtifactCandidate to AdmissionService with the selected LoaderPort, latest managed generation, exact dependency boot receipts, and explicit compatibility and test limits. Admission never loads or exercises the candidate in the live context."
 claims_anchors = [
   "anchor/crate/sim-lib-hotload",
   "anchor/rustdoc/sim-lib-hotload",
 ]
 claims_surfaces = ["site/sim-lib-hotload"]
-claims_specimens = ["spec-test/sim-run/crates/sim-lib-hotload/src/build"]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-lib-hotload/src/admission",
+  "spec-test/sim-run/crates/sim-lib-hotload/src/build",
+  "spec-test/sim-run/crates/sim-lib-hotload/src/compatibility",
+  "spec-test/sim-run/crates/sim-lib-hotload/src/preflight",
+]
 supports = [
   "feature/sim-run/loaders",
   "feature/sim-runtime/sandboxed-execution",
