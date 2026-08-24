@@ -2,6 +2,12 @@
 
 sim-run is the command-line bootloader repository for SIM.
 
+The default bootloader selects the loadable observatory with
+`sim model-test <verb>`. It contributes source selection only: command behavior
+stays in `sim-lib-model-test`, generic lifecycle and decisions stay in
+`sim-lib-study`, and provider access stays in the separate provider and
+model-access products.
+
 The loadable `sim estate` verb exposes `discover`, `plan`, `preview`, `review`,
 `apply`, `watch`, `verify`, `reconcile`, `history`, and `doctor`. The bootloader
 selects this library by verb only; it contains no provider matcher.

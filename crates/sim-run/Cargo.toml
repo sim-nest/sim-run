@@ -42,6 +42,7 @@ sim-lib-estate-book = { version = "0.1.0" }
 sim-lib-estate-serve = { version = "0.1.0" }
 sim-lib-index = { version = "0.3.0", path = "../sim-lib-index" }
 sim-lib-study = { version = "0.1.0" }
+sim-lib-model-test = { version = "0.1.0" }
 sim-lib-provider-cli = { version = "0.1.0" }
 sim-lib-lang-jvm = { version = "0.1.0" }
 sim-platform-core = { version = "0.1.0" }
