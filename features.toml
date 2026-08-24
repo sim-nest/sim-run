@@ -77,8 +77,8 @@ summary = "Dispatch the loadable study product through sim study without adding 
 owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Use sim study with an explicit graph and one of plan, seal, run, resume, cancel, status, show, verify, report, decide, select, or export. The bootloader only selects sim-lib-study and the boot codec; lifecycle, effects, reports, and decisions remain in the loaded library."
-claims_anchors = ["anchor/export/sim-lib-study/cli/main/study"]
-claims_surfaces = ["cli/study"]
+claims_surfaces = ["cli/sim-run"]
+claims_specimens = ["spec-test/sim-run/crates/sim-run/src/study"]
 supports = ["feature/sim-run/bootloader", "feature/sim-runtime/domain-free-study-lifecycle"]
 
 [[feature]]
@@ -146,6 +146,36 @@ claims_specimens = [
 ]
 supports = [
   "feature/sim-run/bootloader",
+]
+
+[[feature]]
+id = "feature/sim-run/relation-command"
+title = "Relational command handoff"
+summary = "Register the standard loadable relation command and hand the relation verb to storage-owned behavior."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use sim relation for relational operations. This row owns only standard-distribution registration and bootloader handoff; parsing, authorization, plans, provider composition, and rendering remain in sim-lib-relation-cli."
+claims_anchors = [
+  "anchor/cli/sim-run",
+]
+claims_surfaces = ["cli/sim-run"]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-run/src/relation",
+]
+supports = [
+  "feature/sim-run/bootloader",
+  "feature/sim-storage/relation-command",
+]
+
+[[route]]
+id = "route/run-relation-command"
+task = "Run the standard relation command"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader selects loaded behavior from the relation product verb." },
+  { feature = "feature/sim-storage/relation-command", why = "The storage library owns admitted relation operations and output." },
+  { feature = "feature/sim-run/relation-command", why = "The standard distribution registers the library and declared SQLite site identity." },
+  { specimen = "spec-test/sim-run/crates/sim-run/src/relation", why = "The handoff specimen proves verb selection and standard site discovery." },
 ]
 
 [[feature]]

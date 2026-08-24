@@ -32,3 +32,4 @@ mod tests {
         assert!(matches!(command, CliCommand::Boot(_)));
     }
 }
+// conformance: standard study verb registration and bootloader handoff.
