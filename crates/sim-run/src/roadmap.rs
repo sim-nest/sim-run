@@ -4,6 +4,7 @@ use crate::boot_codec::{BOOT_CODEC_HOST, BootCodec};
 
 const VERB: &str = "roadmap";
 const HOST: &str = "lib/roadmap";
+const RUNNER_HOST: &str = "lib/roadmap-runner";
 
 pub(crate) fn with_roadmap_if_selected(command: &CliCommand, session: LoadSession) -> LoadSession {
     if !is_roadmap_command(command) {
@@ -12,11 +13,14 @@ pub(crate) fn with_roadmap_if_selected(command: &CliCommand, session: LoadSessio
     session
         .with_host_factory(BOOT_CODEC_HOST, || Box::new(BootCodec))
         .with_host_factory(HOST, || Box::new(sim_lib_roadmap::RoadmapLib::new()))
+        .with_host_factory(RUNNER_HOST, || {
+            Box::new(sim_lib_roadmap_runner::LocalRoadmapRunnerLib::new())
+        })
         .with_default_verb_sources(
             VERB,
             vec![
                 LibSourceSpec::Host(BOOT_CODEC_HOST.into()),
-                LibSourceSpec::Host(HOST.into()),
+                LibSourceSpec::Host(RUNNER_HOST.into()),
             ],
         )
 }
