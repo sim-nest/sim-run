@@ -269,6 +269,37 @@ supports = [
 ]
 
 [[feature]]
+id = "feature/sim-run/loadable-hot-generation"
+title = "Loadable hot-generation lifecycle"
+summary = "Inspect, build, admit, activate, and explain native generations through Shape-checked operations and read-constructable records."
+owner = "crate/sim-lib-hotload"
+audiences = ["user", "code", "framework"]
+guidance = "Load HotloadLib with a host-composed HotloadPort. Call hotload/status and hotload/history with hotload/inspect; delegate hotload/build, hotload/admit, and hotload/activate separately. Consume operation-cards and typed record outcomes rather than host paths, argv, loader handles, or journal internals."
+claims_anchors = [
+  "anchor/crate/sim-lib-hotload",
+  "anchor/rustdoc/sim-lib-hotload",
+]
+claims_surfaces = ["site/sim-lib-hotload"]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-lib-hotload/src/surface/tests",
+  "spec-recipe/sim-run/hotload-generation-lifecycle",
+]
+supports = [
+  "feature/sim-run/immutable-native-build",
+  "feature/sim-run/loaders",
+  "feature/sim-storage/durable-journal",
+]
+
+[[route]]
+id = "route/sim-run/hotload-generation-lifecycle"
+task = "Operate and explain one hot generation"
+audiences = ["user", "code", "framework"]
+steps = [
+  { feature = "feature/sim-run/loadable-hot-generation", why = "Use the five loadable operations, separate capabilities, Shapes, Cards, and typed records." },
+  { specimen = "spec-recipe/sim-run/hotload-generation-lifecycle", why = "Verify the public lifecycle contract offline." },
+]
+
+[[feature]]
 id = "feature/sim-run/loaders"
 title = "Loadable source libraries"
 summary = "Load exact native, wasm, source, re-exported, and AOT artifacts through the run-owned object-safe LoaderPort."

@@ -16,6 +16,7 @@ sha2 = "0.10"
 sim-kernel = { version = "0.2.1", path = "../../../sim-kernel" }
 sim-lib-exec = { version = "0.2.0", path = "../../../sim-runtime/crates/sim-lib-exec" }
 sim-lib-journal = { version = "0.1.0", path = "../../../sim-storage/crates/sim-lib-journal" }
+sim-shape = { version = "0.2.4", path = "../../../sim-shape" }
 sim-run-loaders = { version = "0.2.0", path = "../sim-run-loaders" }
 sim-storage-port = { version = "0.1.0", path = "../../../sim-storage/crates/sim-storage-port" }
 toml = "0.8"

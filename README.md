@@ -44,6 +44,8 @@ the exact command grammar is under
   `sim compute`, alongside headless modeled and automatic compute site providers.
 - `sim-lib-index` provides the loadable `cli/main/index` entry point and the
   immutable table view over the embedded public SIM Index snapshot.
+- `sim-lib-hotload` provides Shape-checked `hotload/build`, `admit`, `activate`,
+  `status`, and `history` operations over read-constructable data records.
 - `sim-lib-repl` provides the loadable `cli/main/repl` entry point and the
   read-eval-print core used by that entry point.
 - `sim-view-tty` is a loadable terminal (CLI/TUI) view/edit surface: it projects

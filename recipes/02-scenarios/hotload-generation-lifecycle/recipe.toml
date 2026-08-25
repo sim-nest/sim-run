@@ -1,0 +1,9 @@
+id = "hotload-generation-lifecycle"
+title = "Browse the Hot Generation Lifecycle"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 73
+tags = ["hotload", "library", "capability", "offline", "deterministic"]
+requires = ["sim-lib-hotload"]
+network = false
