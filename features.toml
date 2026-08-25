@@ -306,6 +306,34 @@ supports = [
 ]
 
 [[feature]]
+id = "feature/sim-run/continuity-command"
+title = "Loadable continuity composition command"
+summary = "Compose continuity plans, platform capsules, sites, phone surfaces, and optional providers through the generic bootloader registry."
+owner = "crate/sim-run"
+stability = "experimental"
+guidance = "Use `sim continuity` to resolve a versioned plan as data and project deterministic unsigned Android or host-modeled artifacts. Static linkage is an ordered provider table; missing optional satellites degrade and missing required services refuse without teaching the bootloader platform, device, or continuity policy."
+claims_anchors = ["anchor/cli/continuity", "anchor/export/sim-run/cli/main/continuity"]
+claims_surfaces = ["cli/sim-run"]
+claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/continuity"]
+supports = [
+  "feature/sim-agent-net/pure-continuity",
+  "feature/sim-platform/android-capsule",
+  "feature/sim-web/device-surfaces",
+]
+
+[[route]]
+id = "route/load-continuity-plan"
+task = "Load a continuity plan through the bootloader"
+steps = [
+  { feature = "feature/sim-run/continuity-command", why = "The generic command composes registered libraries and plan data without boot-frame policy." },
+  { feature = "feature/sim-agent-net/pure-continuity", why = "The continuity organ owns replay and policy reduction." },
+  { feature = "feature/sim-platform/android-capsule", why = "The Android capsule owns lifecycle and platform services." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/continuity", why = "Command tests cover networkless composition, deterministic artifacts, refusals, lifecycle events, and data-driven plan changes." },
+  { specimen = "recipe/sim-sdk/continuity/expedition-thought", why = "The first synthetic product exercises the shared continuity mechanism." },
+  { specimen = "recipe/sim-sdk/continuity/quiet-stewardship-cards", why = "The second synthetic product proves product policy stays outside composition." },
+]
+
+[[feature]]
 id = "feature/sim-run/terminal-surface"
 title = "Terminal view surface"
 summary = "Render and interpret terminal view intents through the loaded TTY surface library."

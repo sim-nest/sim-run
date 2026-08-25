@@ -19,6 +19,7 @@ const TYPESCRIPT_NOTATION_HELP: &str =
 
 mod boot_codec;
 mod compute;
+mod continuity;
 mod estate;
 mod expr_tree;
 mod glasses;
@@ -87,6 +88,7 @@ fn boot(
     session = physics::with_physics_if_selected(&command, session);
     session = jvm::with_jvm_if_selected(&command, session);
     session = compute::with_compute_if_selected(&command, session);
+    session = continuity::with_continuity_if_selected(&command, session);
     session = estate::with_estate_if_selected(&command, session);
     session = expr_tree::with_expr_tree_if_selected(&command, session);
     session = study::with_study_if_selected(&command, session);

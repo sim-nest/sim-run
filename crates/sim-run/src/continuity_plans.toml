@@ -1,0 +1,26 @@
+schema = "sim.continuity-plans/v1"
+
+[[plan]]
+id = "continuity/carrier-only"
+revision = 1
+root = "android-root"
+required = ["phone-review", "lifecycle", "mounts", "capture", "render", "stop", "journal-append"]
+optional_roles = []
+
+[[plan]]
+id = "continuity/walk"
+revision = 1
+extends = "continuity/carrier-only"
+optional_roles = ["watch"]
+
+[[plan]]
+id = "continuity/desk"
+revision = 1
+extends = "continuity/carrier-only"
+optional_roles = ["desk-display"]
+
+[[plan]]
+id = "continuity/halo-optional"
+revision = 1
+extends = "continuity/carrier-only"
+optional_roles = ["halo"]

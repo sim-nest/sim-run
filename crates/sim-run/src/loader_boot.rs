@@ -29,6 +29,7 @@ pub(crate) fn run(
     session = crate::platform::with_platform_if_selected(&command, session);
     session = crate::physics::with_physics_if_selected(&command, session);
     session = crate::compute::with_compute_if_selected(&command, session);
+    session = crate::continuity::with_continuity_if_selected(&command, session);
     session = crate::expr_tree::with_expr_tree_if_selected(&command, session);
     sim_run_core::run_command_with_session_at_version(
         command,
