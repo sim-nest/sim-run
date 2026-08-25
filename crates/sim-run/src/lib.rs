@@ -30,6 +30,7 @@ mod jvm;
 #[cfg(any(feature = "dynamic-native", feature = "wasm"))]
 mod loader_boot;
 mod model_test;
+mod physics;
 mod platform;
 mod provider;
 mod relation;
@@ -83,6 +84,7 @@ fn boot(
     session = search::with_search_if_selected(&command, session);
     session = model_test::with_model_test_if_selected(&command, session);
     session = platform::with_platform_if_selected(&command, session);
+    session = physics::with_physics_if_selected(&command, session);
     session = jvm::with_jvm_if_selected(&command, session);
     session = compute::with_compute_if_selected(&command, session);
     session = estate::with_estate_if_selected(&command, session);

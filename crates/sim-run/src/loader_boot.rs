@@ -27,6 +27,7 @@ pub(crate) fn run(
     session = crate::search::with_search_if_selected(&command, session);
     session = crate::roadmap::with_roadmap_if_selected(&command, session);
     session = crate::platform::with_platform_if_selected(&command, session);
+    session = crate::physics::with_physics_if_selected(&command, session);
     session = crate::compute::with_compute_if_selected(&command, session);
     session = crate::expr_tree::with_expr_tree_if_selected(&command, session);
     sim_run_core::run_command_with_session_at_version(
