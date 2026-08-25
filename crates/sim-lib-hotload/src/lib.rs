@@ -5,6 +5,7 @@
 //! Callers provide identities and preopened mounts, never commands or host paths.
 //! The build policy is fixed here; execution remains behind `sim-lib-exec`.
 
+mod activation;
 mod admission;
 mod artifact;
 mod build;
@@ -13,6 +14,10 @@ mod error;
 mod preflight;
 mod request;
 
+pub use activation::{
+    ActivationAudit, ActivationFailure, ActivationReceipt, ActivationRequest, ActivationService,
+    ActivationStatus,
+};
 pub use admission::{
     AdmissionFailure, AdmissionReceipt, AdmissionRequest, AdmissionService, HotloadGeneration,
 };
