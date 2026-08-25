@@ -527,12 +527,14 @@ mod tests {
                 Vec::new(),
             )))
             .unwrap();
-        assert!(function
-            .object()
-            .as_callable()
-            .unwrap()
-            .call(&mut cx, Args::new(vec![request.clone()]))
-            .is_err());
+        assert!(
+            function
+                .object()
+                .as_callable()
+                .unwrap()
+                .call(&mut cx, Args::new(vec![request.clone()]))
+                .is_err()
+        );
         seat.grant(&mut cx, hotload_capability("build")).unwrap();
         let first = function
             .object()
@@ -548,6 +550,9 @@ mod tests {
             .unwrap();
         assert!(first.object().as_any().is::<HotloadRecord>());
         assert!(second.object().as_any().is::<HotloadRecord>());
-        assert_eq!(port.0.lock().unwrap().as_slice(), [HotloadOperation::Build, HotloadOperation::Build]);
+        assert_eq!(
+            port.0.lock().unwrap().as_slice(),
+            [HotloadOperation::Build, HotloadOperation::Build]
+        );
     }
 }
