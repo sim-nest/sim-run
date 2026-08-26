@@ -1,3 +1,5 @@
+// conformance: preflight bounds and retains candidate test evidence deterministically.
+
 use sim_kernel::{Symbol, TestReport};
 
 /// Hard bounds for candidate-declared conformance execution and retained evidence.

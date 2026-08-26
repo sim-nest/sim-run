@@ -32,7 +32,11 @@ mod tests {
 
     #[test]
     fn explicit_exit_code_domain_preserves_product_outcome() {
-        let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+        let mut cx = Cx::new(
+            Arc::new(NoopEvalPolicy),
+            Arc::new(DefaultFactory),
+            sim_kernel::HandleSeed::new(0x4558_4954),
+        );
         let value = cx
             .factory()
             .number_literal(Symbol::new("exit-code"), "30".into())

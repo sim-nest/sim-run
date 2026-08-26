@@ -52,7 +52,7 @@ pub enum ActivationStatus {
     /// Further activation is allowed.
     Ready,
     /// A committed activation awaits its completion append.
-    AuditPending(ActivationReceipt),
+    AuditPending(Box<ActivationReceipt>),
 }
 
 /// Closed activation failure. A committed kernel transaction is never returned
@@ -102,7 +102,7 @@ impl<B: JournalBackend + 'static> ActivationService<B> {
         self.pending
             .as_ref()
             .map_or(ActivationStatus::Ready, |pending| {
-                ActivationStatus::AuditPending(pending.receipt.clone())
+                ActivationStatus::AuditPending(Box::new(pending.receipt.clone()))
             })
     }
 

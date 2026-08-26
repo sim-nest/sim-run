@@ -29,6 +29,7 @@
   ],
   "groups": {
     "workspace": [
+      "sim-lib-hotload",
       "sim-lib-index",
       "sim-lib-repl",
       "sim-run",
@@ -40,8 +41,43 @@
   },
   "non_citizen_exemption_count": 0,
   "non_citizen_exemptions": [],
-  "package_count": 7,
+  "package_count": 8,
   "packages": [
+    {
+      "crate_name": "sim_lib_hotload",
+      "dependencies": [
+        {
+          "kind": "normal",
+          "optional": false,
+          "package": "sim-run-loaders",
+          "rename": null,
+          "target": null
+        }
+      ],
+      "description": "Structured offline sandboxed native library builds for SIM.",
+      "features": [],
+      "group": "workspace",
+      "manifest": "crates/sim-lib-hotload/Cargo.toml",
+      "name": "sim-lib-hotload",
+      "publish": "true",
+      "root": "crates/sim-lib-hotload",
+      "rustdoc_summary": "Structured, offline, sandboxed construction of immutable native candidates.",
+      "target_kinds": [
+        "lib"
+      ],
+      "targets": [
+        {
+          "crate_types": [
+            "lib"
+          ],
+          "kind": [
+            "lib"
+          ],
+          "name": "sim_lib_hotload",
+          "src": "crates/sim-lib-hotload/src/lib.rs"
+        }
+      ]
+    },
     {
       "crate_name": "sim_lib_index",
       "dependencies": [
@@ -278,6 +314,16 @@
           "kind": [
             "test"
           ],
+          "name": "continuity",
+          "src": "crates/sim-run/tests/continuity.rs"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "test"
+          ],
           "name": "expr_tree",
           "src": "crates/sim-run/tests/expr_tree.rs"
         },
@@ -320,6 +366,16 @@
           ],
           "name": "native_dynamic_repl",
           "src": "crates/sim-run/tests/native_dynamic_repl.rs"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "test"
+          ],
+          "name": "physics",
+          "src": "crates/sim-run/tests/physics.rs"
         },
         {
           "crate_types": [
@@ -528,10 +584,10 @@
     "generated_by": "cargo run -p xtask -- simdoc",
     "generation_timestamp": "2026-07-16T03:56:38+02:00",
     "generator": "xtask repo-contract v1",
-    "git_commit": "3e643d701c97bc45cdbc2c21f516c59a2dc3d760",
+    "git_commit": "ab7101d394d0b308d33ec6f477655b0f92fa6489",
     "repo": "sim-run",
     "schema": "sim.provenance.v1",
-    "source_commit": "3e643d701c97bc45cdbc2c21f516c59a2dc3d760",
+    "source_commit": "ab7101d394d0b308d33ec6f477655b0f92fa6489",
     "source_remote": "https://github.com/sim-nest/sim-run",
     "validation_commands": [
       "cargo fmt --all --check",
@@ -544,11 +600,22 @@
       "cargo run -p xtask -- validation-matrix --check --repo .",
       "cargo run -p xtask -- crate-catalog --check --repo ."
     ],
-    "workspace_hash": "ae9acf0e50225a82",
+    "workspace_hash": "906b15af7f827334",
     "workspace_hash_algorithm": "fnv1a64",
-    "workspace_hash_input_count": 139,
+    "workspace_hash_input_count": 157,
     "workspace_hash_inputs": [
       "Cargo.toml",
+      "crates/sim-lib-hotload/Cargo.toml",
+      "crates/sim-lib-hotload/src/activation.rs",
+      "crates/sim-lib-hotload/src/admission.rs",
+      "crates/sim-lib-hotload/src/artifact.rs",
+      "crates/sim-lib-hotload/src/build.rs",
+      "crates/sim-lib-hotload/src/compatibility.rs",
+      "crates/sim-lib-hotload/src/error.rs",
+      "crates/sim-lib-hotload/src/lib.rs",
+      "crates/sim-lib-hotload/src/preflight.rs",
+      "crates/sim-lib-hotload/src/request.rs",
+      "crates/sim-lib-hotload/src/surface.rs",
       "crates/sim-lib-index/Cargo.toml",
       "crates/sim-lib-index/src/args.rs",
       "crates/sim-lib-index/src/dir.rs",
@@ -568,6 +635,7 @@
       "crates/sim-run/Cargo.toml",
       "crates/sim-run/src/boot_codec.rs",
       "crates/sim-run/src/compute.rs",
+      "crates/sim-run/src/continuity.rs",
       "crates/sim-run/src/estate.rs",
       "crates/sim-run/src/expr_tree.rs",
       "crates/sim-run/src/glasses.rs",
@@ -579,9 +647,11 @@
       "crates/sim-run/src/loader_boot.rs",
       "crates/sim-run/src/main.rs",
       "crates/sim-run/src/model_test.rs",
+      "crates/sim-run/src/physics.rs",
       "crates/sim-run/src/platform.rs",
       "crates/sim-run/src/provider.rs",
       "crates/sim-run/src/relation.rs",
+      "crates/sim-run/src/roadmap.rs",
       "crates/sim-run/src/search.rs",
       "crates/sim-run/src/study.rs",
       "crates/sim-run/src/watch.rs",
@@ -590,11 +660,13 @@
       "crates/sim-run/tests/compute.rs",
       "crates/sim-run/tests/config.rs",
       "crates/sim-run/tests/config_report.rs",
+      "crates/sim-run/tests/continuity.rs",
       "crates/sim-run/tests/expr_tree.rs",
       "crates/sim-run/tests/glasses.rs",
       "crates/sim-run/tests/jvm_product.rs",
       "crates/sim-run/tests/native_dynamic_lisp.rs",
       "crates/sim-run/tests/native_dynamic_repl.rs",
+      "crates/sim-run/tests/physics.rs",
       "crates/sim-run/tests/support/feature_build.rs",
       "crates/sim-run/tests/support/mod.rs",
       "crates/sim-run/tests/support/temp.rs",
@@ -607,6 +679,7 @@
       "crates/sim-run-core/src/bootstrap_tests.rs",
       "crates/sim-run-core/src/codec_boot.rs",
       "crates/sim-run-core/src/codec_boot_tests.rs",
+      "crates/sim-run-core/src/command.rs",
       "crates/sim-run-core/src/config.rs",
       "crates/sim-run-core/src/config_report_tests.rs",
       "crates/sim-run-core/src/config_site_tests.rs",
@@ -674,6 +747,7 @@
       "recipes/02-scenarios/config-status/recipe.toml",
       "recipes/02-scenarios/fake-crates-io/recipe.toml",
       "recipes/02-scenarios/host-verb/recipe.toml",
+      "recipes/02-scenarios/hotload-generation-lifecycle/recipe.toml",
       "recipes/02-scenarios/index-examples/recipe.toml",
       "recipes/02-scenarios/index-find-codec/recipe.toml",
       "recipes/02-scenarios/index-list-languages/recipe.toml",
@@ -697,7 +771,7 @@
       "card_id": "cookbook/sim-run",
       "group": "workspace",
       "package": "sim-run",
-      "recipe_count": 20,
+      "recipe_count": 21,
       "recipes": [
         {
           "card_id": "sim-run/01-basics/hello",
@@ -770,6 +844,14 @@
           "package": "sim-run",
           "recipe_toml": "recipes/02-scenarios/host-verb/recipe.toml",
           "title": "Host library verb"
+        },
+        {
+          "card_id": "sim-run/02-scenarios/hotload-generation-lifecycle",
+          "codec": "shell",
+          "id": "hotload-generation-lifecycle",
+          "package": "sim-run",
+          "recipe_toml": "recipes/02-scenarios/hotload-generation-lifecycle/recipe.toml",
+          "title": "Browse the Hot Generation Lifecycle"
         },
         {
           "card_id": "sim-run/02-scenarios/index-examples",

@@ -1,3 +1,5 @@
+// conformance: compatibility policy rejects removed and changed managed exports.
+
 use std::{collections::BTreeSet, fmt};
 
 use sim_kernel::{ExportKind, LibManifest, Symbol};

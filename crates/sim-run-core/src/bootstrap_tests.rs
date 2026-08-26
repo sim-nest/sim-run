@@ -1,6 +1,6 @@
 #[test]
 fn supplied_bootstrap_source_has_no_ambient_discovery() {
-    let source = include_str!("lib.rs");
+    let source = include_str!("command.rs");
     let body = source
         .split("pub fn run_supplied_bootstrap")
         .nth(1)

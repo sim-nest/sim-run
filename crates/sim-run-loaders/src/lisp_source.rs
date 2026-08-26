@@ -186,11 +186,15 @@ pub fn compile_lisp_source_pack(
 
 #[cfg(test)]
 mod tests {
-    use std::{path::PathBuf, sync::Arc};
+    use std::path::PathBuf;
+    #[cfg(feature = "shape")]
+    use std::sync::Arc;
 
     use sim_kernel::{Expr, LibLoader, LibTarget, Symbol};
 
-    use super::{LispSourceLoader, compile_lisp_source_lib};
+    use super::LispSourceLoader;
+    #[cfg(feature = "shape")]
+    use super::compile_lisp_source_lib;
 
     #[test]
     fn lisp_source_loader_accepts_lisp_paths() {
@@ -222,6 +226,7 @@ mod tests {
         let mut cx = sim_kernel::Cx::new(
             Arc::new(sim_kernel::EagerPolicy),
             Arc::new(sim_kernel::DefaultFactory),
+            sim_kernel::HandleSeed::new(0x4c49_5350),
         );
 
         cx.load_lib(lib.as_ref()).unwrap();

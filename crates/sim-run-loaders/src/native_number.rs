@@ -408,7 +408,11 @@ mod tests {
             guest: Arc::new(MockGuest),
             symbol: Symbol::qualified("numbers", "f64"),
         };
-        let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+        let mut cx = Cx::new(
+            Arc::new(NoopEvalPolicy),
+            Arc::new(DefaultFactory),
+            sim_kernel::HandleSeed::new(0xce71_6af1_0021_f0fd),
+        );
 
         let parsed = domain.parse_literal(&mut cx, "1.5").unwrap().unwrap();
         assert_eq!(
@@ -473,7 +477,11 @@ mod tests {
             guest: Arc::new(F19Guest),
             symbol: Symbol::qualified("numbers", "f64"),
         };
-        let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+        let mut cx = Cx::new(
+            Arc::new(NoopEvalPolicy),
+            Arc::new(DefaultFactory),
+            sim_kernel::HandleSeed::new(0xb7da_46d0_f20d_f63e),
+        );
 
         let err = domain.parse_literal(&mut cx, "noncanon").unwrap_err();
         assert!(matches!(

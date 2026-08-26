@@ -137,7 +137,7 @@ fn parse_jvm_args(args: &[String]) -> Result<sim_lib_lang_jvm::JvmExecutionReque
 }
 
 fn decode_hex(input: &str) -> Result<Vec<u8>> {
-    if input.len() % 2 != 0 {
+    if !input.len().is_multiple_of(2) {
         return Err(Error::Eval(
             "JVM classfile hex must contain complete bytes".into(),
         ));

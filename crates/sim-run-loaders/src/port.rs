@@ -166,6 +166,38 @@ pub struct StaticRegistry {
     entries: std::sync::RwLock<std::collections::BTreeMap<Symbol, StaticLibFactory>>,
 }
 
+impl StaticRegistry {
+    /// Registers an AOT factory under an exact artifact symbol.
+    pub fn register(
+        &self,
+        artifact: Symbol,
+        factory: impl Fn() -> Box<dyn Lib> + Send + Sync + 'static,
+    ) {
+        self.entries
+            .write()
+            .expect("static loader registry poisoned")
+            .insert(artifact, Arc::new(factory));
+    }
+
+    /// Realizes an exact registered artifact.
+    pub fn realize(&self, artifact: &Symbol) -> Result<LoadOutcome> {
+        let factory = self
+            .entries
+            .read()
+            .expect("static loader registry poisoned")
+            .get(artifact)
+            .cloned()
+            .ok_or_else(|| {
+                sim_kernel::Error::HostError(format!(
+                    "no static library artifact registered as {artifact}"
+                ))
+            })?;
+        let library = factory();
+        let manifest = library.manifest();
+        Ok(LoadOutcome { manifest, library })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,37 +249,5 @@ mod tests {
     fn malformed_static_source_fails_closed() {
         let source = LibSource::open(static_source_kind(), sim_kernel::Datum::Bytes(vec![]));
         assert!(static_artifact(&source).is_err());
-    }
-}
-
-impl StaticRegistry {
-    /// Registers an AOT factory under an exact artifact symbol.
-    pub fn register(
-        &self,
-        artifact: Symbol,
-        factory: impl Fn() -> Box<dyn Lib> + Send + Sync + 'static,
-    ) {
-        self.entries
-            .write()
-            .expect("static loader registry poisoned")
-            .insert(artifact, Arc::new(factory));
-    }
-
-    /// Realizes an exact registered artifact.
-    pub fn realize(&self, artifact: &Symbol) -> Result<LoadOutcome> {
-        let factory = self
-            .entries
-            .read()
-            .expect("static loader registry poisoned")
-            .get(artifact)
-            .cloned()
-            .ok_or_else(|| {
-                sim_kernel::Error::HostError(format!(
-                    "no static library artifact registered as {artifact}"
-                ))
-            })?;
-        let library = factory();
-        let manifest = library.manifest();
-        Ok(LoadOutcome { manifest, library })
     }
 }

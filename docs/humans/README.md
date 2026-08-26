@@ -17,6 +17,7 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 
 | Feature | Subject | Specimens | Summary |
 | --- | --- | ---: | --- |
+| `feature/sim-run/physics-library-selection` | `crate/sim-run` | 1 | Routes the physics verb through the ordinary host-library load session without embedding scientific behavior in the bootloader. |
 | `feature/sim-run/index` | `crate/xtask` | 1 | Expose generated package, card, surface, and recipe facts as a checked SIM Index fragment. |
 | `feature/sim-run/bootloader` | `crate/sim-run-core` | 2 | Start product commands through the shared bootloader and loaded runtime libraries. |
 | `feature/sim-run/study-command` | `crate/sim-run` | 1 | Dispatch the loadable study product through sim study without adding study behavior to the bootloader. |
@@ -27,8 +28,11 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `feature/sim-run/runtime-index` | `crate/sim-lib-index` | 4 | Explore merged SIM Index graph and public source facts through the bootloader as stable Table/Dir rows and structured query output. |
 | `feature/sim-run/compute` | `crate/sim-run` | 1 | Start modeled and automatic compute inspection through the shared command bootloader. |
 | `feature/sim-run/expression-tree-command` | `crate/sim-run` | 1 | Load the standard expression-tree product recipe through the shared command bootloader. |
+| `feature/sim-run/immutable-native-build` | `crate/sim-lib-hotload` | 4 | Build one locked offline cdylib, publish verified bytes by content identity, and admit compatible candidates through an isolated loader preflight. |
+| `feature/sim-run/loadable-hot-generation` | `crate/sim-lib-hotload` | 2 | Inspect, build, admit, activate, and explain native generations through Shape-checked operations and read-constructable records. |
 | `feature/sim-run/loaders` | `crate/sim-run-loaders` | 1 | Load exact native, wasm, source, re-exported, and AOT artifacts through the run-owned object-safe LoaderPort. |
 | `feature/sim-run/index-table-dir` | `crate/sim-lib-index` | 1 | Expose the embedded SIM Index as immutable Table/Dir collections for loaded runtime code. |
+| `feature/sim-run/continuity-command` | `crate/sim-run` | 1 | Compose continuity plans, platform capsules, sites, phone surfaces, and optional providers through the generic bootloader registry. |
 | `feature/sim-run/terminal-surface` | `crate/sim-view-tty` | 1 | Render and interpret terminal view intents through the loaded TTY surface library. |
 | `feature/sim-run/jvm-command` | `crate/sim-run` | 2 | Run caller-supplied classfile bytes, exact class, member, descriptor, and integer arguments through the host-registered JVM library and cli/main/jvm adapter. |
 | `feature/sim-run/platform-command` | `crate/sim-run` | 0 | Dispatch platform show, require, doctor, and attest-verify through cli/main/platform. |
@@ -39,6 +43,7 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 
 | Surface | Kind | Subject |
 | --- | --- | --- |
+| `cli/continuity` | `cli` | `crate/sim-run` |
 | `cli/estate` | `cli` | `crate/sim-run` |
 | `cli/glasses` | `cli` | `crate/sim-run` |
 | `cli/index` | `cli` | `crate/sim-lib-index` |
@@ -85,6 +90,9 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 - `recipes/02-scenarios/host-verb/purpose.md`
 - `recipes/02-scenarios/host-verb/recipe.toml`
 - `recipes/02-scenarios/host-verb/setup.sh`
+- `recipes/02-scenarios/hotload-generation-lifecycle/purpose.md`
+- `recipes/02-scenarios/hotload-generation-lifecycle/recipe.toml`
+- `recipes/02-scenarios/hotload-generation-lifecycle/setup.sh`
 - `recipes/02-scenarios/index-examples/purpose.md`
 - `recipes/02-scenarios/index-examples/recipe.toml`
 - `recipes/02-scenarios/index-examples/setup.sh`
@@ -122,6 +130,38 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 - `recipes/tui-surface-keys.md`
 
 ## Worked Examples
+
+### `feature/sim-run/physics-library-selection`
+
+Specimen `spec-test/sim-run/crates/sim-run/tests/physics` is checked by `cargo test`.
+
+Source `crates/sim-run/tests/physics.rs`:
+
+```rust
+use std::process::Command;
+
+// conformance: physics selection loads the runtime library through the shared bootloader.
+
+#[test]
+fn physics_selection_registers_the_runtime_library() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sim"))
+        .args(["physics", "browse"])
+        .output()
+        .expect("run sim physics browse");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("loaded libs: codec/lisp, sim/physics"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("no loaded lib claims cli/main/physics or cli/main"),
+        "{stderr}"
+    );
+}
+```
 
 ### `feature/sim-run/index`
 
@@ -806,6 +846,1857 @@ impl Drop for TempConfig {
 }
 ```
 
+### `feature/sim-run/immutable-native-build`
+
+Specimen `spec-test/sim-run/crates/sim-lib-hotload/src/admission` is checked by `cargo test`.
+
+Source `crates/sim-lib-hotload/src/admission.rs`:
+
+```rust
+// conformance: admission rejects incompatible or insufficiently proven native candidates.
+
+use std::{fmt, sync::Arc};
+
+use sha2::{Digest, Sha256};
+use sim_kernel::{ContentId, Cx, HandleSeed, LibBootReceipt, LibManifest, LibSource, Symbol};
+use sim_run_loaders::{LoadRequest, LoaderKind, LoaderPort};
+use sim_storage_port::HostDirPort;
+
+use crate::{
+    AchievedLimits, ArtifactCandidate, CandidateTestResult, CompatibilityPolicy,
+    CompatibilityReport, PreflightLimits,
+    artifact::{content_id, hex},
+    compatibility, preflight,
+};
+
+/// Latest completed generation recorded by the hotload journal.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HotloadGeneration {
+    /// Managed library identity.
+    pub library: Symbol,
+    /// Content identity installed by that completed activation.
+    pub content: ContentId,
+    /// Manifest bound to that completed activation.
+    pub manifest: LibManifest,
+}
+
+/// Complete, data-only request for isolated candidate admission.
+pub struct AdmissionRequest<'a> {
+    /// Candidate produced by the immutable build stage.
+    pub candidate: &'a ArtifactCandidate,
+    /// Loader kind selected from the installed platform capsule.
+    pub loader_kind: LoaderKind,
+    /// Exact loader source whose bytes are addressed by `candidate.content`.
+    pub source: LibSource,
+    /// Latest completed managed generation, if any.
+    pub latest_generation: Option<&'a HotloadGeneration>,
+    /// Replacement export policy.
+    pub compatibility: CompatibilityPolicy,
+    /// Boot receipts for exactly the target's dependencies.
+    pub dependency_receipts: &'a [LibBootReceipt],
+    /// Seed for the fresh shadow context's handle namespace.
+    pub shadow_seed: HandleSeed,
+    /// Test evidence bounds.
+    pub limits: PreflightLimits,
+}
+
+/// Content-identified proof that a candidate passed admission away from live state.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdmissionReceipt {
+    /// Identity of this receipt's canonical content.
+    pub content: ContentId,
+    /// Candidate artifact identity.
+    pub artifact: ContentId,
+    /// Current managed generation, for replacement.
+    pub current_generation: Option<ContentId>,
+    /// Candidate manifest inspected through the loader port.
+    pub manifest: LibManifest,
+    /// Compatibility evidence.
+    pub compatibility: CompatibilityReport,
+    /// Stable loader identity.
+    pub loader: Symbol,
+    /// Sorted dependency symbols used to seed the shadow.
+    pub dependencies: Vec<Symbol>,
+    /// Candidate-declared conformance results.
+    pub tests: Vec<CandidateTestResult>,
+    /// Limits achieved by candidate execution.
+    pub achieved_limits: AchievedLimits,
+}
+
+/// Closed admission refusal; no operation mutates the live context.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdmissionFailure(pub String);
+impl fmt::Display for AdmissionFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+impl std::error::Error for AdmissionFailure {}
+
+/// Admission coordinator over the existing immutable store and loader membrane.
+pub struct AdmissionService<'a> {
+    artifacts: &'a dyn HostDirPort,
+    loader: Arc<dyn LoaderPort>,
+}
+
+impl<'a> AdmissionService<'a> {
+    /// Composes existing storage and loader ports without native or ABI access.
+    pub fn new(artifacts: &'a dyn HostDirPort, loader: Arc<dyn LoaderPort>) -> Self {
+        Self { artifacts, loader }
+    }
+
+    /// Inspects, checks, and exercises a candidate in a fresh shadow context.
+    pub fn admit(
+        &self,
+        live: &Cx,
+        request: AdmissionRequest<'_>,
+    ) -> Result<AdmissionReceipt, AdmissionFailure> {
+        let bytes = self
+            .artifacts
+            .read(&[hex(&request.candidate.content.bytes)])
+            .map_err(|error| AdmissionFailure(format!("artifact re-read failed: {error}")))?;
+        if content_id(&bytes) != request.candidate.content {
+            return Err(AdmissionFailure(
+                "artifact content identity changed before admission".into(),
+            ));
+        }
+        require_candidate_source(&request.source, &request.candidate.content, &bytes)?;
+
+        let current = live
+            .registry()
+            .manifest_by_symbol(&request.candidate.expected_library);
+        let current_generation = match (current, request.latest_generation) {
+            (None, None) => None,
+            (None, Some(_)) => {
+                return Err(AdmissionFailure(
+                    "completed generation exists but library is absent".into(),
+                ));
+            }
+            (Some(_), None) => {
+                return Err(AdmissionFailure(
+                    "loaded library is not named by a completed hotload receipt".into(),
+                ));
+            }
+            (Some(_), Some(generation))
+                if generation.library != request.candidate.expected_library =>
+            {
+                return Err(AdmissionFailure(
+                    "completed generation names a different library".into(),
+                ));
+            }
+            (Some(loaded), Some(generation)) if &generation.manifest != loaded => {
+                return Err(AdmissionFailure(
+                    "loaded library does not match the latest completed generation".into(),
+                ));
+            }
+            (Some(_), Some(generation)) => Some(generation.content.clone()),
+        };
+
+        if let Some(loaded) = live.registry().lib(&request.candidate.expected_library) {
+            let mut probe = live.registry().clone();
+            if let Err(sim_kernel::Error::LibHasDependents { mut dependents, .. }) =
+                probe.unload(loaded.id)
+            {
+                dependents.sort();
+                return Err(AdmissionFailure(format!(
+                    "loaded dependents refuse replacement: {}",
+                    dependents
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+        }
+
+        let mut inspection = fresh_context(live, request.shadow_seed, &[])?;
+        let manifest = self
+            .loader
+            .inspect(
+                &mut inspection,
+                &LoadRequest {
+                    kind: request.loader_kind.clone(),
+                    source: clone_source(&request.source)?,
+                },
+            )
+            .map_err(|error| AdmissionFailure(format!("loader inspection failed: {error}")))?
+            .ok_or_else(|| AdmissionFailure("loader cannot inspect candidate manifest".into()))?;
+        let compatibility = compatibility::compare(
+            &request.candidate.expected_library,
+            &manifest,
+            current,
+            request.compatibility,
+        )
+        .map_err(AdmissionFailure)?;
+
+        let mut dependencies = manifest
+            .requires
+            .iter()
+            .map(|dependency| dependency.id.clone())
+            .collect::<Vec<_>>();
+        dependencies.sort();
+        let mut supplied = request
+            .dependency_receipts
+            .iter()
+            .map(|receipt| receipt.manifest.id.clone())
+            .collect::<Vec<_>>();
+        supplied.sort();
+        if supplied != dependencies {
+            return Err(AdmissionFailure(
+                "dependency boot receipts do not exactly match candidate requirements".into(),
+            ));
+        }
+        for receipt in request.dependency_receipts {
+            let live_receipt = live
+                .registry()
+                .boot_receipt(
+                    receipt.lib_id,
+                    receipt.requested_source.clone(),
+                    receipt.resolved_source.clone(),
+                )
+                .ok_or_else(|| {
+                    AdmissionFailure(format!("dependency {} is not loaded", receipt.manifest.id))
+                })?;
+            if &live_receipt != receipt {
+                return Err(AdmissionFailure(format!(
+                    "dependency boot receipt for {} is stale",
+                    receipt.manifest.id
+                )));
+            }
+        }
+
+        let mut shadow = fresh_context(live, request.shadow_seed, &manifest.capabilities)?;
+        *shadow.registry_mut() = live.registry().subset_for_libs(&dependencies);
+        let outcome = self
+            .loader
+            .realize(
+                &mut shadow,
+                LoadRequest {
+                    kind: request.loader_kind.clone(),
+                    source: clone_source(&request.source)?,
+                },
+            )
+            .map_err(|error| AdmissionFailure(format!("candidate realization failed: {error}")))?;
+        if outcome.manifest != manifest || outcome.library.manifest() != manifest {
+            return Err(AdmissionFailure(
+                "realized candidate manifest differs from inspected manifest".into(),
+            ));
+        }
+        shadow
+            .load_lib(outcome.library.as_ref())
+            .map_err(|error| AdmissionFailure(format!("shadow load failed: {error}")))?;
+        let symbols = shadow
+            .registry()
+            .tests_for_lib(&manifest.id)
+            .unwrap_or_default()
+            .to_vec();
+        if symbols.len() > request.limits.max_tests {
+            return Err(AdmissionFailure(
+                "candidate declared too many conformance tests".into(),
+            ));
+        }
+        let mut tests = Vec::with_capacity(symbols.len());
+        let mut max_events = 0;
+        let mut max_detail = 0;
+        for symbol in symbols {
+            let test = shadow
+                .registry()
+                .test_by_symbol(&symbol)
+                .cloned()
+                .ok_or_else(|| AdmissionFailure(format!("candidate test {symbol} disappeared")))?;
+            let report = test.run(&mut shadow).map_err(|error| {
+                AdmissionFailure(format!("candidate test {symbol} failed to run: {error}"))
+            })?;
+            max_events = max_events.max(report.events.len());
+            max_detail = max_detail.max(
+                report
+                    .detail
+                    .as_deref()
+                    .map(str::chars)
+                    .map(Iterator::count)
+                    .unwrap_or(0)
+                    .min(request.limits.max_detail_chars),
+            );
+            let result =
+                preflight::bounded_result(report, request.limits).map_err(AdmissionFailure)?;
+            if !result.passed {
+                return Err(AdmissionFailure(format!(
+                    "candidate test {} did not pass",
+                    result.symbol
+                )));
+            }
+            tests.push(result);
+        }
+        tests.sort_by(|a, b| a.symbol.cmp(&b.symbol));
+        let achieved_limits = AchievedLimits {
+            tests_run: tests.len(),
+            max_events_observed: max_events,
+            max_detail_chars_observed: max_detail,
+        };
+        let loader = request.loader_kind.symbol().clone();
+        let receipt_content = receipt_id(&AdmissionIdentity {
+            artifact: &request.candidate.content,
+            current: current_generation.as_ref(),
+            manifest: &manifest,
+            compatibility: &compatibility,
+            loader: &loader,
+            dependencies: &dependencies,
+            tests: &tests,
+            limits: &achieved_limits,
+        });
+        Ok(AdmissionReceipt {
+            content: receipt_content,
+            artifact: request.candidate.content.clone(),
+            current_generation,
+            manifest,
+            compatibility,
+            loader,
+            dependencies,
+            tests,
+            achieved_limits,
+        })
+    }
+}
+
+fn fresh_context(
+    live: &Cx,
+    seed: HandleSeed,
+    capabilities: &[sim_kernel::CapabilityName],
+) -> Result<Cx, AdmissionFailure> {
+    let (mut context, seat) = Cx::new_seated(live.eval_policy_ref(), live.factory_ref(), seed);
+    context.set_control_policy(live.control_policy_ref());
+    for capability in capabilities {
+        seat.grant(&mut context, capability.clone())
+            .map_err(|error| {
+                AdmissionFailure(format!(
+                    "cannot grant shadow capability {capability}: {error}"
+                ))
+            })?;
+    }
+    Ok(context)
+}
+
+fn require_candidate_source(
+    source: &LibSource,
+    content: &ContentId,
+    bytes: &[u8],
+) -> Result<(), AdmissionFailure> {
+    if sim_run_loaders::bytes_from_source(source)
+        .map_err(|error| AdmissionFailure(format!("candidate source is malformed: {error}")))?
+        .as_deref()
+        == Some(bytes)
+    {
+        return Ok(());
+    }
+    let expected_hex = hex(&content.bytes);
+    let addressed = match sim_run_loaders::content_address_payload(source) {
+        Some(sim_kernel::Datum::Bytes(digest)) => digest.as_slice() == content.bytes,
+        Some(sim_kernel::Datum::String(digest)) => digest == &expected_hex,
+        _ => false,
+    };
+    if addressed {
+        Ok(())
+    } else {
+        Err(AdmissionFailure(
+            "loader source does not name the verified candidate content".into(),
+        ))
+    }
+}
+
+fn clone_source(source: &LibSource) -> Result<LibSource, AdmissionFailure> {
+    match source {
+        LibSource::Symbol(value) => Ok(LibSource::Symbol(value.clone())),
+        LibSource::Open { kind, payload } => Ok(LibSource::Open {
+            kind: kind.clone(),
+            payload: payload.clone(),
+        }),
+        LibSource::Host(_) => Err(AdmissionFailure(
+            "host library sources cannot be admitted".into(),
+        )),
+    }
+}
+
+struct AdmissionIdentity<'a> {
+    artifact: &'a ContentId,
+    current: Option<&'a ContentId>,
+    manifest: &'a LibManifest,
+    compatibility: &'a CompatibilityReport,
+    loader: &'a Symbol,
+    dependencies: &'a [Symbol],
+    tests: &'a [CandidateTestResult],
+    limits: &'a AchievedLimits,
+}
+
+fn receipt_id(identity: &AdmissionIdentity<'_>) -> ContentId {
+    let AdmissionIdentity {
+        artifact,
+        current,
+        manifest,
+        compatibility,
+        loader,
+        dependencies,
+        tests,
+        limits,
+    } = identity;
+    let canonical = format!(
+        "artifact={artifact:?}\ncurrent={current:?}\nmanifest={manifest:?}\ncompatibility={compatibility:?}\nloader={loader}\ndependencies={dependencies:?}\ntests={tests:?}\nlimits={limits:?}\n"
+    );
+    ContentId::from_bytes(
+        Symbol::qualified("core", "sha256"),
+        Sha256::digest(canonical.as_bytes()).into(),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sim_kernel::Datum;
+
+    #[test]
+    fn artifact_source_must_bind_the_verified_bytes_or_digest() {
+        let bytes = b"candidate";
+        let content = content_id(bytes);
+        let direct = sim_run_loaders::bytes_source(bytes);
+        assert!(require_candidate_source(&direct, &content, bytes).is_ok());
+
+        let addressed =
+            sim_run_loaders::content_address_source(Datum::Bytes(content.bytes.to_vec()));
+        assert!(require_candidate_source(&addressed, &content, bytes).is_ok());
+        assert!(require_candidate_source(&direct, &content, b"mutated").is_err());
+    }
+
+    #[test]
+    fn host_sources_cannot_cross_the_admission_membrane() {
+        struct HostLib;
+        impl sim_kernel::Lib for HostLib {
+            fn manifest(&self) -> LibManifest {
+                unreachable!("host source is rejected before manifest access")
+            }
+            fn load(
+                &self,
+                _cx: &mut sim_kernel::LoadCx,
+                _linker: &mut sim_kernel::Linker,
+            ) -> sim_kernel::Result<()> {
+                unreachable!("host source is rejected before native behavior")
+            }
+        }
+        assert!(clone_source(&LibSource::Host(Box::new(HostLib))).is_err());
+    }
+}
+```
+
+Specimen `spec-test/sim-run/crates/sim-lib-hotload/src/build` is checked by `cargo test`.
+
+Source `crates/sim-lib-hotload/src/build.rs`:
+
+```rust
+// conformance: native builds use sealed offline inputs and publish immutable artifacts.
+
+use crate::{
+    ArtifactCandidate, BuildFailure, FailureKind, NativeBuildRequest,
+    artifact::{ArtifactStore, content_id},
+};
+use serde::Deserialize;
+use sim_lib_exec::{
+    ArgAtom, MountAccess, ProcessCancellation, ProgramRef, SandboxAttempt, SandboxControl,
+    SandboxLauncher, SandboxLimits, SandboxMount, SandboxPolicy, SandboxRequest,
+    SandboxRequirement, SealedBindings,
+};
+use sim_storage_port::HostDirPort;
+use std::collections::BTreeMap;
+
+const SOURCE: &str = "/source";
+const TOOLCHAIN: &str = "/toolchain";
+const TARGET: &str = "/target";
+
+/// Preopened byte mounts used around sandbox execution.
+pub struct BuildMounts<'a> {
+    /// Sealed source tree.
+    pub source: &'a dyn HostDirPort,
+    /// Writable sandbox target tree.
+    pub target: &'a dyn HostDirPort,
+    /// Immutable artifact store.
+    pub artifacts: &'a dyn HostDirPort,
+}
+
+/// Native build policy bound to one trusted launcher.
+pub struct NativeBuilder<'a> {
+    launcher: &'a dyn SandboxLauncher,
+}
+impl<'a> NativeBuilder<'a> {
+    /// Creates a builder over a boot-selected sandbox launcher.
+    pub fn new(launcher: &'a dyn SandboxLauncher) -> Self {
+        Self { launcher }
+    }
+
+    /// Validates, executes, selects, and immutably publishes one candidate.
+    pub fn build(
+        &self,
+        request: &NativeBuildRequest,
+        mounts: BuildMounts<'_>,
+        cancellation: &ProcessCancellation,
+    ) -> Result<ArtifactCandidate, BuildFailure> {
+        request.validate_fields()?;
+        let manifest_bytes = mounts
+            .source
+            .read(&split(&request.manifest)?)
+            .map_err(|e| BuildFailure::request(e.to_string()))?;
+        let manifest: toml::Value = toml::from_str(
+            std::str::from_utf8(&manifest_bytes)
+                .map_err(|_| BuildFailure::request("manifest is not UTF-8"))?,
+        )
+        .map_err(|e| BuildFailure::request(e.to_string()))?;
+        validate_manifest(&manifest, request, mounts.source)?;
+        let sandbox = sandbox_request(request)?;
+        let result = match self.launcher.launch(&sandbox, cancellation) {
+            SandboxAttempt::Completed(v) if v.report.proves_required(&sandbox.policy) => v,
+            SandboxAttempt::Completed(_) => {
+                return Err(BuildFailure::new(
+                    FailureKind::SandboxRefusal,
+                    "required controls were not achieved",
+                ));
+            }
+            SandboxAttempt::Refused(v) | SandboxAttempt::Unknown(v) => {
+                return Err(BuildFailure::new(FailureKind::SandboxRefusal, v.reason));
+            }
+            SandboxAttempt::Stopped(_) => {
+                return Err(BuildFailure::new(
+                    FailureKind::SandboxRefusal,
+                    "sandbox stopped before completion",
+                ));
+            }
+        };
+        if result.exit_code != 0 {
+            return Err(BuildFailure::new(
+                FailureKind::CargoFailure,
+                String::from_utf8_lossy(&result.stderr),
+            ));
+        }
+        let artifact_path = select_artifact(&result.stdout, &request.package)?;
+        let bytes = mounts
+            .target
+            .read(&split_target(&artifact_path)?)
+            .map_err(|e| BuildFailure::artifact(e.to_string()))?;
+        let (content, cache_hit) = ArtifactStore::new(mounts.artifacts).put(&bytes)?;
+        let report = content_id(format!("{:?}", result.report).as_bytes());
+        let receipt = content_id(
+            format!(
+                "{}:{}:{}",
+                request.source_mount,
+                request.toolchain.content,
+                crate::artifact::hex(&content.bytes)
+            )
+            .as_bytes(),
+        );
+        Ok(ArtifactCandidate {
+            content,
+            bytes: bytes.len() as u64,
+            expected_library: request.expected_library.clone(),
+            sandbox_report: report,
+            build_receipt: receipt,
+            cache_hit,
+        })
+    }
+}
+
+fn validate_manifest(
+    value: &toml::Value,
+    request: &NativeBuildRequest,
+    source: &dyn HostDirPort,
+) -> Result<(), BuildFailure> {
+    let package = value
+        .get("package")
+        .and_then(|v| v.get("name"))
+        .and_then(toml::Value::as_str);
+    if package != Some(&request.package) {
+        return Err(BuildFailure::request(
+            "manifest package does not match request",
+        ));
+    }
+    let kinds = value
+        .get("lib")
+        .and_then(|v| v.get("crate-type"))
+        .and_then(toml::Value::as_array)
+        .ok_or_else(|| BuildFailure::request("manifest must declare a cdylib"))?;
+    if !kinds.iter().any(|v| v.as_str() == Some("cdylib")) {
+        return Err(BuildFailure::request("manifest must declare a cdylib"));
+    }
+    if source
+        .metadata(&["Cargo.lock".into()])
+        .map_err(|e| BuildFailure::request(e.to_string()))?
+        .is_none()
+    {
+        return Err(BuildFailure::request("locked manifest requires Cargo.lock"));
+    }
+    for table in ["dependencies", "build-dependencies", "dev-dependencies"] {
+        if let Some(deps) = value.get(table).and_then(toml::Value::as_table) {
+            for dep in deps.values() {
+                if let Some(t) = dep.as_table() {
+                    if t.contains_key("git") || t.contains_key("registry") {
+                        return Err(BuildFailure::request(
+                            "URL and git dependencies are forbidden",
+                        ));
+                    }
+                    if let Some(path) = t.get("path").and_then(toml::Value::as_str) {
+                        split(path)?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn sandbox_request(request: &NativeBuildRequest) -> Result<SandboxRequest, BuildFailure> {
+    let mut argv = vec![
+        "build",
+        "--locked",
+        "--offline",
+        "--message-format=json-render-diagnostics",
+        "--manifest-path",
+        "/source/",
+    ];
+    let manifest_arg = format!("{SOURCE}/{}", request.manifest);
+    let mut atoms = argv.drain(..5).map(atom).collect::<Result<Vec<_>, _>>()?;
+    atoms.push(atom(&manifest_arg)?);
+    atoms.extend([
+        atom("--package")?,
+        atom(&request.package)?,
+        atom("--target-dir")?,
+        atom(TARGET)?,
+    ]);
+    if !request.features.is_empty() {
+        atoms.extend([
+            atom("--features")?,
+            atom(
+                &request
+                    .features
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(","),
+            )?,
+        ]);
+    }
+    let requirements = all_controls()
+        .into_iter()
+        .map(|c| (c, SandboxRequirement::Required));
+    let policy = SandboxPolicy::new(
+        requirements,
+        vec![
+            SandboxMount {
+                source: request.source_mount.clone(),
+                guest_path: SOURCE.into(),
+                access: MountAccess::ReadOnly,
+            },
+            SandboxMount {
+                source: request.toolchain.content.clone(),
+                guest_path: TOOLCHAIN.into(),
+                access: MountAccess::ReadOnly,
+            },
+            SandboxMount {
+                source: "hotload-target".into(),
+                guest_path: TARGET.into(),
+                access: MountAccess::Writable,
+            },
+        ],
+        SandboxLimits {
+            cpu_seconds: 300,
+            memory_bytes: 2 * 1024 * 1024 * 1024,
+            wall_time_ms: 360_000,
+            process_count: 64,
+            file_count: 100_000,
+            file_bytes: 2 * 1024 * 1024 * 1024,
+            output_bytes: 8 * 1024 * 1024,
+            stdin_bytes: 1,
+        },
+    )
+    .map_err(|e| BuildFailure::request(e.to_string()))?;
+    let environment = SealedBindings::literals(
+        request
+            .toolchain
+            .environment
+            .clone()
+            .into_iter()
+            .collect::<BTreeMap<_, _>>(),
+    )
+    .map_err(|e| BuildFailure::toolchain(e.to_string()))?;
+    SandboxRequest::new(
+        ProgramRef::new(request.toolchain.cargo_program.clone())
+            .map_err(|e| BuildFailure::toolchain(e.to_string()))?,
+        atoms,
+        environment,
+        vec![],
+        policy,
+    )
+    .map_err(|e| BuildFailure::request(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{FailureKind, ToolchainIdentity};
+    use sim_kernel::Symbol;
+    use std::collections::BTreeSet;
+
+    fn request() -> NativeBuildRequest {
+        NativeBuildRequest {
+            source_mount: "sha256:source".into(),
+            manifest: "Cargo.toml".into(),
+            package: "guest".into(),
+            features: BTreeSet::from(["native".into()]),
+            expected_library: Symbol::qualified("guest", "lib"),
+            toolchain: ToolchainIdentity {
+                content: "sha256:toolchain".into(),
+                cargo_program: "sealed-cargo".into(),
+                environment: vec![("PATH".into(), "/toolchain/bin".into())],
+            },
+        }
+    }
+
+    fn artifact(path: &str) -> Vec<u8> {
+        format!(r#"{{"reason":"compiler-artifact","package_id":"guest 0.1.0 (path+file:///source)","target":{{"kind":["cdylib"]}},"filenames":["{path}"]}}"#).into_bytes()
+    }
+
+    #[test]
+    fn denial_before_spawn_rejects_escaping_manifest() {
+        let mut value = request();
+        value.manifest = "../Cargo.toml".into();
+        assert_eq!(
+            value.validate_fields().unwrap_err().kind,
+            FailureKind::RequestRefusal
+        );
+    }
+
+    #[test]
+    fn fixed_plan_is_offline_locked_and_has_one_writable_mount() {
+        let plan = sandbox_request(&request()).unwrap();
+        let args = plan.argv.iter().map(ArgAtom::as_str).collect::<Vec<_>>();
+        assert_eq!(
+            &args[..4],
+            [
+                "build",
+                "--locked",
+                "--offline",
+                "--message-format=json-render-diagnostics"
+            ]
+        );
+        assert_eq!(
+            plan.policy
+                .mounts()
+                .iter()
+                .filter(|m| m.access == MountAccess::Writable)
+                .count(),
+            1
+        );
+        assert!(plan.environment.iter().all(|(k, _)| k == "PATH"));
+    }
+
+    #[test]
+    fn multiple_artifacts_are_refused() {
+        let mut lines = artifact("/target/debug/libguest.so");
+        lines.push(b'\n');
+        lines.extend(artifact("/target/release/libguest.so"));
+        assert_eq!(
+            select_artifact(&lines, "guest").unwrap_err().kind,
+            FailureKind::MalformedCargoOutput
+        );
+    }
+
+    #[test]
+    fn truncated_json_is_refused() {
+        assert_eq!(
+            select_artifact(br#"{"reason":"compiler"#, "guest")
+                .unwrap_err()
+                .kind,
+            FailureKind::MalformedCargoOutput
+        );
+    }
+
+    #[test]
+    fn out_of_root_artifact_is_refused() {
+        assert_eq!(
+            select_artifact(&artifact("/source/escape.so"), "guest")
+                .unwrap_err()
+                .kind,
+            FailureKind::MalformedCargoOutput
+        );
+    }
+
+    #[test]
+    fn source_and_toolchain_identity_change_receipt_material() {
+        let a = request();
+        let mut b = request();
+        b.toolchain.content = "sha256:other".into();
+        assert_ne!(
+            format!("{}:{}", a.source_mount, a.toolchain.content),
+            format!("{}:{}", b.source_mount, b.toolchain.content)
+        );
+    }
+
+    #[test]
+    fn diagnostics_are_bounded_and_sanitized() {
+        let failure = BuildFailure::new(
+            FailureKind::CargoFailure,
+            format!("{}\0secret", "x".repeat(3000)),
+        );
+        assert!(failure.diagnostic.len() <= 2048);
+        assert!(!failure.diagnostic.contains('\0'));
+    }
+}
+
+fn atom(v: &str) -> Result<ArgAtom, BuildFailure> {
+    ArgAtom::new(v).map_err(|e| BuildFailure::request(e.to_string()))
+}
+fn all_controls() -> [SandboxControl; 14] {
+    [
+        SandboxControl::Network,
+        SandboxControl::Mounts,
+        SandboxControl::Root,
+        SandboxControl::Environment,
+        SandboxControl::Identity,
+        SandboxControl::Cpu,
+        SandboxControl::Memory,
+        SandboxControl::WallTime,
+        SandboxControl::ProcessCount,
+        SandboxControl::FileCount,
+        SandboxControl::FileBytes,
+        SandboxControl::Output,
+        SandboxControl::Stdin,
+        SandboxControl::ProcessTree,
+    ]
+}
+
+#[derive(Deserialize)]
+struct Message {
+    reason: String,
+    package_id: Option<String>,
+    target: Option<Target>,
+    filenames: Option<Vec<String>>,
+}
+#[derive(Deserialize)]
+struct Target {
+    kind: Vec<String>,
+}
+fn select_artifact(stdout: &[u8], package: &str) -> Result<String, BuildFailure> {
+    let text = std::str::from_utf8(stdout).map_err(|_| {
+        BuildFailure::new(
+            FailureKind::MalformedCargoOutput,
+            "Cargo output is not UTF-8",
+        )
+    })?;
+    let mut found = vec![];
+    for line in text.lines() {
+        let msg: Message = serde_json::from_str(line).map_err(|_| {
+            BuildFailure::new(
+                FailureKind::MalformedCargoOutput,
+                "truncated or malformed Cargo JSON",
+            )
+        })?;
+        if msg.reason == "compiler-artifact"
+            && msg
+                .package_id
+                .as_deref()
+                .is_some_and(|id| id.split_whitespace().next() == Some(package))
+            && msg
+                .target
+                .as_ref()
+                .is_some_and(|t| t.kind.iter().any(|k| k == "cdylib"))
+        {
+            found.extend(
+                msg.filenames
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|p| p.starts_with(&format!("{TARGET}/"))),
+            );
+        }
+    }
+    if found.len() != 1 {
+        return Err(BuildFailure::new(
+            FailureKind::MalformedCargoOutput,
+            "expected exactly one in-target cdylib artifact",
+        ));
+    }
+    Ok(found.remove(0))
+}
+fn split(value: &str) -> Result<Vec<String>, BuildFailure> {
+    let path = std::path::Path::new(value);
+    if value.is_empty()
+        || path.is_absolute()
+        || path
+            .components()
+            .any(|c| !matches!(c, std::path::Component::Normal(_)))
+    {
+        return Err(BuildFailure::request("path escapes sealed mount"));
+    }
+    Ok(path
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect())
+}
+fn split_target(value: &str) -> Result<Vec<String>, BuildFailure> {
+    value
+        .strip_prefix(&format!("{TARGET}/"))
+        .ok_or_else(|| {
+            BuildFailure::new(
+                FailureKind::MalformedCargoOutput,
+                "artifact escaped target root",
+            )
+        })
+        .and_then(split)
+}
+```
+
+Specimen `spec-test/sim-run/crates/sim-lib-hotload/src/compatibility` is checked by `cargo test`.
+
+Source `crates/sim-lib-hotload/src/compatibility.rs`:
+
+```rust
+// conformance: compatibility policy rejects removed and changed managed exports.
+
+use std::{collections::BTreeSet, fmt};
+
+use sim_kernel::{ExportKind, LibManifest, Symbol};
+
+/// Export compatibility applied to an already-managed generation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CompatibilityPolicy {
+    /// Candidate exports must equal the current export surface.
+    Exact,
+    /// Candidate exports may add names but may not remove or change existing names.
+    Additive,
+}
+
+/// Deterministic compatibility evidence retained by an admission receipt.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CompatibilityReport {
+    /// Policy applied; absent for an initial generation.
+    pub policy: Option<CompatibilityPolicy>,
+    /// Sorted candidate export surface.
+    pub candidate_exports: Vec<(ExportKind, Symbol)>,
+    /// Sorted exports added by an additive replacement.
+    pub added_exports: Vec<(ExportKind, Symbol)>,
+}
+
+pub(crate) fn compare(
+    expected_library: &Symbol,
+    candidate: &LibManifest,
+    current: Option<&LibManifest>,
+    policy: CompatibilityPolicy,
+) -> Result<CompatibilityReport, String> {
+    if &candidate.id != expected_library {
+        return Err(format!(
+            "candidate manifest id {} does not match expected {}",
+            candidate.id, expected_library
+        ));
+    }
+    let candidate_exports = exports(candidate);
+    let Some(current) = current else {
+        return Ok(CompatibilityReport {
+            policy: None,
+            candidate_exports,
+            added_exports: Vec::new(),
+        });
+    };
+    if candidate.abi.major != current.abi.major {
+        return Err("candidate ABI major differs from current generation".into());
+    }
+    if sorted_debug(&candidate.capabilities) != sorted_debug(&current.capabilities) {
+        return Err("candidate capability set differs from current generation".into());
+    }
+    if sorted_debug(&candidate.requires) != sorted_debug(&current.requires) {
+        return Err("candidate dependency requirements differ from current generation".into());
+    }
+    let old = exports(current).into_iter().collect::<BTreeSet<_>>();
+    let new = candidate_exports.iter().cloned().collect::<BTreeSet<_>>();
+    for (kind, symbol) in &old {
+        match new
+            .iter()
+            .find(|(_, candidate_symbol)| candidate_symbol == symbol)
+        {
+            None => {
+                return Err(format!(
+                    "candidate removed export {:?}:{symbol}",
+                    kind.symbol()
+                ));
+            }
+            Some((candidate_kind, _)) if candidate_kind != kind => {
+                return Err(format!(
+                    "candidate changed kind of export {symbol} from {:?} to {:?}",
+                    kind.symbol(),
+                    candidate_kind.symbol()
+                ));
+            }
+            Some(_) => {}
+        }
+    }
+    let added_exports = new.difference(&old).cloned().collect::<Vec<_>>();
+    if policy == CompatibilityPolicy::Exact && !added_exports.is_empty() {
+        return Err(format!(
+            "exact compatibility forbids added export {:?}:{}",
+            added_exports[0].0.symbol(),
+            added_exports[0].1
+        ));
+    }
+    Ok(CompatibilityReport {
+        policy: Some(policy),
+        candidate_exports,
+        added_exports,
+    })
+}
+
+fn sorted_debug<T: fmt::Debug>(values: &[T]) -> Vec<String> {
+    let mut values = values
+        .iter()
+        .map(|value| format!("{value:?}"))
+        .collect::<Vec<_>>();
+    values.sort();
+    values
+}
+
+fn exports(manifest: &LibManifest) -> Vec<(ExportKind, Symbol)> {
+    let mut exports = manifest
+        .exports
+        .iter()
+        .map(|export| {
+            let record = export.declared_record();
+            (record.kind, record.symbol)
+        })
+        .collect::<Vec<_>>();
+    exports.sort();
+    exports
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sim_kernel::{AbiVersion, CapabilityName, Dependency, Export, LibTarget, Version};
+
+    fn manifest(id: &str, exports: Vec<Export>) -> LibManifest {
+        LibManifest {
+            id: Symbol::new(id),
+            version: Version("1.0.0".into()),
+            abi: AbiVersion { major: 1, minor: 0 },
+            target: LibTarget::Native,
+            requires: vec![Dependency {
+                id: Symbol::new("dep"),
+                minimum_version: None,
+            }],
+            capabilities: vec![CapabilityName::new("read")],
+            exports,
+        }
+    }
+
+    fn value(name: &str) -> Export {
+        Export::Value {
+            symbol: Symbol::new(name),
+        }
+    }
+
+    #[test]
+    fn initial_generation_requires_the_expected_manifest_id() {
+        assert!(
+            compare(
+                &Symbol::new("wanted"),
+                &manifest("wrong", vec![]),
+                None,
+                CompatibilityPolicy::Exact
+            )
+            .is_err()
+        );
+        assert!(
+            compare(
+                &Symbol::new("wanted"),
+                &manifest("wanted", vec![]),
+                None,
+                CompatibilityPolicy::Exact
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn replacement_refuses_removed_changed_and_exact_extra_exports() {
+        let current = manifest("lib", vec![value("answer")]);
+        assert!(
+            compare(
+                &current.id,
+                &manifest("lib", vec![]),
+                Some(&current),
+                CompatibilityPolicy::Exact
+            )
+            .unwrap_err()
+            .contains("removed")
+        );
+        let changed = Export::Function {
+            symbol: Symbol::new("answer"),
+            function_id: None,
+        };
+        assert!(
+            compare(
+                &current.id,
+                &manifest("lib", vec![changed]),
+                Some(&current),
+                CompatibilityPolicy::Exact
+            )
+            .unwrap_err()
+            .contains("changed kind")
+        );
+        assert!(
+            compare(
+                &current.id,
+                &manifest("lib", vec![value("answer"), value("extra")]),
+                Some(&current),
+                CompatibilityPolicy::Exact
+            )
+            .unwrap_err()
+            .contains("forbids added")
+        );
+    }
+
+    #[test]
+    fn replacement_refuses_abi_capability_and_dependency_drift() {
+        let current = manifest("lib", vec![value("answer")]);
+
+        let mut changed = current.clone();
+        changed.abi.major += 1;
+        assert!(
+            compare(
+                &current.id,
+                &changed,
+                Some(&current),
+                CompatibilityPolicy::Additive
+            )
+            .unwrap_err()
+            .contains("ABI major")
+        );
+
+        changed = current.clone();
+        changed.capabilities.push(CapabilityName::new("write"));
+        assert!(
+            compare(
+                &current.id,
+                &changed,
+                Some(&current),
+                CompatibilityPolicy::Additive
+            )
+            .unwrap_err()
+            .contains("capability")
+        );
+
+        changed = current.clone();
+        changed.requires.clear();
+        assert!(
+            compare(
+                &current.id,
+                &changed,
+                Some(&current),
+                CompatibilityPolicy::Additive
+            )
+            .unwrap_err()
+            .contains("dependency")
+        );
+    }
+
+    #[test]
+    fn additive_replacement_reports_sorted_additions() {
+        let current = manifest("lib", vec![value("answer")]);
+        let report = compare(
+            &current.id,
+            &manifest("lib", vec![value("z"), value("answer"), value("a")]),
+            Some(&current),
+            CompatibilityPolicy::Additive,
+        )
+        .unwrap();
+        assert_eq!(
+            report
+                .added_exports
+                .iter()
+                .map(|(_, symbol)| symbol.to_string())
+                .collect::<Vec<_>>(),
+            vec!["a", "z"]
+        );
+    }
+}
+```
+
+Specimen `spec-test/sim-run/crates/sim-lib-hotload/src/preflight` is checked by `cargo test`.
+
+Source `crates/sim-lib-hotload/src/preflight.rs`:
+
+```rust
+// conformance: preflight bounds and retains candidate test evidence deterministically.
+
+use sim_kernel::{Symbol, TestReport};
+
+/// Hard bounds for candidate-declared conformance execution and retained evidence.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PreflightLimits {
+    /// Maximum tests a candidate may register.
+    pub max_tests: usize,
+    /// Maximum events retained from any one test report.
+    pub max_events_per_test: usize,
+    /// Maximum UTF-8 characters retained from test detail.
+    pub max_detail_chars: usize,
+}
+
+impl Default for PreflightLimits {
+    fn default() -> Self {
+        Self {
+            max_tests: 64,
+            max_events_per_test: 256,
+            max_detail_chars: 2048,
+        }
+    }
+}
+
+/// Limits actually reached while exercising a candidate.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AchievedLimits {
+    /// Number of candidate tests run.
+    pub tests_run: usize,
+    /// Largest event count in one report.
+    pub max_events_observed: usize,
+    /// Largest retained detail length in characters.
+    pub max_detail_chars_observed: usize,
+}
+
+/// Stable result retained for one candidate-declared test.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CandidateTestResult {
+    /// Test symbol.
+    pub symbol: Symbol,
+    /// Whether the test passed without being skipped.
+    pub passed: bool,
+    /// Bounded diagnostic detail.
+    pub detail: Option<String>,
+}
+
+pub(crate) fn bounded_result(
+    report: TestReport,
+    limits: PreflightLimits,
+) -> Result<CandidateTestResult, String> {
+    if report.events.len() > limits.max_events_per_test {
+        return Err(format!("test {} exceeded event limit", report.name));
+    }
+    let detail = report
+        .detail
+        .map(|value| value.chars().take(limits.max_detail_chars).collect());
+    Ok(CandidateTestResult {
+        symbol: report.name,
+        passed: report.passed && !report.skipped,
+        detail,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failed_skipped_and_over_limit_reports_refuse() {
+        let limits = PreflightLimits {
+            max_tests: 1,
+            max_events_per_test: 0,
+            max_detail_chars: 3,
+        };
+        let mut report =
+            TestReport::from_result(Symbol::new("self-test"), false, Some("failure".into()));
+        assert!(!bounded_result(report.clone(), limits).unwrap().passed);
+        report.skipped = true;
+        report.passed = true;
+        assert!(!bounded_result(report.clone(), limits).unwrap().passed);
+        assert_eq!(
+            bounded_result(report, limits).unwrap().detail.as_deref(),
+            Some("fai")
+        );
+    }
+}
+```
+
+### `feature/sim-run/loadable-hot-generation`
+
+Specimen `spec-test/sim-run/crates/sim-lib-hotload/src/surface` is checked by `cargo test`.
+
+Source `crates/sim-lib-hotload/src/surface.rs`:
+
+```rust
+//! Loadable, data-only hot-generation operations.
+
+// conformance: the hotload surface exposes typed operations without owning host effects.
+
+use std::{collections::BTreeMap, sync::Arc};
+
+use sim_kernel::{
+    AbiVersion, Args, Callable, CapabilityName, ClassRef, Cx, Error, Export, Factory, Lib,
+    LibManifest, LibTarget, Linker, LoadCx, MatchScore, Object, ObjectCompat, ObjectEncode,
+    ObjectEncoding, Ref, Result, Shape, ShapeDoc, ShapeMatch, ShapeRef, Symbol, Value, Version,
+    card::Card,
+};
+use sim_shape::shape_value;
+
+/// The five stable operations exported by [`HotloadLib`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HotloadOperation {
+    /// Construct immutable candidate bytes in the configured sandbox.
+    Build,
+    /// Inspect and test a candidate outside the live context.
+    Admit,
+    /// Atomically install an admitted generation.
+    Activate,
+    /// Inspect the current generation and mutation state.
+    Status,
+    /// Inspect durable generation and refusal evidence.
+    History,
+}
+
+impl HotloadOperation {
+    const ALL: [Self; 5] = [
+        Self::Build,
+        Self::Admit,
+        Self::Activate,
+        Self::Status,
+        Self::History,
+    ];
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Build => "build",
+            Self::Admit => "admit",
+            Self::Activate => "activate",
+            Self::Status => "status",
+            Self::History => "history",
+        }
+    }
+
+    fn capability(self) -> CapabilityName {
+        hotload_capability(match self {
+            Self::Build => "build",
+            Self::Activate => "activate",
+            Self::Admit => "admit",
+            Self::Status | Self::History => "inspect",
+        })
+    }
+
+    fn help(self) -> &'static str {
+        match self {
+            Self::Build => {
+                "build a sealed package; returns candidate identity and sandbox evidence"
+            }
+            Self::Admit => {
+                "check compatibility and bounded tests without touching the live context"
+            }
+            Self::Activate => "activate an admission receipt atomically and durably",
+            Self::Status => {
+                "inspect generation identity, reachability, sandbox controls, and audit state"
+            }
+            Self::History => {
+                "browse completed generations, refusals, compatibility differences, and journal evidence"
+            }
+        }
+    }
+}
+
+/// Data-only request or outcome record. Its constructor encoding produces
+/// `#(hotload/Record KIND {FIELDS...})` in Lisp data position.
+#[derive(Clone, Debug)]
+pub struct HotloadRecord {
+    kind: Symbol,
+    fields: BTreeMap<Symbol, sim_kernel::Expr>,
+}
+
+impl HotloadRecord {
+    /// Creates a canonical record. Field order is normalized by symbol.
+    pub fn new(kind: Symbol, fields: impl IntoIterator<Item = (Symbol, sim_kernel::Expr)>) -> Self {
+        Self {
+            kind,
+            fields: fields.into_iter().collect(),
+        }
+    }
+
+    /// Record kind.
+    pub fn kind(&self) -> &Symbol {
+        &self.kind
+    }
+
+    /// Canonically ordered public fields.
+    pub fn fields(&self) -> &BTreeMap<Symbol, sim_kernel::Expr> {
+        &self.fields
+    }
+
+    fn from_value(cx: &mut Cx, value: &Value) -> Result<Self> {
+        if let Some(record) = value.object().as_any().downcast_ref::<Self>() {
+            return Ok(record.clone());
+        }
+        let expr = value.object().as_expr(cx)?;
+        let sim_kernel::Expr::Map(entries) = expr else {
+            return Err(Error::TypeMismatch {
+                expected: "hotload record",
+                found: "non-record",
+            });
+        };
+        let mut kind = None;
+        let mut fields = BTreeMap::new();
+        for (key, value) in entries {
+            let sim_kernel::Expr::Symbol(key) = key else {
+                continue;
+            };
+            if key == Symbol::new("kind") {
+                let sim_kernel::Expr::Symbol(value) = value else {
+                    return Err(Error::TypeMismatch {
+                        expected: "record kind symbol",
+                        found: "non-symbol",
+                    });
+                };
+                kind = Some(value);
+            } else {
+                fields.insert(key, value);
+            }
+        }
+        Ok(Self::new(
+            kind.ok_or_else(|| Error::Eval("hotload record has no kind".into()))?,
+            fields,
+        ))
+    }
+}
+
+impl Object for HotloadRecord {
+    fn display(&self, _cx: &mut Cx) -> Result<String> {
+        Ok(format!("#<hotload-record {}>", self.kind))
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl ObjectCompat for HotloadRecord {
+    fn class(&self, cx: &mut Cx) -> Result<ClassRef> {
+        cx.factory()
+            .class_stub(sim_kernel::ClassId(0x484f_5401), record_class_symbol())
+    }
+    fn as_expr(&self, _cx: &mut Cx) -> Result<sim_kernel::Expr> {
+        let mut entries = vec![(
+            sim_kernel::Expr::Symbol(Symbol::new("kind")),
+            sim_kernel::Expr::Symbol(self.kind.clone()),
+        )];
+        entries.extend(
+            self.fields
+                .iter()
+                .map(|(key, value)| (sim_kernel::Expr::Symbol(key.clone()), value.clone())),
+        );
+        Ok(sim_kernel::Expr::Map(entries))
+    }
+    fn as_object_encoder(&self) -> Option<&dyn ObjectEncode> {
+        Some(self)
+    }
+}
+
+impl ObjectEncode for HotloadRecord {
+    fn object_encoding(&self, _cx: &mut Cx) -> Result<ObjectEncoding> {
+        Ok(ObjectEncoding::Constructor {
+            class: record_class_symbol(),
+            args: vec![
+                sim_kernel::Expr::Symbol(self.kind.clone()),
+                sim_kernel::Expr::Map(
+                    self.fields
+                        .iter()
+                        .map(|(k, v)| (sim_kernel::Expr::Symbol(k.clone()), v.clone()))
+                        .collect(),
+                ),
+            ],
+        })
+    }
+}
+
+/// Host-provided orchestration membrane. Implementations compose the existing
+/// builder, admission, activation, and journal services; values crossing this
+/// boundary are records only.
+pub trait HotloadPort: Send + Sync {
+    /// Performs one typed operation.
+    fn invoke(
+        &self,
+        operation: HotloadOperation,
+        request: &HotloadRecord,
+    ) -> std::result::Result<HotloadRecord, HotloadRecord>;
+}
+
+/// Loadable hot-generation library over an injected orchestration membrane.
+pub struct HotloadLib {
+    port: Arc<dyn HotloadPort>,
+}
+
+impl HotloadLib {
+    /// Composes the loadable surface with an installed host orchestration port.
+    pub fn new(port: Arc<dyn HotloadPort>) -> Self {
+        Self { port }
+    }
+}
+
+impl Lib for HotloadLib {
+    fn manifest(&self) -> LibManifest {
+        LibManifest {
+            id: hotload_lib_symbol(),
+            version: Version(env!("CARGO_PKG_VERSION").into()),
+            abi: AbiVersion { major: 0, minor: 1 },
+            target: LibTarget::HostRegistered,
+            requires: Vec::new(),
+            capabilities: Vec::new(),
+            exports: exports(),
+        }
+    }
+
+    fn load(&self, cx: &mut LoadCx, linker: &mut Linker<'_>) -> Result<()> {
+        let mut contracts = Vec::new();
+        for operation in HotloadOperation::ALL {
+            let args = operation_shape(operation, "Args", "one hotload/Record request", true);
+            let result =
+                operation_shape(operation, "Result", "typed hotload/Record outcome", false);
+            linker.shape_value(shape_symbol(operation, "Args"), args.clone())?;
+            linker.shape_value(shape_symbol(operation, "Result"), result.clone())?;
+            linker.function_value(
+                operation_symbol(operation),
+                cx.factory().opaque(Arc::new(HotloadFunction {
+                    operation,
+                    port: Arc::clone(&self.port),
+                    args: args.clone(),
+                    result: result.clone(),
+                }))?,
+            )?;
+            contracts.push((operation, args, result));
+        }
+        linker.value(
+            hotload_operation_cards_symbol(),
+            cx.factory().list(cards(cx.factory(), &contracts)?)?,
+        )?;
+        Ok(())
+    }
+}
+
+struct HotloadFunction {
+    operation: HotloadOperation,
+    port: Arc<dyn HotloadPort>,
+    args: Value,
+    result: Value,
+}
+impl Object for HotloadFunction {
+    fn display(&self, _cx: &mut Cx) -> Result<String> {
+        Ok(format!("#<function {}>", operation_symbol(self.operation)))
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+impl ObjectCompat for HotloadFunction {
+    fn class(&self, cx: &mut Cx) -> Result<ClassRef> {
+        cx.resolve_class(&Symbol::qualified("core", "Function"))
+    }
+    fn as_callable(&self) -> Option<&dyn Callable> {
+        Some(self)
+    }
+}
+impl Callable for HotloadFunction {
+    fn call(&self, cx: &mut Cx, args: Args) -> Result<Value> {
+        let values = args.into_vec();
+        let [value] = values.as_slice() else {
+            return Err(Error::Eval(format!(
+                "{} expects one record",
+                operation_symbol(self.operation)
+            )));
+        };
+        cx.require(&self.operation.capability())?;
+        let request = HotloadRecord::from_value(cx, value)?;
+        let outcome = self
+            .port
+            .invoke(self.operation, &request)
+            .unwrap_or_else(|refusal| refusal);
+        cx.factory().opaque(Arc::new(outcome))
+    }
+    fn browse_args_shape(&self, _cx: &mut Cx) -> Result<Option<ShapeRef>> {
+        Ok(Some(self.args.clone()))
+    }
+    fn browse_result_shape(&self, _cx: &mut Cx) -> Result<Option<ShapeRef>> {
+        Ok(Some(self.result.clone()))
+    }
+}
+
+struct RecordShape {
+    symbol: Symbol,
+    operation: HotloadOperation,
+    args: bool,
+    detail: &'static str,
+}
+impl Shape for RecordShape {
+    fn symbol(&self) -> Option<Symbol> {
+        Some(self.symbol.clone())
+    }
+    fn check_value(&self, cx: &mut Cx, value: Value) -> Result<ShapeMatch> {
+        if self.args {
+            let expr = value.object().as_expr(cx)?;
+            let sim_kernel::Expr::List(items) = expr else {
+                return Ok(ShapeMatch::reject("arguments must be a list"));
+            };
+            if items.len() != 1 {
+                return Ok(ShapeMatch::reject("exactly one record is required"));
+            }
+        } else if HotloadRecord::from_value(cx, &value).is_err() {
+            return Ok(ShapeMatch::reject("result must be a hotload record"));
+        }
+        Ok(ShapeMatch::accept(MatchScore::exact(100)))
+    }
+    fn check_expr(&self, _cx: &mut Cx, expr: &sim_kernel::Expr) -> Result<ShapeMatch> {
+        let accepted = if self.args {
+            matches!(expr, sim_kernel::Expr::List(items) if items.len() == 1)
+        } else {
+            matches!(expr, sim_kernel::Expr::Map(_))
+        };
+        Ok(if accepted {
+            ShapeMatch::accept(MatchScore::exact(100))
+        } else {
+            ShapeMatch::reject("hotload record shape mismatch")
+        })
+    }
+    fn describe(&self, _cx: &mut Cx) -> Result<ShapeDoc> {
+        Ok(ShapeDoc::new(format!(
+            "{} {}",
+            operation_symbol(self.operation),
+            if self.args { "arguments" } else { "result" }
+        ))
+        .with_detail(self.detail))
+    }
+}
+
+fn operation_shape(
+    operation: HotloadOperation,
+    suffix: &str,
+    detail: &'static str,
+    args: bool,
+) -> Value {
+    let symbol = shape_symbol(operation, suffix);
+    shape_value(
+        symbol.clone(),
+        Arc::new(RecordShape {
+            symbol,
+            operation,
+            args,
+            detail,
+        }),
+    )
+}
+fn cards(
+    factory: &dyn Factory,
+    contracts: &[(HotloadOperation, Value, Value)],
+) -> Result<Vec<Value>> {
+    contracts
+        .iter()
+        .map(|(operation, args, result)| {
+            let symbol = operation_symbol(*operation);
+            let entries = vec![
+                (Symbol::new("subject"), factory.symbol(symbol.clone())?),
+                (
+                    Symbol::new("kind"),
+                    factory.symbol(Symbol::qualified("hotload", "operation"))?,
+                ),
+                (
+                    Symbol::new("help"),
+                    factory.string(operation.help().to_owned())?,
+                ),
+                (Symbol::new("args"), args.clone()),
+                (Symbol::new("result"), result.clone()),
+                (Symbol::new("tests"), factory.list(Vec::new())?),
+                (
+                    Symbol::new("ops"),
+                    factory.list(vec![factory.symbol(symbol.clone())?])?,
+                ),
+                (
+                    Symbol::new("requires"),
+                    factory.list(vec![factory.symbol(Symbol::qualified(
+                        "capability",
+                        operation.capability().as_str(),
+                    ))?])?,
+                ),
+                (Symbol::new("see-also"), factory.list(Vec::new())?),
+                (Symbol::new("shape-known"), factory.bool(true)?),
+            ];
+            factory.opaque(Arc::new(Card::new(Ref::Symbol(symbol), entries)))
+        })
+        .collect()
+}
+
+fn exports() -> Vec<Export> {
+    let mut exports = vec![Export::Value {
+        symbol: hotload_operation_cards_symbol(),
+    }];
+    for operation in HotloadOperation::ALL {
+        exports.push(Export::Function {
+            symbol: operation_symbol(operation),
+            function_id: None,
+        });
+        exports.push(Export::Shape {
+            symbol: shape_symbol(operation, "Args"),
+            shape_id: None,
+        });
+        exports.push(Export::Shape {
+            symbol: shape_symbol(operation, "Result"),
+            shape_id: None,
+        });
+    }
+    exports
+}
+fn operation_symbol(operation: HotloadOperation) -> Symbol {
+    Symbol::qualified("hotload", operation.name())
+}
+fn shape_symbol(operation: HotloadOperation, suffix: &str) -> Symbol {
+    Symbol::qualified(format!("hotload/{}", operation.name()), suffix)
+}
+fn record_class_symbol() -> Symbol {
+    Symbol::qualified("hotload", "Record")
+}
+/// Stable library identity.
+pub fn hotload_lib_symbol() -> Symbol {
+    Symbol::qualified("lib", "hotload")
+}
+/// Stable Cards export.
+pub fn hotload_operation_cards_symbol() -> Symbol {
+    Symbol::qualified("hotload", "operation-cards")
+}
+/// Stable operation symbols in product order.
+pub fn hotload_operation_symbols() -> Vec<Symbol> {
+    HotloadOperation::ALL
+        .into_iter()
+        .map(operation_symbol)
+        .collect()
+}
+/// Returns one narrowly scoped hotload capability.
+pub fn hotload_capability(name: &str) -> CapabilityName {
+    CapabilityName::new(format!("hotload/{name}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    struct RecordingPort(Mutex<Vec<HotloadOperation>>);
+    impl HotloadPort for RecordingPort {
+        fn invoke(
+            &self,
+            operation: HotloadOperation,
+            request: &HotloadRecord,
+        ) -> std::result::Result<HotloadRecord, HotloadRecord> {
+            self.0.lock().unwrap().push(operation);
+            Ok(HotloadRecord::new(
+                Symbol::qualified("hotload", "ok"),
+                [(
+                    Symbol::new("request-kind"),
+                    sim_kernel::Expr::Symbol(request.kind().clone()),
+                )],
+            ))
+        }
+    }
+
+    #[test]
+    fn manifest_exports_five_functions_shapes_and_cards() {
+        let lib = HotloadLib::new(Arc::new(RecordingPort(Mutex::new(Vec::new()))));
+        let manifest = lib.manifest();
+        for symbol in hotload_operation_symbols() {
+            assert!(manifest.exports.iter().any(|export| matches!(export, Export::Function { symbol: found, .. } if found == &symbol)));
+        }
+        assert_eq!(manifest.capabilities, Vec::new());
+    }
+
+    #[test]
+    fn records_encode_without_host_authority() {
+        let record = HotloadRecord::new(
+            Symbol::qualified("hotload", "candidate"),
+            [(
+                Symbol::new("generation"),
+                sim_kernel::Expr::String("sha256:abc".into()),
+            )],
+        );
+        let mut cx = Cx::new(
+            Arc::new(sim_kernel::NoopEvalPolicy),
+            Arc::new(sim_kernel::DefaultFactory),
+            sim_kernel::HandleSeed::new(9),
+        );
+        let ObjectEncoding::Constructor { class, args } = record.object_encoding(&mut cx).unwrap()
+        else {
+            panic!("constructor encoding")
+        };
+        assert_eq!(class, record_class_symbol());
+        let text = format!("{args:?}");
+        for forbidden in ["path", "argv", "handle", "loader", "provider"] {
+            assert!(!text.contains(forbidden));
+        }
+    }
+
+    #[test]
+    fn callable_enforces_capability_and_returns_typed_idempotent_outcome() {
+        let port = Arc::new(RecordingPort(Mutex::new(Vec::new())));
+        let (mut cx, seat) = Cx::new_seated(
+            Arc::new(sim_kernel::NoopEvalPolicy),
+            Arc::new(sim_kernel::DefaultFactory),
+            sim_kernel::HandleSeed::new(10),
+        );
+        cx.load_lib(&HotloadLib::new(port.clone())).unwrap();
+        let function = cx
+            .registry()
+            .function_by_symbol(&operation_symbol(HotloadOperation::Build))
+            .unwrap()
+            .clone();
+        let request = cx
+            .factory()
+            .opaque(Arc::new(HotloadRecord::new(
+                Symbol::qualified("hotload", "build-request"),
+                Vec::new(),
+            )))
+            .unwrap();
+        assert!(
+            function
+                .object()
+                .as_callable()
+                .unwrap()
+                .call(&mut cx, Args::new(vec![request.clone()]))
+                .is_err()
+        );
+        seat.grant(&mut cx, hotload_capability("build")).unwrap();
+        let first = function
+            .object()
+            .as_callable()
+            .unwrap()
+            .call(&mut cx, Args::new(vec![request.clone()]))
+            .unwrap();
+        let second = function
+            .object()
+            .as_callable()
+            .unwrap()
+            .call(&mut cx, Args::new(vec![request]))
+            .unwrap();
+        assert!(first.object().as_any().is::<HotloadRecord>());
+        assert!(second.object().as_any().is::<HotloadRecord>());
+        assert_eq!(
+            port.0.lock().unwrap().as_slice(),
+            [HotloadOperation::Build, HotloadOperation::Build]
+        );
+    }
+}
+```
+
+Specimen `recipe/sim-run/02-scenarios/hotload-generation-lifecycle` is checked by `xtask check-recipes`.
+
+Source `recipes/02-scenarios/hotload-generation-lifecycle/recipe.toml`:
+
+```toml
+id = "hotload-generation-lifecycle"
+title = "Browse the Hot Generation Lifecycle"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 73
+tags = ["hotload", "library", "capability", "offline", "deterministic"]
+requires = ["sim-lib-hotload"]
+network = false
+```
+
 ### `feature/sim-run/loaders`
 
 Specimen `spec-test/sim-run/crates/sim-run-loaders/src/native/codec_proxy_tests` is checked by `cargo test`.
@@ -841,7 +2732,11 @@ impl NativeGuest for MockGuest {
 }
 
 fn test_cx() -> Cx {
-    Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory))
+    Cx::new(
+        Arc::new(NoopEvalPolicy),
+        Arc::new(DefaultFactory),
+        sim_kernel::HandleSeed::new(0x2459_4890_7aea_f0fa),
+    )
 }
 
 #[test]
@@ -1210,13 +3105,18 @@ mod tests {
     // conformance: index Table/Dir backend exposes immutable generated index rows.
     #[test]
     fn table_dir_exposes_known_collections() {
-        let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+        let mut cx = Cx::new(
+            Arc::new(NoopEvalPolicy),
+            Arc::new(DefaultFactory),
+            sim_kernel::HandleSeed::new(0x4333_ad96_0412_ded8),
+        );
         let dir = IndexDir::new(IndexDoc {
             schema: "sim.index".to_owned(),
             generated_by: "test".to_owned(),
             visibility: Visibility::Public,
             subjects: Vec::new(),
             anchors: Vec::new(),
+            source_units: Vec::new(),
             surfaces: Vec::new(),
             specimens: Vec::new(),
             drafts: Vec::new(),
@@ -1238,6 +3138,164 @@ mod tests {
         let nil = cx.factory().nil().unwrap();
         assert!(dir.set(&mut cx, Symbol::new("features"), nil).is_err());
     }
+}
+```
+
+### `feature/sim-run/continuity-command`
+
+Specimen `spec-test/sim-run/crates/sim-run/tests/continuity` is checked by `cargo test`.
+
+Source `crates/sim-run/tests/continuity.rs`:
+
+```rust
+use std::{fs, process::Command};
+
+// conformance: continuity plans degrade optional services and refuse absent required services.
+
+fn run(args: &[&str]) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_sim"))
+        .args(args)
+        .output()
+        .expect("run sim continuity")
+}
+
+#[test]
+fn help_and_dry_run_requirement_are_explicit() {
+    let help = run(&["continuity", "--help"]);
+    assert!(help.status.success());
+    assert!(
+        String::from_utf8(help.stdout)
+            .unwrap()
+            .contains("Usage: sim continuity")
+    );
+
+    let live = run(&["continuity"]);
+    assert_eq!(live.status.code(), Some(2));
+    assert!(
+        String::from_utf8(live.stderr)
+            .unwrap()
+            .contains("requires --dry-run or --artifact-dir")
+    );
+}
+
+#[test]
+fn carrier_only_boots_networkless_with_satellites_absent() {
+    let output = run(&[
+        "continuity",
+        "--dry-run",
+        "--plan",
+        "continuity/carrier-only",
+        "--absent",
+        "watch",
+        "--absent",
+        "desk-display",
+        "--absent",
+        "halo",
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("plan=continuity/carrier-only"));
+    assert!(stdout.contains("optional-absent: none"));
+}
+
+#[test]
+fn missing_optional_degrades_and_missing_required_refuses() {
+    let optional = run(&[
+        "continuity",
+        "--dry-run",
+        "--plan",
+        "continuity/walk",
+        "--absent",
+        "watch",
+    ]);
+    assert!(optional.status.success());
+    assert!(
+        String::from_utf8(optional.stdout)
+            .unwrap()
+            .contains("optional-absent: watch")
+    );
+
+    let required = run(&["continuity", "--dry-run", "--absent", "lifecycle"]);
+    assert_eq!(required.status.code(), Some(2));
+    assert!(
+        String::from_utf8(required.stderr)
+            .unwrap()
+            .contains("required continuity service is absent: lifecycle")
+    );
+}
+
+#[test]
+fn android_and_host_modeled_artifacts_are_deterministic_and_unsigned() {
+    let root = std::env::temp_dir().join(format!("sim-continuity-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    for mode in ["android", "host-modeled"] {
+        let first = run(&[
+            "continuity",
+            "--mode",
+            mode,
+            "--artifact-dir",
+            root.to_str().unwrap(),
+        ]);
+        let second = run(&[
+            "continuity",
+            "--mode",
+            mode,
+            "--artifact-dir",
+            root.to_str().unwrap(),
+        ]);
+        assert!(first.status.success());
+        assert_eq!(first.stdout, second.stdout);
+        assert!(
+            String::from_utf8(first.stdout)
+                .unwrap()
+                .contains("unsigned")
+        );
+    }
+    let android = fs::read_to_string(root.join("continuity.android.bundle")).unwrap();
+    let host = fs::read_to_string(root.join("continuity.host-modeled.bundle")).unwrap();
+    assert!(android.contains("mode=android\n"));
+    assert!(host.contains("mode=host-modeled\n"));
+    assert!(android.contains("unsigned=true"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn shutdown_restart_and_replay_are_loaded_events() {
+    for event in ["shutdown", "restart", "replay"] {
+        let output = run(&["continuity", event, "--dry-run"]);
+        assert!(output.status.success());
+        assert!(
+            String::from_utf8(output.stdout)
+                .unwrap()
+                .contains(&format!("event={event}"))
+        );
+    }
+}
+
+#[test]
+fn plan_file_changes_composition_without_bootloader_change() {
+    let root = std::env::temp_dir().join(format!("sim-continuity-plan-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let plan = root.join("plans.toml");
+    fs::write(&plan, "schema = \"sim.continuity-plans/v1\"\n[[plan]]\nid = \"continuity/carrier-only\"\nrevision = 9\nroot = \"android-root\"\nrequired = [\"phone-review\", \"lifecycle\", \"mounts\", \"capture\", \"render\", \"stop\", \"journal-append\"]\noptional_roles = []\n").unwrap();
+    let output = run(&[
+        "continuity",
+        "--dry-run",
+        "--plan-file",
+        plan.to_str().unwrap(),
+    ]);
+    assert!(output.status.success());
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("revision=9")
+    );
+    fs::remove_dir_all(root).unwrap();
 }
 ```
 
@@ -1286,7 +3344,7 @@ use std::process::Command;
 fn published_binary_runs_caller_selected_bytecode() {
     let hex = include_str!("fixtures/StaticInt.hex").trim();
     let output = Command::new(env!("CARGO_BIN_EXE_sim"))
-        .args(["jvm", &hex, "StaticInt", "wholePipeline", "(II)I", "5", "6"])
+        .args(["jvm", hex, "StaticInt", "wholePipeline", "(II)I", "5", "6"])
         .output()
         .unwrap();
     assert!(

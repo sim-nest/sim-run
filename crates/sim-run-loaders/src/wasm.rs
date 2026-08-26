@@ -44,9 +44,15 @@ impl LibLoader for WasmLoader {
         cx.require(&wasm_load_capability())?;
 
         if let Some(path) = path_from_source(&source)? {
-            return Ok(Box::new(sim_wasm_abi::load_wasm_lib_from_file(
+            let bytes = std::fs::read(&path).map_err(|err| {
+                sim_kernel::Error::HostError(format!(
+                    "failed to read wasm module {}: {err}",
+                    path.display()
+                ))
+            })?;
+            return Ok(Box::new(sim_wasm_abi::load_wasm_lib_from_bytes(
                 self.runtime.clone(),
-                path,
+                &bytes,
             )?));
         }
         if let Some(bytes) = bytes_from_source(&source)? {
@@ -68,6 +74,7 @@ impl LibLoader for WasmLoader {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     use sim_kernel::{AbiVersion, Args, Cx, DefaultFactory, Expr, LibLoader, LibTarget, Symbol};
@@ -122,6 +129,7 @@ mod tests {
         let mut cx = Cx::new(
             Arc::new(sim_kernel::NoopEvalPolicy),
             Arc::new(DefaultFactory),
+            sim_kernel::HandleSeed::new(0x5741_5301),
         );
         cx.grant(wasm_load_capability());
         let lib = loader.load(&mut cx, source).unwrap();
@@ -147,6 +155,31 @@ mod tests {
     }
 
     #[test]
+    fn wasm_site_export_loads_from_path_at_the_bootloader_boundary() {
+        let runtime = Arc::new(InMemoryWasmRuntime::new());
+        runtime
+            .register_module(WASM_SITE_BYTES, Arc::new(SiteGuest))
+            .unwrap();
+        let loader = WasmLoader::new(runtime);
+        let path = temporary_wasm_path();
+        std::fs::write(&path, WASM_SITE_BYTES).unwrap();
+        let source = crate::path_source(path.clone());
+        assert!(loader.can_load(&source));
+
+        let mut cx = Cx::new(
+            Arc::new(sim_kernel::NoopEvalPolicy),
+            Arc::new(DefaultFactory),
+            sim_kernel::HandleSeed::new(0x5741_5302),
+        );
+        cx.grant(wasm_load_capability());
+        let lib = loader.load(&mut cx, source).unwrap();
+        std::fs::remove_file(path).unwrap();
+
+        cx.load_lib(lib.as_ref()).unwrap();
+        assert!(cx.registry().site_by_symbol(&wasm_site_symbol()).is_some());
+    }
+
+    #[test]
     fn wasm_loader_requires_wasm_load_capability() {
         let runtime = Arc::new(InMemoryWasmRuntime::new());
         let loader = WasmLoader::new(runtime);
@@ -154,6 +187,7 @@ mod tests {
         let mut cx = Cx::new(
             Arc::new(sim_kernel::NoopEvalPolicy),
             Arc::new(DefaultFactory),
+            sim_kernel::HandleSeed::new(0x5741_5303),
         );
 
         let err = match loader.load(&mut cx, source) {
@@ -184,5 +218,13 @@ mod tests {
 
     fn wasm_site_symbol() -> Symbol {
         Symbol::qualified("model", "loader-wasm-site")
+    }
+
+    fn temporary_wasm_path() -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "sim-run-loader-wasm-{}-{:?}.wasm",
+            std::process::id(),
+            std::thread::current().id()
+        ))
     }
 }

@@ -4,6 +4,11 @@
     {
       "features": [],
       "group": "workspace",
+      "package": "sim-lib-hotload"
+    },
+    {
+      "features": [],
+      "group": "workspace",
       "package": "sim-lib-index"
     },
     {

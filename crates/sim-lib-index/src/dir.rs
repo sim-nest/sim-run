@@ -317,13 +317,18 @@ mod tests {
     // conformance: index Table/Dir backend exposes immutable generated index rows.
     #[test]
     fn table_dir_exposes_known_collections() {
-        let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+        let mut cx = Cx::new(
+            Arc::new(NoopEvalPolicy),
+            Arc::new(DefaultFactory),
+            sim_kernel::HandleSeed::new(0x4333_ad96_0412_ded8),
+        );
         let dir = IndexDir::new(IndexDoc {
             schema: "sim.index".to_owned(),
             generated_by: "test".to_owned(),
             visibility: Visibility::Public,
             subjects: Vec::new(),
             anchors: Vec::new(),
+            source_units: Vec::new(),
             surfaces: Vec::new(),
             specimens: Vec::new(),
             drafts: Vec::new(),

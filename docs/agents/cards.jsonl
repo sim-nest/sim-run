@@ -27,6 +27,9 @@
 {"kind":"recipe","path":"recipes/02-scenarios/host-verb/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/host-verb/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/host-verb/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/hotload-generation-lifecycle/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/hotload-generation-lifecycle/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/hotload-generation-lifecycle/setup.sh"}
 {"kind":"recipe","path":"recipes/02-scenarios/index-examples/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/index-examples/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/index-examples/setup.sh"}

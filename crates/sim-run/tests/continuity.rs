@@ -1,5 +1,7 @@
 use std::{fs, process::Command};
 
+// conformance: continuity plans degrade optional services and refuse absent required services.
+
 fn run(args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_sim"))
         .args(args)

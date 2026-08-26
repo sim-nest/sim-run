@@ -1,5 +1,7 @@
 //! Loadable, data-only hot-generation operations.
 
+// conformance: the hotload surface exposes typed operations without owning host effects.
+
 use std::{collections::BTreeMap, sync::Arc};
 
 use sim_kernel::{
@@ -146,10 +148,8 @@ impl Object for HotloadRecord {
 
 impl ObjectCompat for HotloadRecord {
     fn class(&self, cx: &mut Cx) -> Result<ClassRef> {
-        cx.factory().class_stub(
-            sim_kernel::ClassId(0x484f_544c_4f41_4401),
-            record_class_symbol(),
-        )
+        cx.factory()
+            .class_stub(sim_kernel::ClassId(0x484f_5401), record_class_symbol())
     }
     fn as_expr(&self, _cx: &mut Cx) -> Result<sim_kernel::Expr> {
         let mut entries = vec![(

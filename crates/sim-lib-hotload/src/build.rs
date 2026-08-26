@@ -1,3 +1,5 @@
+// conformance: native builds use sealed offline inputs and publish immutable artifacts.
+
 use crate::{
     ArtifactCandidate, BuildFailure, FailureKind, NativeBuildRequest,
     artifact::{ArtifactStore, content_id},
@@ -128,7 +130,7 @@ fn validate_manifest(
         return Err(BuildFailure::request("manifest must declare a cdylib"));
     }
     if source
-        .metadata(&vec!["Cargo.lock".into()])
+        .metadata(&["Cargo.lock".into()])
         .map_err(|e| BuildFailure::request(e.to_string()))?
         .is_none()
     {

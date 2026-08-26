@@ -125,7 +125,8 @@ impl Lib for ContinuityCommandLib {
         linker.function_value(
             cli_main_entrypoint_symbol(VERB),
             cx.factory().opaque(Arc::new(ContinuityEntrypoint))?,
-        )
+        )?;
+        Ok(())
     }
 }
 

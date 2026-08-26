@@ -602,6 +602,7 @@ mod tests {
                 title: "expression-tree".to_owned(),
             }],
             anchors: Vec::new(),
+            source_units: Vec::new(),
             surfaces: vec![DiscoveredSurface {
                 id: SurfaceId::new("cli/expression-tree"),
                 subject: SubjectId::new("crate/expression-tree"),

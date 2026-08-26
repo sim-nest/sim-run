@@ -1,3 +1,5 @@
+// conformance: admission rejects incompatible or insufficiently proven native candidates.
+
 use std::{fmt, sync::Arc};
 
 use sha2::{Digest, Sha256};
@@ -277,16 +279,16 @@ impl<'a> AdmissionService<'a> {
             max_detail_chars_observed: max_detail,
         };
         let loader = request.loader_kind.symbol().clone();
-        let receipt_content = receipt_id(
-            &request.candidate.content,
-            current_generation.as_ref(),
-            &manifest,
-            &compatibility,
-            &loader,
-            &dependencies,
-            &tests,
-            &achieved_limits,
-        );
+        let receipt_content = receipt_id(&AdmissionIdentity {
+            artifact: &request.candidate.content,
+            current: current_generation.as_ref(),
+            manifest: &manifest,
+            compatibility: &compatibility,
+            loader: &loader,
+            dependencies: &dependencies,
+            tests: &tests,
+            limits: &achieved_limits,
+        });
         Ok(AdmissionReceipt {
             content: receipt_content,
             artifact: request.candidate.content.clone(),
@@ -359,16 +361,28 @@ fn clone_source(source: &LibSource) -> Result<LibSource, AdmissionFailure> {
     }
 }
 
-fn receipt_id(
-    artifact: &ContentId,
-    current: Option<&ContentId>,
-    manifest: &LibManifest,
-    compatibility: &CompatibilityReport,
-    loader: &Symbol,
-    dependencies: &[Symbol],
-    tests: &[CandidateTestResult],
-    limits: &AchievedLimits,
-) -> ContentId {
+struct AdmissionIdentity<'a> {
+    artifact: &'a ContentId,
+    current: Option<&'a ContentId>,
+    manifest: &'a LibManifest,
+    compatibility: &'a CompatibilityReport,
+    loader: &'a Symbol,
+    dependencies: &'a [Symbol],
+    tests: &'a [CandidateTestResult],
+    limits: &'a AchievedLimits,
+}
+
+fn receipt_id(identity: &AdmissionIdentity<'_>) -> ContentId {
+    let AdmissionIdentity {
+        artifact,
+        current,
+        manifest,
+        compatibility,
+        loader,
+        dependencies,
+        tests,
+        limits,
+    } = identity;
     let canonical = format!(
         "artifact={artifact:?}\ncurrent={current:?}\nmanifest={manifest:?}\ncompatibility={compatibility:?}\nloader={loader}\ndependencies={dependencies:?}\ntests={tests:?}\nlimits={limits:?}\n"
     );

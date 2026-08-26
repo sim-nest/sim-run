@@ -30,8 +30,8 @@ owner = "crate/sim-run"
 audiences = ["user", "code", "framework"]
 guidance = "Use sim physics to select lib/physics; Shapes, operations, methods, adapters, and providers remain owned outside the frame."
 claims_anchors = ["anchor/bin/sim"]
-claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/physics_selects_the_standard_bootloader_path"]
-composes = ["feature/sim-physics/loadable-runtime-composition", "crate/sim-run-core"]
+claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/physics"]
+composes = ["crate/sim-lib-physics-runtime", "crate/sim-run-core"]
 
 [[feature]]
 id = "feature/sim-run/index"
@@ -91,6 +91,17 @@ guidance = "Use sim study with an explicit graph and one of plan, seal, run, res
 claims_surfaces = ["cli/sim-run"]
 claims_specimens = ["spec-test/sim-run/crates/sim-run/src/study"]
 supports = ["feature/sim-run/bootloader", "feature/sim-runtime/domain-free-study-lifecycle"]
+
+[[route]]
+id = "route/run-study-command"
+task = "Run and inspect a generic study from the terminal"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader selects the study verb and loads its product library without acquiring study policy." },
+  { feature = "feature/sim-runtime/domain-free-study-lifecycle", why = "The runtime library owns sealed coordinates, execution, evidence, reports, and decisions." },
+  { feature = "feature/sim-run/study-command", why = "The command row wires the standard distribution to the loadable study surface." },
+  { specimen = "spec-test/sim-run/crates/sim-run/src/study", why = "The checked handoff specimen covers verb selection and loadable-library dispatch." },
+]
 
 [[feature]]
 id = "feature/sim-run/watch"
@@ -253,9 +264,8 @@ audiences = ["code", "framework"]
 guidance = "Compose NativeBuilder with a boot-selected sim-lib-exec launcher and preopened source, target, and artifact mounts. Pass its ArtifactCandidate to AdmissionService with the selected LoaderPort, latest managed generation, exact dependency boot receipts, and explicit compatibility and test limits. Admission never loads or exercises the candidate in the live context."
 claims_anchors = [
   "anchor/crate/sim-lib-hotload",
-  "anchor/rustdoc/sim-lib-hotload",
+  "anchor/rustdoc/sim-lib-hotload/crate-root",
 ]
-claims_surfaces = ["site/sim-lib-hotload"]
 claims_specimens = [
   "spec-test/sim-run/crates/sim-lib-hotload/src/admission",
   "spec-test/sim-run/crates/sim-lib-hotload/src/build",
@@ -264,8 +274,8 @@ claims_specimens = [
 ]
 supports = [
   "feature/sim-run/loaders",
-  "feature/sim-runtime/sandboxed-execution",
-  "feature/sim-storage/durable-journal",
+  "feature/sim-runtime/sandbox-exec",
+  "feature/sim-storage/atomic-content-journal",
 ]
 
 [[feature]]
@@ -277,17 +287,16 @@ audiences = ["user", "code", "framework"]
 guidance = "Load HotloadLib with a host-composed HotloadPort. Call hotload/status and hotload/history with hotload/inspect; delegate hotload/build, hotload/admit, and hotload/activate separately. Consume operation-cards and typed record outcomes rather than host paths, argv, loader handles, or journal internals."
 claims_anchors = [
   "anchor/crate/sim-lib-hotload",
-  "anchor/rustdoc/sim-lib-hotload",
+  "anchor/rustdoc/sim-lib-hotload/crate-root",
 ]
-claims_surfaces = ["site/sim-lib-hotload"]
 claims_specimens = [
-  "spec-test/sim-run/crates/sim-lib-hotload/src/surface/tests",
-  "spec-recipe/sim-run/hotload-generation-lifecycle",
+  "spec-test/sim-run/crates/sim-lib-hotload/src/surface",
+  "recipe/sim-run/02-scenarios/hotload-generation-lifecycle",
 ]
 supports = [
   "feature/sim-run/immutable-native-build",
   "feature/sim-run/loaders",
-  "feature/sim-storage/durable-journal",
+  "feature/sim-storage/atomic-content-journal",
 ]
 
 [[route]]
@@ -296,7 +305,7 @@ task = "Operate and explain one hot generation"
 audiences = ["user", "code", "framework"]
 steps = [
   { feature = "feature/sim-run/loadable-hot-generation", why = "Use the five loadable operations, separate capabilities, Shapes, Cards, and typed records." },
-  { specimen = "spec-recipe/sim-run/hotload-generation-lifecycle", why = "Verify the public lifecycle contract offline." },
+  { specimen = "recipe/sim-run/02-scenarios/hotload-generation-lifecycle", why = "Verify the public lifecycle contract offline." },
 ]
 
 [[feature]]
@@ -341,7 +350,6 @@ id = "feature/sim-run/continuity-command"
 title = "Loadable continuity composition command"
 summary = "Compose continuity plans, platform capsules, sites, phone surfaces, and optional providers through the generic bootloader registry."
 owner = "crate/sim-run"
-stability = "experimental"
 guidance = "Use `sim continuity` to resolve a versioned plan as data and project deterministic unsigned Android or host-modeled artifacts. Static linkage is an ordered provider table; missing optional satellites degrade and missing required services refuse without teaching the bootloader platform, device, or continuity policy."
 claims_anchors = ["anchor/cli/continuity", "anchor/export/sim-run/cli/main/continuity"]
 claims_surfaces = ["cli/sim-run"]
