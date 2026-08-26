@@ -1,3 +1,5 @@
+// conformance: the estate boot verb maps only fixed subcommands to typed organ calls.
+
 use crate::boot_codec::{BOOT_CODEC_HOST, BootCodec};
 use sim_estate_serve_alias::Call;
 use sim_kernel::{

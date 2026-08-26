@@ -1,3 +1,5 @@
+// conformance: the platform command validates curated bundles through a loadable command library.
+
 use std::sync::Arc;
 
 use sim_kernel::{

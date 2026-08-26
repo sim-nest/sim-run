@@ -29,7 +29,6 @@ summary = "Routes the physics verb through the ordinary host-library load sessio
 owner = "crate/sim-run"
 audiences = ["user", "code", "framework"]
 guidance = "Use sim physics to select lib/physics; Shapes, operations, methods, adapters, and providers remain owned outside the frame."
-claims_anchors = ["anchor/bin/sim"]
 claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/physics"]
 composes = ["crate/sim-lib-physics-runtime", "crate/sim-run-core"]
 
@@ -62,6 +61,7 @@ owner = "crate/sim-run-core"
 audiences = ["user", "code"]
 guidance = "Feed boot_load_requests the platform-composed PureBootEnvelope. It preserves the explicit application/library load plan and performs no target, provider, registry, host, or fallback selection. Use generic codec/load/profile controls for behavior; the bootloader owns no language engine or platform policy. The optional artifact registry keeps its integrity and cache contract here while delegating generic blocking HTTP policy and framing to feature/sim-foundation/blocking-http-client."
 claims_anchors = [
+  "anchor/bin/sim",
   "anchor/cli/sim-run",
   "anchor/crate/sim-run",
   "anchor/crate/sim-run-core",
@@ -88,7 +88,6 @@ summary = "Dispatch the loadable study product through sim study without adding 
 owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Use sim study with an explicit graph and one of plan, seal, run, resume, cancel, status, show, verify, report, decide, select, or export. The bootloader only selects sim-lib-study and the boot codec; lifecycle, effects, reports, and decisions remain in the loaded library."
-claims_surfaces = ["cli/sim-run"]
 claims_specimens = ["spec-test/sim-run/crates/sim-run/src/study"]
 supports = ["feature/sim-run/bootloader", "feature/sim-runtime/domain-free-study-lifecycle"]
 
@@ -177,10 +176,6 @@ summary = "Register the standard loadable relation command and hand the relation
 owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Use sim relation for relational operations. This row owns only standard-distribution registration and bootloader handoff; parsing, authorization, plans, provider composition, and rendering remain in sim-lib-relation-cli."
-claims_anchors = [
-  "anchor/cli/sim-run",
-]
-claims_surfaces = ["cli/sim-run"]
 claims_specimens = [
   "spec-test/sim-run/crates/sim-run/src/relation",
 ]
@@ -263,8 +258,6 @@ owner = "crate/sim-lib-hotload"
 audiences = ["code", "framework"]
 guidance = "Compose NativeBuilder with a boot-selected sim-lib-exec launcher and preopened source, target, and artifact mounts. Pass its ArtifactCandidate to AdmissionService with the selected LoaderPort, latest managed generation, exact dependency boot receipts, and explicit compatibility and test limits. Admission never loads or exercises the candidate in the live context."
 claims_anchors = [
-  "anchor/crate/sim-lib-hotload",
-  "anchor/rustdoc/sim-lib-hotload/crate-root",
 ]
 claims_specimens = [
   "spec-test/sim-run/crates/sim-lib-hotload/src/admission",
@@ -287,6 +280,7 @@ audiences = ["user", "code", "framework"]
 guidance = "Load HotloadLib with a host-composed HotloadPort. Call hotload/status and hotload/history with hotload/inspect; delegate hotload/build, hotload/admit, and hotload/activate separately. Consume operation-cards and typed record outcomes rather than host paths, argv, loader handles, or journal internals."
 claims_anchors = [
   "anchor/crate/sim-lib-hotload",
+  "anchor/runtime-lib/sim-lib-hotload/hotload-lib",
   "anchor/rustdoc/sim-lib-hotload/crate-root",
 ]
 claims_specimens = [
@@ -317,6 +311,7 @@ audiences = ["code", "framework"]
 guidance = "Compose an installed platform LoaderPort and bind each advertised LoaderKind through PortLoader. Bundle descriptors select exact artifacts and kinds; use StaticRegistry for AOT factories without changing LibManifest or ordinary Lib call and unload behavior."
 claims_anchors = [
   "anchor/crate/sim-run-loaders",
+  "anchor/runtime-lib/sim-run/component-lib",
   "anchor/runtime-lib/sim-run-loaders/loaded-native-lib",
   "anchor/runtime-lib/sim-run-loaders/reexport-lib",
   "anchor/runtime-lib/sim-run-loaders/source-lib",
@@ -351,8 +346,8 @@ title = "Loadable continuity composition command"
 summary = "Compose continuity plans, platform capsules, sites, phone surfaces, and optional providers through the generic bootloader registry."
 owner = "crate/sim-run"
 guidance = "Use `sim continuity` to resolve a versioned plan as data and project deterministic unsigned Android or host-modeled artifacts. Static linkage is an ordered provider table; missing optional satellites degrade and missing required services refuse without teaching the bootloader platform, device, or continuity policy."
-claims_anchors = ["anchor/cli/continuity", "anchor/export/sim-run/cli/main/continuity"]
-claims_surfaces = ["cli/sim-run"]
+claims_anchors = ["anchor/cli/continuity", "anchor/export/sim-run/cli/main/continuity", "anchor/export/sim-run/site/android-root", "anchor/export/sim-run/surface/phone", "anchor/runtime-lib/sim-run/continuity-command-lib"]
+claims_surfaces = ["cli/continuity"]
 claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/continuity"]
 supports = [
   "feature/sim-agent-net/pure-continuity",
@@ -483,7 +478,6 @@ owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Invoke sim jvm HEX_CLASSFILE CLASS MEMBER DESCRIPTOR [I32 ...]. The binary selects host factories and capabilities, then the one sim-run-core bootloader loads sim-lib-lang-jvm and dispatches cli/main/jvm; it only parses the caller envelope and renders value, Java throwable, or refusal, and never constructs a Cx, reads an ambient classpath, or embeds JVM semantics."
 claims_anchors = [
-  "anchor/bin/sim",
   "anchor/cli/jvm",
   "anchor/export/sim-run/cli/main/jvm",
   "anchor/runtime-lib/sim-run/jvm-cli-lib",
@@ -522,8 +516,23 @@ summary = "Dispatch platform show, require, doctor, and attest-verify through cl
 owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Invoke sim platform with a supported subcommand. The product library registers one host command adapter; the binary remains a one-call process membrane."
-claims_anchors = ["anchor/bin/sim"]
+claims_anchors = [
+  "anchor/cli/platform",
+  "anchor/export/sim-run/cli/main/platform",
+  "anchor/runtime-lib/sim-run/platform-command-lib",
+]
+claims_surfaces = ["cli/platform"]
+claims_specimens = ["spec-test/sim-run/crates/sim-run/src/platform"]
 presents = ["feature/sim-platform/product-membrane"]
+
+[[route]]
+id = "route/inspect-platform-command"
+task = "Inspect and verify the selected platform through the loadable command"
+audiences = ["user", "code", "framework"]
+steps = [
+  { feature = "feature/sim-run/platform-command", why = "The bootloader dispatches the fixed platform vocabulary through the loaded product library." },
+  { specimen = "spec-test/sim-run/crates/sim-run/src/platform", why = "The command specimen proves fixed dispatch, machine output, and typed refusal behavior." },
+]
 
 [[feature]]
 id = "feature/sim-run/search-command"
@@ -532,7 +541,7 @@ summary = "Select the search verb and delegate canonical query, fetch, research,
 owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Use sim search; the bootloader contributes only the host factory and verb source, while SearchCommandLib owns all configuration, records, policy, and rendering."
-claims_anchors = ["anchor/bin/sim", "anchor/crate/sim-run"]
+claims_specimens = ["spec-test/sim-run/crates/sim-run/src/search"]
 presents = ["feature/sim-agent-net/search-product"]
 
 [[route]]
@@ -551,7 +560,13 @@ summary = "The sim bootloader selects the estate command library only for the es
 owner = "crate/sim-run"
 audiences = ["user", "code"]
 guidance = "Use sim estate discover, plan, preview, review, apply, watch, verify, reconcile, history, or doctor; arguments never select a provider implementation or executable text."
-claims_anchors = ["anchor/crate/sim-run"]
+claims_anchors = [
+  "anchor/cli/estate",
+  "anchor/export/sim-run/cli/main/estate",
+  "anchor/runtime-lib/sim-run/estate-command-lib",
+]
+claims_surfaces = ["cli/estate"]
+claims_specimens = ["spec-test/sim-run/crates/sim-run/src/estate"]
 
 [[route]]
 id = "route/operate-estate-from-terminal"

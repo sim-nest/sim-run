@@ -1,3 +1,5 @@
+// conformance: the bootloader selects search only for the explicit search verb.
+
 use sim_run_core::{CliCommand, LibSourceSpec, LoadSession};
 
 const VERB: &str = sim_lib_search::SEARCH_VERB;
