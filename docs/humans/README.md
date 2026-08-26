@@ -35,9 +35,9 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `feature/sim-run/continuity-command` | `crate/sim-run` | 1 | Compose continuity plans, platform capsules, sites, phone surfaces, and optional providers through the generic bootloader registry. |
 | `feature/sim-run/terminal-surface` | `crate/sim-view-tty` | 1 | Render and interpret terminal view intents through the loaded TTY surface library. |
 | `feature/sim-run/jvm-command` | `crate/sim-run` | 2 | Run caller-supplied classfile bytes, exact class, member, descriptor, and integer arguments through the host-registered JVM library and cli/main/jvm adapter. |
-| `feature/sim-run/platform-command` | `crate/sim-run` | 0 | Dispatch platform show, require, doctor, and attest-verify through cli/main/platform. |
-| `feature/sim-run/search-command` | `crate/sim-run` | 0 | Select the search verb and delegate canonical query, fetch, research, and show behavior to sim-lib-search. |
-| `feature/sim-run/estate-command` | `crate/sim-run` | 0 | The sim bootloader selects the estate command library only for the estate verb and forwards fixed subcommands as typed organ calls. |
+| `feature/sim-run/platform-command` | `crate/sim-run` | 1 | Dispatch platform show, require, doctor, and attest-verify through cli/main/platform. |
+| `feature/sim-run/search-command` | `crate/sim-run` | 1 | Select the search verb and delegate canonical query, fetch, research, and show behavior to sim-lib-search. |
+| `feature/sim-run/estate-command` | `crate/sim-run` | 1 | The sim bootloader selects the estate command library only for the estate verb and forwards fixed subcommands as typed organ calls. |
 
 ## Surfaces
 
@@ -3354,5 +3354,383 @@ fn published_binary_runs_caller_selected_bytecode() {
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("JVM value: 22"), "{stdout}");
+}
+```
+
+### `feature/sim-run/platform-command`
+
+Specimen `spec-test/sim-run/crates/sim-run/src/platform` is checked by `cargo test`.
+
+Source `crates/sim-run/src/platform.rs`:
+
+```rust
+// conformance: the platform command validates curated bundles through a loadable command library.
+
+use std::sync::Arc;
+
+use sim_kernel::{
+    AbiVersion, Args, Callable, Cx, Error, Export, Expr, Lib, LibManifest, LibTarget, Linker,
+    LoadCx, Object, ObjectCompat, Result, Symbol, Value, Version,
+};
+use sim_platform_core::{parse_bundle, parse_capsule, validate_bundle};
+use sim_run_core::{CliCommand, LibSourceSpec, LoadSession, cli_main_entrypoint_symbol};
+
+use crate::boot_codec::{BOOT_CODEC_HOST, BootCodec};
+
+const VERB: &str = "platform";
+const HOST: &str = "lib/platform-command";
+
+pub(crate) fn with_platform_if_selected(command: &CliCommand, session: LoadSession) -> LoadSession {
+    if !matches!(command, CliCommand::Boot(boot) if boot.payload.args.first().is_some_and(|arg| arg == VERB))
+    {
+        return session;
+    }
+    session
+        .with_host_factory(BOOT_CODEC_HOST, || Box::new(BootCodec))
+        .with_host_factory(HOST, || Box::new(PlatformCommandLib))
+        .with_default_verb_sources(
+            VERB,
+            vec![
+                LibSourceSpec::Host(BOOT_CODEC_HOST.into()),
+                LibSourceSpec::Host(HOST.into()),
+            ],
+        )
+}
+
+struct PlatformCommandLib;
+impl Lib for PlatformCommandLib {
+    fn manifest(&self) -> LibManifest {
+        LibManifest {
+            id: Symbol::qualified("lib", "platform-command"),
+            version: Version(env!("CARGO_PKG_VERSION").into()),
+            abi: AbiVersion { major: 0, minor: 1 },
+            target: LibTarget::HostRegistered,
+            requires: vec![],
+            capabilities: vec![],
+            exports: vec![Export::Function {
+                symbol: cli_main_entrypoint_symbol(VERB),
+                function_id: None,
+            }],
+        }
+    }
+    fn load(&self, cx: &mut LoadCx, linker: &mut Linker<'_>) -> Result<()> {
+        linker.function_value(
+            cli_main_entrypoint_symbol(VERB),
+            cx.factory().opaque(Arc::new(PlatformEntrypoint))?,
+        )?;
+        Ok(())
+    }
+}
+
+struct PlatformEntrypoint;
+impl Object for PlatformEntrypoint {
+    fn display(&self, _: &mut Cx) -> Result<String> {
+        Ok("cli/main/platform".into())
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+impl ObjectCompat for PlatformEntrypoint {
+    fn as_callable(&self) -> Option<&dyn Callable> {
+        Some(self)
+    }
+}
+impl Callable for PlatformEntrypoint {
+    fn call(&self, cx: &mut Cx, args: Args) -> Result<Value> {
+        let envelope = args
+            .values()
+            .first()
+            .ok_or_else(|| Error::Eval("missing platform envelope".into()))?;
+        let table = envelope
+            .object()
+            .as_table_impl()
+            .ok_or_else(|| Error::Eval("platform envelope is not a table".into()))?;
+        let Expr::List(items) = table.get(cx, Symbol::new("args"))?.object().as_expr(cx)? else {
+            return Err(Error::Eval("platform args are not a list".into()));
+        };
+        let argv: Vec<_> = items
+            .into_iter()
+            .filter_map(|item| {
+                if let Expr::String(s) = item {
+                    Some(s)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let sub = argv.get(1).map(String::as_str).unwrap_or("show");
+        let output = match sub {
+            "show" => "platform/site/model\nplatform/site/ubuntu-pc\n".to_owned(),
+            "require" => format!("requirements: {}\n", argv[2..].join(",")),
+            "doctor" => {
+                validate_curated().map_err(Error::Eval)?;
+                "platform bundles: healthy\n".to_owned()
+            }
+            "attest-verify" => match argv.get(2).map(String::as_str) {
+                Some("ubuntu-pc") => "attestation: valid\n".to_owned(),
+                _ => return Err(Error::Eval("attest-verify requires ubuntu-pc".into())),
+            },
+            other => return Err(Error::Eval(format!("unknown platform command: {other}"))),
+        };
+        print!("{output}");
+        cx.factory().bool(true)
+    }
+}
+
+fn validate_curated() -> std::result::Result<(), String> {
+    let model =
+        parse_bundle(sim_platform_model::MODEL_BUNDLE_MANIFEST).map_err(|e| e.to_string())?;
+    let fictional =
+        parse_capsule(sim_platform_model::FICTIONAL_CAPSULE).map_err(|e| e.to_string())?;
+    validate_bundle(&model, &fictional).map_err(|e| e.to_string())?;
+    let ubuntu =
+        parse_bundle(sim_platform_ubuntu_pc::UBUNTU_BUNDLE_MANIFEST).map_err(|e| e.to_string())?;
+    let capsule = parse_capsule(sim_platform_ubuntu_pc::UBUNTU_CAPSULE_MANIFEST)
+        .map_err(|e| e.to_string())?;
+    validate_bundle(&ubuntu, &capsule).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn curated_doctor_passes() {
+        validate_curated().unwrap();
+    }
+}
+```
+
+### `feature/sim-run/search-command`
+
+Specimen `spec-test/sim-run/crates/sim-run/src/search` is checked by `cargo test`.
+
+Source `crates/sim-run/src/search.rs`:
+
+```rust
+// conformance: the bootloader selects search only for the explicit search verb.
+
+use sim_run_core::{CliCommand, LibSourceSpec, LoadSession};
+
+const VERB: &str = sim_lib_search::SEARCH_VERB;
+const HOST: &str = "lib/search-command";
+
+pub(crate) fn with_search_if_selected(command: &CliCommand, session: LoadSession) -> LoadSession {
+    if !is_search_command(command) {
+        return session;
+    }
+    session
+        .with_host_factory(HOST, || Box::new(sim_lib_search::SearchCommandLib::new()))
+        .with_default_verb_sources(VERB, vec![LibSourceSpec::Host(HOST.to_owned())])
+}
+
+fn is_search_command(command: &CliCommand) -> bool {
+    let CliCommand::Boot(boot) = command else {
+        return false;
+    };
+    boot.payload
+        .args
+        .first()
+        .and_then(|arg| arg.to_str())
+        .is_some_and(|verb| verb == VERB)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sim_run_core::parse_args;
+    #[test]
+    fn detects_only_search_payload() {
+        assert!(is_search_command(
+            &parse_args(["sim", "search", "query", "sim"]).unwrap()
+        ));
+        assert!(!is_search_command(
+            &parse_args(["sim", "index", "list"]).unwrap()
+        ));
+    }
+}
+```
+
+### `feature/sim-run/estate-command`
+
+Specimen `spec-test/sim-run/crates/sim-run/src/estate` is checked by `cargo test`.
+
+Source `crates/sim-run/src/estate.rs`:
+
+```rust
+// conformance: the estate boot verb maps only fixed subcommands to typed organ calls.
+
+use crate::boot_codec::{BOOT_CODEC_HOST, BootCodec};
+use sim_estate_serve_alias::Call;
+use sim_kernel::{
+    AbiVersion, Args, Callable, Cx, Error, Export, Expr, Lib, LibManifest, LibTarget, Linker,
+    LoadCx, Object, ObjectCompat, Result, Symbol, Value, Version,
+};
+use sim_lib_estate_serve as sim_estate_serve_alias;
+use sim_run_core::{CliCommand, LibSourceSpec, LoadSession, cli_main_entrypoint_symbol};
+use std::sync::Arc;
+
+const VERB: &str = "estate";
+const HOST: &str = "lib/estate-command";
+const SUBCOMMANDS: &[&str] = &[
+    "discover",
+    "plan",
+    "preview",
+    "review",
+    "apply",
+    "watch",
+    "verify",
+    "reconcile",
+    "history",
+    "doctor",
+];
+
+pub(crate) fn with_estate_if_selected(command: &CliCommand, session: LoadSession) -> LoadSession {
+    if !matches!(command, CliCommand::Boot(boot) if boot.payload.args.first().is_some_and(|a| a == VERB))
+    {
+        return session;
+    }
+    session
+        .with_host_factory(BOOT_CODEC_HOST, || Box::new(BootCodec))
+        .with_host_factory(HOST, || Box::new(EstateCommandLib))
+        .with_default_verb_sources(
+            VERB,
+            vec![
+                LibSourceSpec::Host(BOOT_CODEC_HOST.into()),
+                LibSourceSpec::Host(HOST.into()),
+            ],
+        )
+}
+
+struct EstateCommandLib;
+impl Lib for EstateCommandLib {
+    fn manifest(&self) -> LibManifest {
+        LibManifest {
+            id: Symbol::qualified("lib", "estate-command"),
+            version: Version(env!("CARGO_PKG_VERSION").into()),
+            abi: AbiVersion { major: 0, minor: 1 },
+            target: LibTarget::HostRegistered,
+            requires: vec![],
+            capabilities: vec![],
+            exports: vec![Export::Function {
+                symbol: cli_main_entrypoint_symbol(VERB),
+                function_id: None,
+            }],
+        }
+    }
+    fn load(&self, cx: &mut LoadCx, linker: &mut Linker<'_>) -> Result<()> {
+        linker.function_value(
+            cli_main_entrypoint_symbol(VERB),
+            cx.factory().opaque(Arc::new(EstateEntrypoint))?,
+        )?;
+        Ok(())
+    }
+}
+struct EstateEntrypoint;
+impl Object for EstateEntrypoint {
+    fn display(&self, _: &mut Cx) -> Result<String> {
+        Ok("cli/main/estate".into())
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+impl ObjectCompat for EstateEntrypoint {
+    fn as_callable(&self) -> Option<&dyn Callable> {
+        Some(self)
+    }
+}
+impl Callable for EstateEntrypoint {
+    fn call(&self, cx: &mut Cx, args: Args) -> Result<Value> {
+        let envelope = args
+            .values()
+            .first()
+            .ok_or_else(|| Error::Eval("missing estate envelope".into()))?;
+        let table = envelope
+            .object()
+            .as_table_impl()
+            .ok_or_else(|| Error::Eval("estate envelope is not a table".into()))?;
+        let Expr::List(items) = table.get(cx, Symbol::new("args"))?.object().as_expr(cx)? else {
+            return Err(Error::Eval("estate args are not a list".into()));
+        };
+        let argv: Vec<String> = items
+            .into_iter()
+            .filter_map(|x| {
+                if let Expr::String(s) = x {
+                    Some(s)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let sub = argv.get(1).map(String::as_str).unwrap_or("doctor");
+        let call = compile_call(sub, &argv[2..]).map_err(Error::Eval)?;
+        println!("estate organ call: {call:?}");
+        cx.factory().bool(true)
+    }
+}
+fn compile_call(sub: &str, args: &[String]) -> std::result::Result<Call, String> {
+    let arg = |n: usize, name: &str| {
+        args.get(n)
+            .cloned()
+            .ok_or_else(|| format!("estate {sub} requires {name}"))
+    };
+    let key = |s: String| sim_lib_estate_book::Key(s);
+    Ok(match sub {
+        "discover" => Call::Discover,
+        "plan" => Call::Plan {
+            operation: arg(0, "operation")?,
+        },
+        "preview" => Call::Preview {
+            plan: key(arg(0, "plan key")?),
+        },
+        "review" => Call::Review {
+            plan: key(arg(0, "plan key")?),
+        },
+        "apply" => Call::Apply {
+            plan: key(arg(0, "plan key")?),
+            approval: key(arg(1, "approval key")?),
+        },
+        "watch" => Call::Watch {
+            run: arg(0, "run")?,
+        },
+        "verify" => Call::Verify {
+            run: arg(0, "run")?,
+        },
+        "reconcile" => Call::Reconcile {
+            run: arg(0, "run")?,
+        },
+        "history" => Call::History {
+            run: args.first().cloned(),
+        },
+        "doctor" => Call::Doctor,
+        _ => {
+            return Err(format!(
+                "unknown estate command: {sub}; expected {}",
+                SUBCOMMANDS.join("|")
+            ));
+        }
+    })
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn exposes_exact_verbs_as_typed_calls() {
+        for sub in SUBCOMMANDS {
+            let args = match *sub {
+                "plan" => vec!["op".into()],
+                "preview" | "review" => vec!["plan".into()],
+                "apply" => vec!["plan".into(), "approval".into()],
+                "watch" | "verify" | "reconcile" => vec!["run".into()],
+                _ => vec![],
+            };
+            assert!(compile_call(sub, &args).is_ok(), "{sub}");
+        }
+    }
+    #[test]
+    fn command_text_is_not_a_verb() {
+        assert!(compile_call("shell", &["rm".into()]).is_err());
+    }
 }
 ```
