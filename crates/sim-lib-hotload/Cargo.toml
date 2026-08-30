@@ -13,11 +13,11 @@ homepage.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-sim-kernel = { version = "0.2.1" }
+sim-kernel = { version = "0.3.0" }
 sim-lib-exec = { version = "0.2.0" }
 sim-lib-journal = { version = "0.1.0" }
-sim-shape = { version = "0.2.4" }
-sim-run-loaders = { version = "0.2.0", path = "../sim-run-loaders" }
+sim-shape = { version = "0.3.0" }
+sim-run-loaders = { version = "0.3.0", path = "../sim-run-loaders" }
 sim-storage-port = { version = "0.1.0" }
 toml = "0.8"
 
