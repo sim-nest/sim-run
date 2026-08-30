@@ -30,7 +30,7 @@ fn manifests_carry_publish_metadata_and_version_requirements() {
         "sim-run-core",
         "Core command entry API for the SIM bootloader.",
     );
-    assert_dependency_version(&core, "sim-kernel", "0.2.1");
+    assert_dependency_version(&core, "sim-kernel", "0.3.0");
     assert_dependency_has_no_path(&core, "sim-kernel");
     assert_dependency_matches_package_version(&core, "sim-run-loaders", &loaders);
     assert_dependency_path(&core, "sim-run-loaders", "../sim-run-loaders");
