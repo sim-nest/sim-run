@@ -165,6 +165,7 @@ mod tests {
                 title: "demo".to_owned(),
             }],
             anchors: Vec::new(),
+            source_units: Vec::new(),
             surfaces: Vec::new(),
             specimens: Vec::new(),
             drafts: Vec::new(),

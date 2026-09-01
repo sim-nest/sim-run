@@ -4,6 +4,7 @@ members = [
   "crates/sim-run-core",
   "crates/sim-run-loaders",
   "crates/sim-lib-index",
+  "crates/sim-lib-hotload",
   "crates/sim-lib-repl",
   "crates/sim-run",
   "crates/sim-view-tty",

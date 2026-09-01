@@ -2,6 +2,26 @@
 
 sim-run is the command-line bootloader repository for SIM.
 
+The standard distribution also selects the loadable `sim search` behavior.
+Use `sim search query|fetch|research|show INPUT`; `--json` emits its canonical
+Shape record, while live-fake, cassette, and offline modes remain explicit.
+
+The default bootloader selects the loadable observatory with
+`sim model-test <verb>`. It contributes source selection only: command behavior
+stays in `sim-lib-model-test`, generic lifecycle and decisions stay in
+`sim-lib-study`, and provider access stays in the separate provider and
+model-access products.
+
+The loadable `sim estate` verb exposes `discover`, `plan`, `preview`, `review`,
+`apply`, `watch`, `verify`, `reconcile`, `history`, and `doctor`. The bootloader
+selects this library by verb only; it contains no provider matcher.
+
+`sim roadmap` loads the local runner for `run --observe`, `resume`, `status`,
+`explain`, and `replay`. The binary contributes only host registration and the
+argument/result handoff. Parsing, content-identity checks, mutation authority,
+generation retention, journaling, and delivery refusal remain in
+`sim-lib-roadmap-runner`; no outward delivery verb is registered.
+
 ## Run it
 
 Installing the `sim-run` crate gives you the `sim` command: a bootloader that
@@ -30,6 +50,10 @@ the exact command grammar is under
   `sim compute`, alongside headless modeled and automatic compute site providers.
 - `sim-lib-index` provides the loadable `cli/main/index` entry point and the
   immutable table view over the embedded public SIM Index snapshot.
+- `sim-lib-hotload` provides Shape-checked `hotload/build`, `admit`, `activate`,
+  `status`, and `history` operations over read-constructable data records.
+- The published `sim-lib-roadmap-runner` provides the Shape-checked local
+  roadmap execution service selected by the bootloader.
 - `sim-lib-repl` provides the loadable `cli/main/repl` entry point and the
   read-eval-print core used by that entry point.
 - `sim-view-tty` is a loadable terminal (CLI/TUI) view/edit surface: it projects

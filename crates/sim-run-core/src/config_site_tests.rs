@@ -16,7 +16,11 @@ fn lib(namespace: &str, name: &str) -> Symbol {
 }
 
 fn test_cx() -> Cx {
-    Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory))
+    Cx::new(
+        Arc::new(NoopEvalPolicy),
+        Arc::new(DefaultFactory),
+        sim_kernel::HandleSeed::new(1),
+    )
 }
 
 fn site_config_dir_expr(target: &Symbol) -> Expr {

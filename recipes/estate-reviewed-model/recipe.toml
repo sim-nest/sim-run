@@ -1,0 +1,4 @@
+schema = "sim.recipe/v1"
+title = "Review a modeled estate change from the terminal"
+summary = "Drive the shared modeled scenario through typed sim estate calls."
+entry = "main.siml"

@@ -4,6 +4,7 @@
 
 | Package | Group | Features | Workspace feature edges |
 | --- | --- | ---: | ---: |
+| `sim-lib-hotload` | `workspace` | 0 | 0 |
 | `sim-lib-index` | `workspace` | 0 | 0 |
 | `sim-lib-repl` | `workspace` | 0 | 0 |
 | `sim-run` | `workspace` | 3 | 6 |

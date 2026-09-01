@@ -94,7 +94,11 @@ fn native_lisp_codec_loads_and_decodes_through_cli_loader() {
         .expect("dylib should live in target/<profile>")
         .to_owned();
 
-    let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+    let mut cx = Cx::new(
+        Arc::new(NoopEvalPolicy),
+        Arc::new(DefaultFactory),
+        sim_kernel::HandleSeed::new(0x3798_fd3c_961c_b022),
+    );
     cx.grant(native_dynamic_load_capability());
     LoaderRegistry::new()
         .with_loader(sim_run_loaders::NativeDylibLoader)
@@ -176,7 +180,11 @@ fn native_lisp_recipe_fixture_keeps_cli_entrypoint_envelope() {
         .expect("dylib should live in target/<profile>")
         .to_owned();
 
-    let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+    let mut cx = Cx::new(
+        Arc::new(NoopEvalPolicy),
+        Arc::new(DefaultFactory),
+        sim_kernel::HandleSeed::new(0xbef0_8a38_7e13_a240),
+    );
     cx.grant(native_dynamic_load_capability());
     LoaderRegistry::new()
         .with_loader(sim_run_loaders::NativeDylibLoader)

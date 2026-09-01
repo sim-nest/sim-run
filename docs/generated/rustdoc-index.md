@@ -4,6 +4,7 @@
 
 | Package | Group | Summary |
 | --- | --- | --- |
+| `sim-lib-hotload` | `workspace` | Structured, offline, sandboxed construction of immutable native candidates. |
 | `sim-lib-index` | `workspace` | Loadable runtime exploration surface for the SIM Index. |
 | `sim-lib-repl` | `workspace` | Loadable command-line REPL library for SIM. |
 | `sim-run` | `workspace` | The sim bootloader binary. |

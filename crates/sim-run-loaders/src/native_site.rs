@@ -143,7 +143,11 @@ mod tests {
             },
             guest: Arc::new(MockGuest),
         };
-        let mut cx = Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+        let mut cx = Cx::new(
+            Arc::new(NoopEvalPolicy),
+            Arc::new(DefaultFactory),
+            sim_kernel::HandleSeed::new(0xb1f6_4a86_abde_4aba),
+        );
 
         cx.load_lib(&lib).unwrap();
 

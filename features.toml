@@ -23,12 +23,22 @@ major_entrypoints = "advisory"
 frameworks = "advisory"
 
 [[feature]]
+id = "feature/sim-run/physics-library-selection"
+title = "Physics library boot selection"
+summary = "Routes the physics verb through the ordinary host-library load session without embedding scientific behavior in the bootloader."
+owner = "crate/sim-run"
+audiences = ["user", "code", "framework"]
+guidance = "Use sim physics to select lib/physics; Shapes, operations, methods, adapters, and providers remain owned outside the frame."
+claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/physics"]
+composes = ["crate/sim-lib-physics-runtime", "crate/sim-run-core"]
+
+[[feature]]
 id = "feature/sim-run/index"
 title = "Repository index contract"
 summary = "Expose generated package, card, surface, and recipe facts as a checked SIM Index fragment."
 owner = "crate/xtask"
 audiences = ["code"]
-guidance = "Use this row when checking which generated index facts the repo exports."
+guidance = "Use this host-tool row when checking generated Index facts or standalone packaging evidence. It is structurally outside every product closure."
 claims_anchors = [
   "anchor/cli/xtask",
   "anchor/crate/xtask",
@@ -49,8 +59,9 @@ title = "Bootloader command dispatch"
 summary = "Start product commands through the shared bootloader and loaded runtime libraries."
 owner = "crate/sim-run-core"
 audiences = ["user", "code"]
-guidance = "TypeScript notation; does not type-check. Use `language/typescript-notation` when following the notation profile through generic codec/load/profile controls. The bootloader owns no language engine and adds no TypeScript executable, tsc, tsserver, or LSP service."
+guidance = "Feed boot_load_requests the platform-composed PureBootEnvelope. It preserves the explicit application/library load plan and performs no target, provider, registry, host, or fallback selection. Use generic codec/load/profile controls for behavior; the bootloader owns no language engine or platform policy. The optional artifact registry keeps its integrity and cache contract here while delegating generic blocking HTTP policy and framing to feature/sim-foundation/blocking-http-client."
 claims_anchors = [
+  "anchor/bin/sim",
   "anchor/cli/sim-run",
   "anchor/crate/sim-run",
   "anchor/crate/sim-run-core",
@@ -59,6 +70,7 @@ claims_anchors = [
   "anchor/runtime-lib/sim-run/boot-codec",
   "anchor/rustdoc/sim-run-core/bootloader",
   "anchor/rustdoc/sim-run-core/run_with_session",
+  "anchor/rustdoc/sim-run-core/run_supplied_bootstrap",
 ]
 claims_surfaces = [
   "cli/sim-run",
@@ -67,6 +79,27 @@ claims_surfaces = [
 claims_specimens = [
   "recipe/sim-run/01-basics/version",
   "recipe/sim-run/02-scenarios/boot-lisp-eval",
+]
+
+[[feature]]
+id = "feature/sim-run/study-command"
+title = "Generic study command surface"
+summary = "Dispatch the loadable study product through sim study without adding study behavior to the bootloader."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use sim study with an explicit graph and one of plan, seal, run, resume, cancel, status, show, verify, report, decide, select, or export. The bootloader only selects sim-lib-study and the boot codec; lifecycle, effects, reports, and decisions remain in the loaded library."
+claims_specimens = ["spec-test/sim-run/crates/sim-run/src/study"]
+supports = ["feature/sim-run/bootloader", "feature/sim-runtime/domain-free-study-lifecycle"]
+
+[[route]]
+id = "route/run-study-command"
+task = "Run and inspect a generic study from the terminal"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader selects the study verb and loads its product library without acquiring study policy." },
+  { feature = "feature/sim-runtime/domain-free-study-lifecycle", why = "The runtime library owns sealed coordinates, execution, evidence, reports, and decisions." },
+  { feature = "feature/sim-run/study-command", why = "The command row wires the standard distribution to the loadable study surface." },
+  { specimen = "spec-test/sim-run/crates/sim-run/src/study", why = "The checked handoff specimen covers verb selection and loadable-library dispatch." },
 ]
 
 [[feature]]
@@ -137,6 +170,32 @@ supports = [
 ]
 
 [[feature]]
+id = "feature/sim-run/relation-command"
+title = "Relational command handoff"
+summary = "Register the standard loadable relation command and hand the relation verb to storage-owned behavior."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use sim relation for relational operations. This row owns only standard-distribution registration and bootloader handoff; parsing, authorization, plans, provider composition, and rendering remain in sim-lib-relation-cli."
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-run/src/relation",
+]
+supports = [
+  "feature/sim-run/bootloader",
+  "feature/sim-storage/relation-command",
+]
+
+[[route]]
+id = "route/run-relation-command"
+task = "Run the standard relation command"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The bootloader selects loaded behavior from the relation product verb." },
+  { feature = "feature/sim-storage/relation-command", why = "The storage library owns admitted relation operations and output." },
+  { feature = "feature/sim-run/relation-command", why = "The standard distribution registers the library and declared SQLite site identity." },
+  { specimen = "spec-test/sim-run/crates/sim-run/src/relation", why = "The handoff specimen proves verb selection and standard site discovery." },
+]
+
+[[feature]]
 id = "feature/sim-run/runtime-index"
 title = "Runtime index exploration"
 summary = "Explore merged SIM Index graph and public source facts through the bootloader as stable Table/Dir rows and structured query output."
@@ -192,14 +251,67 @@ claims_specimens = [
 ]
 
 [[feature]]
+id = "feature/sim-run/immutable-native-build"
+title = "Immutable native build and isolated admission"
+summary = "Build one locked offline cdylib, publish verified bytes by content identity, and admit compatible candidates through an isolated loader preflight."
+owner = "crate/sim-lib-hotload"
+audiences = ["code", "framework"]
+guidance = "Compose NativeBuilder with a boot-selected sim-lib-exec launcher and preopened source, target, and artifact mounts. Pass its ArtifactCandidate to AdmissionService with the selected LoaderPort, latest managed generation, exact dependency boot receipts, and explicit compatibility and test limits. Admission never loads or exercises the candidate in the live context."
+claims_anchors = [
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-lib-hotload/src/admission",
+  "spec-test/sim-run/crates/sim-lib-hotload/src/build",
+  "spec-test/sim-run/crates/sim-lib-hotload/src/compatibility",
+  "spec-test/sim-run/crates/sim-lib-hotload/src/preflight",
+]
+supports = [
+  "feature/sim-run/loaders",
+  "feature/sim-runtime/sandbox-exec",
+  "feature/sim-storage/atomic-content-journal",
+]
+
+[[feature]]
+id = "feature/sim-run/loadable-hot-generation"
+title = "Loadable hot-generation lifecycle"
+summary = "Inspect, build, admit, activate, and explain native generations through Shape-checked operations and read-constructable records."
+owner = "crate/sim-lib-hotload"
+audiences = ["user", "code", "framework"]
+guidance = "Load HotloadLib with a host-composed HotloadPort. Call hotload/status and hotload/history with hotload/inspect; delegate hotload/build, hotload/admit, and hotload/activate separately. Consume operation-cards and typed record outcomes rather than host paths, argv, loader handles, or journal internals."
+claims_anchors = [
+  "anchor/crate/sim-lib-hotload",
+  "anchor/runtime-lib/sim-lib-hotload/hotload-lib",
+  "anchor/rustdoc/sim-lib-hotload/crate-root",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-lib-hotload/src/surface",
+  "recipe/sim-run/02-scenarios/hotload-generation-lifecycle",
+]
+supports = [
+  "feature/sim-run/immutable-native-build",
+  "feature/sim-run/loaders",
+  "feature/sim-storage/atomic-content-journal",
+]
+
+[[route]]
+id = "route/sim-run/hotload-generation-lifecycle"
+task = "Operate and explain one hot generation"
+audiences = ["user", "code", "framework"]
+steps = [
+  { feature = "feature/sim-run/loadable-hot-generation", why = "Use the five loadable operations, separate capabilities, Shapes, Cards, and typed records." },
+  { specimen = "recipe/sim-run/02-scenarios/hotload-generation-lifecycle", why = "Verify the public lifecycle contract offline." },
+]
+
+[[feature]]
 id = "feature/sim-run/loaders"
 title = "Loadable source libraries"
-summary = "Load native, source, and re-exported runtime libraries as bootloader inputs."
+summary = "Load exact native, wasm, source, re-exported, and AOT artifacts through the run-owned object-safe LoaderPort."
 owner = "crate/sim-run-loaders"
 audiences = ["code", "framework"]
-guidance = "Use this row when following how runtime libraries are discovered before command dispatch."
+guidance = "Compose an installed platform LoaderPort and bind each advertised LoaderKind through PortLoader. Bundle descriptors select exact artifacts and kinds; use StaticRegistry for AOT factories without changing LibManifest or ordinary Lib call and unload behavior."
 claims_anchors = [
   "anchor/crate/sim-run-loaders",
+  "anchor/runtime-lib/sim-run/component-lib",
   "anchor/runtime-lib/sim-run-loaders/loaded-native-lib",
   "anchor/runtime-lib/sim-run-loaders/reexport-lib",
   "anchor/runtime-lib/sim-run-loaders/source-lib",
@@ -226,6 +338,33 @@ claims_specimens = [
 ]
 supports = [
   "feature/sim-run/runtime-index",
+]
+
+[[feature]]
+id = "feature/sim-run/continuity-command"
+title = "Loadable continuity composition command"
+summary = "Compose continuity plans, platform capsules, sites, phone surfaces, and optional providers through the generic bootloader registry."
+owner = "crate/sim-run"
+guidance = "Use `sim continuity` to resolve a versioned plan as data and project deterministic unsigned Android or host-modeled artifacts. Static linkage is an ordered provider table; missing optional satellites degrade and missing required services refuse without teaching the bootloader platform, device, or continuity policy."
+claims_anchors = ["anchor/cli/continuity", "anchor/export/sim-run/cli/main/continuity", "anchor/export/sim-run/site/android-root", "anchor/export/sim-run/surface/phone", "anchor/runtime-lib/sim-run/continuity-command-lib"]
+claims_surfaces = ["cli/continuity"]
+claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/continuity"]
+supports = [
+  "feature/sim-agent-net/pure-continuity",
+  "feature/sim-platform/android-capsule",
+  "feature/sim-web/device-surfaces",
+]
+
+[[route]]
+id = "route/load-continuity-plan"
+task = "Load a continuity plan through the bootloader"
+steps = [
+  { feature = "feature/sim-run/continuity-command", why = "The generic command composes registered libraries and plan data without boot-frame policy." },
+  { feature = "feature/sim-agent-net/pure-continuity", why = "The continuity organ owns replay and policy reduction." },
+  { feature = "feature/sim-platform/android-capsule", why = "The Android capsule owns lifecycle and platform services." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/continuity", why = "Command tests cover networkless composition, deterministic artifacts, refusals, lifecycle events, and data-driven plan changes." },
+  { specimen = "recipe/sim-sdk/continuity/expedition-thought", why = "The first synthetic product exercises the shared continuity mechanism." },
+  { specimen = "recipe/sim-sdk/continuity/quiet-stewardship-cards", why = "The second synthetic product proves product policy stays outside composition." },
 ]
 
 [[feature]]
@@ -334,12 +473,11 @@ steps = [
 [[feature]]
 id = "feature/sim-run/jvm-command"
 title = "JVM product command"
-summary = "Run the published JVM specimen through a host-registered JVM library and cli/main/jvm adapter in the standard bootloader session."
+summary = "Run caller-supplied classfile bytes, exact class, member, descriptor, and integer arguments through the host-registered JVM library and cli/main/jvm adapter."
 owner = "crate/sim-run"
 audiences = ["user", "code"]
-guidance = "Invoke sim jvm. The binary selects host factories and capabilities, then the one sim-run-core bootloader loads sim-lib-lang-jvm and dispatches cli/main/jvm; it never constructs a Cx or embeds JVM semantics."
+guidance = "Invoke sim jvm HEX_CLASSFILE CLASS MEMBER DESCRIPTOR [I32 ...]. The binary selects host factories and capabilities, then the one sim-run-core bootloader loads sim-lib-lang-jvm and dispatches cli/main/jvm; it only parses the caller envelope and renders value, Java throwable, or refusal, and never constructs a Cx, reads an ambient classpath, or embeds JVM semantics."
 claims_anchors = [
-  "anchor/bin/sim",
   "anchor/cli/jvm",
   "anchor/export/sim-run/cli/main/jvm",
   "anchor/runtime-lib/sim-run/jvm-cli-lib",
@@ -370,3 +508,68 @@ steps = [
   { feature = "feature/sim-run/index-table-dir", why = "The IndexDir implementation shows a runtime table exposed as an immutable directory." },
   { specimen = "recipe/sim-run/02-scenarios/index-examples", why = "The examples recipe exercises table-backed feature-to-specimen lookup." },
 ]
+
+[[feature]]
+id = "feature/sim-run/platform-command"
+title = "Loadable platform command"
+summary = "Dispatch platform show, require, doctor, and attest-verify through cli/main/platform."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Invoke sim platform with a supported subcommand. The product library registers one host command adapter; the binary remains a one-call process membrane."
+claims_anchors = [
+  "anchor/cli/platform",
+  "anchor/export/sim-run/cli/main/platform",
+  "anchor/runtime-lib/sim-run/platform-command-lib",
+]
+claims_surfaces = ["cli/platform"]
+claims_specimens = ["spec-test/sim-run/crates/sim-run/src/platform"]
+presents = ["feature/sim-platform/product-membrane"]
+
+[[route]]
+id = "route/inspect-platform-command"
+task = "Inspect and verify the selected platform through the loadable command"
+audiences = ["user", "code", "framework"]
+steps = [
+  { feature = "feature/sim-run/platform-command", why = "The bootloader dispatches the fixed platform vocabulary through the loaded product library." },
+  { specimen = "spec-test/sim-run/crates/sim-run/src/platform", why = "The command specimen proves fixed dispatch, machine output, and typed refusal behavior." },
+]
+
+[[feature]]
+id = "feature/sim-run/search-command"
+title = "Loadable search command"
+summary = "Select the search verb and delegate canonical query, fetch, research, and show behavior to sim-lib-search."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use sim search; the bootloader contributes only the host factory and verb source, while SearchCommandLib owns all configuration, records, policy, and rendering."
+claims_specimens = ["spec-test/sim-run/crates/sim-run/src/search"]
+presents = ["feature/sim-agent-net/search-product"]
+
+[[route]]
+id = "route/run-search-command"
+task = "Run canonical search from the terminal"
+audiences = ["user", "code"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The standard bootloader owns command dispatch." },
+  { feature = "feature/sim-run/search-command", why = "The command row selects the shared search product without implementing search." },
+  { specimen = "recipe/sim-agent-net/crates/sim-lib-search/01-fixture/cli-mcp-parity", why = "The shared specimen proves the same record through CLI and MCP." },
+]
+[[feature]]
+id = "feature/sim-run/estate-command"
+title = "Loadable estate command"
+summary = "The sim bootloader selects the estate command library only for the estate verb and forwards fixed subcommands as typed organ calls."
+owner = "crate/sim-run"
+audiences = ["user", "code"]
+guidance = "Use sim estate discover, plan, preview, review, apply, watch, verify, reconcile, history, or doctor; arguments never select a provider implementation or executable text."
+claims_anchors = [
+  "anchor/cli/estate",
+  "anchor/export/sim-run/cli/main/estate",
+  "anchor/runtime-lib/sim-run/estate-command-lib",
+]
+claims_surfaces = ["cli/estate"]
+claims_specimens = ["spec-test/sim-run/crates/sim-run/src/estate"]
+
+[[route]]
+id = "route/operate-estate-from-terminal"
+task = "Operate the estate from a terminal"
+audiences = ["user", "code"]
+steps = [{ feature = "feature/sim-run/estate-command", why = "Boot the loadable command and emit the same typed calls used by other surfaces." }]

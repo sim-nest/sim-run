@@ -210,6 +210,7 @@ fn missing_explicit_source_reports_diagnostic() {
     let mut cx = sim_kernel::Cx::new(
         std::sync::Arc::new(sim_kernel::NoopEvalPolicy),
         std::sync::Arc::new(sim_kernel::DefaultFactory),
+        sim_kernel::HandleSeed::new(1),
     );
     let state = load_config_sources(
         &mut cx,

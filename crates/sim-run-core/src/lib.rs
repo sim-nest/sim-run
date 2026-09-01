@@ -26,12 +26,11 @@
 //! The `registry` feature adds a git registry artifact resolver, but it is active
 //! only when the host installs it. Nothing here bakes in a codec.
 
-use std::{ffi::OsString, fmt};
-
 mod args;
 mod boot;
 mod bootloader;
 mod codec_boot;
+mod command;
 mod config;
 mod crates_io;
 mod device_host;
@@ -44,10 +43,13 @@ mod handoff;
 mod host;
 mod introspect;
 mod load;
+mod platform_bundle;
 mod receipt;
 mod report;
 mod source;
 
+#[cfg(test)]
+mod bootstrap_tests;
 #[cfg(test)]
 mod codec_boot_tests;
 #[cfg(test)]
@@ -75,6 +77,10 @@ pub use args::{CliCommand, parse_args};
 pub use boot::{CliBoot, CliEnvelope, Payload};
 pub use bootloader::Bootloader;
 pub use codec_boot::{DEFAULT_CODEC_NAME, boot_codec_name, codec_lib_symbol};
+pub use command::{
+    CliError, run, run_command_with_session, run_command_with_session_at_version,
+    run_supplied_bootstrap, run_with_session, version_line, version_line_for,
+};
 pub use config::{
     ConfigLoadOptions, RuntimeConfigState, load_config_sources, load_config_sources_with_probes,
     run_config_probe,
@@ -92,6 +98,7 @@ pub use envelope::cli_envelope_args;
 pub use git_registry::{GIT_REGISTRY_ENDPOINT_ENV, GitRegistryResolver};
 pub use handoff::{CLI_MAIN_ENTRYPOINT, CliEntrypoint, cli_main_entrypoint_symbol};
 pub use load::LoadSession;
+pub use platform_bundle::{BootLoadRequest, boot_load_requests};
 pub use receipt::{LoadReceipt, LoadReceiptRole};
 pub use report::{
     ConfigReportKind, ConfigReportRequest, ConfigSourceReport, LoadedLibReport, LoadedStateReport,
@@ -99,144 +106,5 @@ pub use report::{
     format_config_status_json, format_effective_config, format_effective_config_json,
     render_config_report,
 };
+pub use sim_platform_bootstrap::{BootstrapEnvelope, BootstrappedCapsule};
 pub use source::LibSourceSpec;
-
-const HELP: &str = "\
-Usage: sim [OPTIONS] [PAYLOAD...]
-
-Options:
-  --help              Print this help text.
-  --version           Print the binary version.
-  --codec NAME        Select the boot codec name.
-  --load SRC          Add a library source to load.
-  --native-audio-provider SRC
-                      Try a native audio provider source and degrade if absent.
-  --config-home PATH  Read home config from PATH.
-  --config-work PATH  Read working config from PATH.
-  --config-file PATH  Read one shared config Dir file after root files.
-  --config-site SYMBOL
-                      Read a config Dir from a loaded site export.
-  --no-config-files   Skip filesystem config discovery.
-  --list              Request a loaded-lib list.
-  --inspect SYMBOL    Request inspection of a loaded lib or export.
-  config status       Report loaded libs, config sources, probes, and diagnostics.
-  config effective LIB
-                      Report the effective config table for LIB.
-  config sources      Report config source provenance and diagnostics.
-  --json              Render a config report command as stable JSON.
-  --eval TEXT         Carry eval text for loaded-lib handoff.
-  --script PATH       Carry a script path for loaded-lib handoff.
-  --stdin TEXT        Carry stdin text for loaded-lib handoff.
-
-Note: the bootloader bakes in no codec. By default it fetches nothing over
-the network and boots only libraries provided via --load (an artifact source) or
-already present in the local cache. A build with the registry feature can fetch from
-an explicit git registry endpoint installed by the host. With no source it reports
-`no codec '<name>' available`.
-";
-
-/// Command-line error returned by the bootloader core.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CliError {
-    message: String,
-}
-
-impl CliError {
-    /// Builds a command-line error from a user-facing message.
-    pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-        }
-    }
-
-    pub(crate) fn unsupported(arg: &str) -> Self {
-        Self::new(format!("unsupported argument: {arg}"))
-    }
-
-    pub(crate) fn missing_value(flag: &str) -> Self {
-        Self::new(format!("{flag} requires a value"))
-    }
-
-    pub(crate) fn duplicate(flag: &str) -> Self {
-        Self::new(format!("{flag} was provided more than once"))
-    }
-}
-
-impl fmt::Display for CliError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
-    }
-}
-
-impl std::error::Error for CliError {}
-
-/// Returns the version line for the `sim-run-core` package.
-///
-/// Product binaries whose package version can differ from the core crate use
-/// [`version_line_for`] through [`run_command_with_session_at_version`].
-pub fn version_line() -> String {
-    version_line_for(env!("CARGO_PKG_VERSION"))
-}
-
-/// Returns the `sim --version` line for the binary-owned `version`.
-pub fn version_line_for(version: &str) -> String {
-    format!("sim {version}\n")
-}
-
-/// Runs the command entry API with process arguments.
-///
-/// This is the one public boot path, expressed through [`Bootloader`]: the default
-/// `sim` runtime is `Bootloader::standard()` (the in-process host loader only), so it
-/// boots no codec or library unless a loadable source is supplied via `--load` or
-/// already cached. A `Boot` command with no available codec returns
-/// `no codec '<name>' available`. To boot a real codec or library in-process, compose
-/// a [`Bootloader`] with [`Bootloader::host_verb`]/[`Bootloader::host_lib`] (or build a
-/// session with [`LoadSession::with_host_factory`]/[`LoadSession::with_loader`] and
-/// call [`run_with_session`]).
-pub fn run<I, S>(args: I) -> Result<i32, CliError>
-where
-    I: IntoIterator<Item = S>,
-    S: Into<OsString>,
-{
-    Bootloader::standard().run(args)
-}
-
-/// Runs the command entry API with an injected loader session.
-pub fn run_with_session<I, S>(args: I, session: &mut LoadSession) -> Result<i32, CliError>
-where
-    I: IntoIterator<Item = S>,
-    S: Into<OsString>,
-{
-    run_command_with_session(parse_args(args)?, session)
-}
-
-/// Runs an already-parsed command with an injected loader session.
-pub fn run_command_with_session(
-    command: CliCommand,
-    session: &mut LoadSession,
-) -> Result<i32, CliError> {
-    run_command_with_session_at_version(command, session, env!("CARGO_PKG_VERSION"))
-}
-
-/// Runs an already-parsed command using the product binary's own `version`.
-///
-/// The version belongs to the executable, not to this reusable core crate. This
-/// entry point keeps `--version` correct when the two packages release on
-/// independent schedules.
-pub fn run_command_with_session_at_version(
-    command: CliCommand,
-    session: &mut LoadSession,
-    version: &str,
-) -> Result<i32, CliError> {
-    match command {
-        CliCommand::Help => {
-            print!("{HELP}");
-            Ok(0)
-        }
-        CliCommand::Version => {
-            print!("{}", version_line_for(version));
-            Ok(0)
-        }
-        CliCommand::Boot(boot) => session.run_loaded_boot(&boot),
-    }
-}

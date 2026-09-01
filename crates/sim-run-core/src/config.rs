@@ -44,8 +44,7 @@ impl ConfigLoadOptions {
 
 impl Default for ConfigLoadOptions {
     fn default() -> Self {
-        let work_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        Self::with_roots(ConfigRoots::from_env(work_root))
+        Self::with_roots(ConfigRoots::new(None, PathBuf::from(".sim/config")))
     }
 }
 

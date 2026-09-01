@@ -47,7 +47,11 @@ fn roots(home: &Path, work: &Path) -> ConfigLoadOptions {
 }
 
 fn test_cx() -> Cx {
-    Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory))
+    Cx::new(
+        Arc::new(NoopEvalPolicy),
+        Arc::new(DefaultFactory),
+        sim_kernel::HandleSeed::new(1),
+    )
 }
 
 struct ModeledDefaultsProbe;

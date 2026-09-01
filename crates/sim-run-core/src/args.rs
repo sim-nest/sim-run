@@ -19,7 +19,8 @@ pub enum CliCommand {
 /// Parses the minimal bootloader flags.
 ///
 /// The first argument is treated as the program name and skipped, matching
-/// `std::env::args_os`. An empty argument list selects [`CliCommand::Help`].
+/// a supplied process argument vector. An empty argument list selects
+/// [`CliCommand::Help`].
 ///
 /// # Examples
 ///

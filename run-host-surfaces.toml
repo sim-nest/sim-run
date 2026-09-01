@@ -1,0 +1,26 @@
+schema = "sim.run-host-surfaces/v1"
+owner = "repo/sim-run"
+rule = "Bootloader policy consumes owned process/config/source facts; concrete capture, loading, and physical acceptance belong to platform capsules or isolated host tools."
+
+[[entry]]
+kind = "process-envelope"
+owner = "sim-platform-ubuntu-pc"
+entry = "sim_platform_ubuntu_pc::UbuntuProcessEnvelope::capture()"
+consumer = "sim_run::process_main_with"
+
+[[entry]]
+kind = "loader-port"
+owner = "sim-run-loaders"
+contract = "LoaderPort"
+realizer = "sim-platform-ubuntu-pc::UbuntuLoaderPort"
+
+[[target_class]]
+kind = "product"
+roots = ["crates/*/src"]
+ambient_process_inputs = "forbidden"
+
+[[target_class]]
+kind = "host-tool"
+roots = ["xtask", "crates/*/tests"]
+role = "host-tool"
+purpose = "standalone contributor validation, packaging, and physical dynamic-loader acceptance"

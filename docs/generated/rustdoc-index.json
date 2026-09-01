@@ -2,6 +2,13 @@
   "generator": "xtask repo-contract v1",
   "packages": [
     {
+      "crate_name": "sim_lib_hotload",
+      "group": "workspace",
+      "manifest": "crates/sim-lib-hotload/Cargo.toml",
+      "package": "sim-lib-hotload",
+      "summary": "Structured, offline, sandboxed construction of immutable native candidates."
+    },
+    {
       "crate_name": "sim_lib_index",
       "group": "workspace",
       "manifest": "crates/sim-lib-index/Cargo.toml",
@@ -16,7 +23,7 @@
       "summary": "Loadable command-line REPL library for SIM."
     },
     {
-      "crate_name": "sim",
+      "crate_name": "sim_run",
       "group": "workspace",
       "manifest": "crates/sim-run/Cargo.toml",
       "package": "sim-run",

@@ -26,7 +26,11 @@ impl NativeGuest for MockGuest {
 }
 
 fn test_cx() -> Cx {
-    Cx::new(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory))
+    Cx::new(
+        Arc::new(NoopEvalPolicy),
+        Arc::new(DefaultFactory),
+        sim_kernel::HandleSeed::new(0x2459_4890_7aea_f0fa),
+    )
 }
 
 #[test]

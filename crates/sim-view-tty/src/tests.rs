@@ -291,7 +291,11 @@ fn loadable_intent_function_returns_nil_for_unmapped_key() {
 }
 
 fn test_cx() -> Cx {
-    Cx::new(Arc::new(EagerPolicy), Arc::new(DefaultFactory))
+    Cx::new(
+        Arc::new(EagerPolicy),
+        Arc::new(DefaultFactory),
+        sim_kernel::HandleSeed::new(0x1b68_fb97_b491_bd22),
+    )
 }
 
 fn number(text: &str) -> Expr {

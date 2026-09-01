@@ -4,9 +4,9 @@ use std::{
 };
 
 use sim_kernel::{
-    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, GrantSeat, Lib, LibId,
-    LibLoader, LibManifest, LibSource as KernelLibSource, LibSourceSpec as KernelLibSourceSpec,
-    LoaderRegistry, NoopEvalPolicy, Symbol,
+    CapabilityName, CatalogSource, Cx, DefaultFactory, Error as KernelError, GrantSeat, HandleSeed,
+    Lib, LibId, LibLoader, LibManifest, LibSource as KernelLibSource,
+    LibSourceSpec as KernelLibSourceSpec, LoaderRegistry, NoopEvalPolicy, Symbol,
 };
 use sim_lib_stream_host::native_audio_provider_capability;
 
@@ -64,15 +64,24 @@ macro_rules! expect_granted {
 impl LoadSession {
     /// Builds a loader session with an empty static host catalog.
     pub fn new() -> Self {
+        Self::with_cache_root(std::path::PathBuf::from(".sim/cache/libs"))
+    }
+
+    /// Builds a loader session with an explicit artifact-cache root.
+    pub fn with_cache_root(cache_root: std::path::PathBuf) -> Self {
         let mut loaders = LoaderRegistry::new();
         loaders.add_loader(HostSourceLoader);
-        let (cx, seat) = Cx::new_seated(Arc::new(NoopEvalPolicy), Arc::new(DefaultFactory));
+        let (cx, seat) = Cx::new_seated(
+            Arc::new(NoopEvalPolicy),
+            Arc::new(DefaultFactory),
+            HandleSeed::new(1),
+        );
         Self {
             cx,
             seat,
             loaders,
             hosts: HostLibRegistry::default(),
-            crates_io: CratesIoResolver::default(),
+            crates_io: CratesIoResolver::new(cache_root),
             catalog_sources: BTreeMap::new(),
             default_verb_sources: BTreeMap::new(),
             default_verb_config_libs: BTreeMap::new(),
@@ -82,9 +91,22 @@ impl LoadSession {
         }
     }
 
+    /// Returns the explicitly supplied artifact-cache root.
+    pub fn crates_io_cache_root(&self) -> &std::path::Path {
+        self.crates_io.cache_dir()
+    }
+
     /// Adds a kernel loader to the session.
     pub fn add_loader(&mut self, loader: impl LibLoader + 'static) {
         self.loaders.add_loader(loader);
+    }
+
+    /// Installs the single capsule already admitted by the platform bootstrap.
+    /// No source resolution or alternate loader is consulted.
+    pub fn install_supplied_capsule(&mut self, capsule: Box<dyn Lib>) -> Result<LibId, CliError> {
+        self.cx
+            .load_lib(capsule.as_ref())
+            .map_err(|error| CliError::new(format!("install supplied capsule: {error}")))
     }
 
     /// Registers a catalog source for a library symbol.
