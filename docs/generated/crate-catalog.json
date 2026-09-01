@@ -1,7 +1,19 @@
 {
   "generator": "xtask crate-catalog v1",
-  "package_count": 7,
+  "package_count": 8,
   "packages": [
+    {
+      "description": "Structured offline sandboxed native library builds for SIM.",
+      "generated_readme": false,
+      "manifest": "crates/sim-lib-hotload/Cargo.toml",
+      "name": "sim-lib-hotload",
+      "publish": "true",
+      "readme": "crates/sim-lib-hotload/README.md",
+      "root": "crates/sim-lib-hotload",
+      "target_kinds": [
+        "lib"
+      ]
+    },
     {
       "description": "Loadable SIM Index exploration library for the sim bootloader.",
       "generated_readme": false,
@@ -60,6 +72,7 @@
       "root": "crates/sim-run",
       "target_kinds": [
         "bin",
+        "lib",
         "test"
       ]
     },

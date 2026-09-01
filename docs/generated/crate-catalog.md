@@ -6,10 +6,11 @@ Generated from Cargo metadata by `xtask crate-catalog v1`.
 
 | Package | Publish | Targets | Description |
 | --- | --- | --- | --- |
+| `sim-lib-hotload` | `true` | `lib` | Structured offline sandboxed native library builds for SIM. |
 | `sim-lib-index` | `true` | `lib` | Loadable SIM Index exploration library for the sim bootloader. |
 | `sim-lib-repl` | `true` | `lib` | Loadable SIM command-line REPL library. |
 | `sim-run-core` | `true` | `lib` | Core command entry API for the SIM bootloader. |
 | `sim-run-loaders` | `true` | `lib` | Feature-composable SIM bootloader loaders. |
-| `sim-run` | `true` | `bin, test` | SIM bootloader command line. |
+| `sim-run` | `true` | `bin, lib, test` | SIM bootloader command line. |
 | `sim-view-tty` | `true` | `lib` | Loadable terminal (CLI/TUI) view/edit surface for SIM, projecting Scenes to text and reducing key input to Intents. |
 | `xtask` | `false` | `bin` | SIM workspace package for xtask. |
