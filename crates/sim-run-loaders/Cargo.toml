@@ -1,6 +1,6 @@
 [package]
 name = "sim-run-loaders"
-version = "0.3.0"
+version = "0.4.0"
 edition.workspace = true
 license.workspace = true
 description = "Feature-composable SIM bootloader loaders."
@@ -18,16 +18,16 @@ shape = ["dep:sim-shape"]
 wasm = ["dep:sim-wasm-abi"]
 
 [dependencies]
-sim-codec = { version = "0.2.0", optional = true }
-sim-codec-binary = { version = "0.3.0", optional = true }
-sim-kernel = { version = "0.3.0" }
-sim-shape = { version = "0.3.0", optional = true }
-sim-value = { version = "0.3.0" }
-sim-wasm-abi = { version = "0.4.0", optional = true }
+sim-codec = { version = "0.3.0", optional = true }
+sim-codec-binary = { version = "0.4.0", optional = true }
+sim-kernel = { version = "0.4.0" }
+sim-shape = { version = "0.4.0", optional = true }
+sim-value = { version = "0.4.0" }
+sim-wasm-abi = { version = "0.5.0", optional = true }
 
 [dev-dependencies]
-sim-kernel = { version = "0.3.0", features = ["test-support"] }
-sim-wasm-abi = { version = "0.4.0" }
+sim-kernel = { version = "0.4.0", features = ["test-support"] }
+sim-wasm-abi = { version = "0.5.0" }
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies]
 libloading = { version = "0.8", optional = true }
