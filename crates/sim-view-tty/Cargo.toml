@@ -1,6 +1,6 @@
 [package]
 name = "sim-view-tty"
-version = "0.1.4"
+version = "0.1.5"
 edition.workspace = true
 license.workspace = true
 description = "Loadable terminal (CLI/TUI) view/edit surface for SIM, projecting Scenes to text and reducing key input to Intents."
@@ -10,11 +10,11 @@ repository = "https://github.com/sim-nest/sim-run"
 homepage = "https://github.com/sim-nest/sim-run"
 
 [dependencies]
-sim-kernel = { version = "0.3.0" }
-sim-value = { version = "0.3.0" }
-sim-lib-scene = { version = "0.3.0" }
-sim-lib-intent = { version = "0.3.0" }
-sim-lib-view = { version = "0.3.0" }
+sim-kernel = { version = "0.4.0" }
+sim-value = { version = "0.4.0" }
+sim-lib-scene = { version = "0.4.0" }
+sim-lib-intent = { version = "0.4.0" }
+sim-lib-view = { version = "0.4.0" }
 
 [lints]
 workspace = true
