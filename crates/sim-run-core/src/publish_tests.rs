@@ -30,7 +30,7 @@ fn manifests_carry_publish_metadata_and_version_requirements() {
         "sim-run-core",
         "Core command entry API for the SIM bootloader.",
     );
-    assert_dependency_version(&core, "sim-kernel", "0.3.0");
+    assert_dependency_has_release_version(&core, "sim-kernel");
     assert_dependency_has_no_path(&core, "sim-kernel");
     assert_dependency_matches_package_version(&core, "sim-run-loaders", &loaders);
     assert_dependency_path(&core, "sim-run-loaders", "../sim-run-loaders");
@@ -210,6 +210,20 @@ fn assert_dependency_version(manifest: &Manifest, dependency: &str, expected: &s
         inline_field(value, "version").as_deref(),
         Some(expected),
         "dependency {dependency} must carry version {expected}"
+    );
+}
+
+fn assert_dependency_has_release_version(manifest: &Manifest, dependency: &str) {
+    let value = dependency_value(manifest, dependency);
+    let version = inline_field(value, "version")
+        .unwrap_or_else(|| panic!("dependency {dependency} must carry a version"));
+    let components = version.split('.').collect::<Vec<_>>();
+    assert!(
+        components.len() == 3
+            && components
+                .iter()
+                .all(|component| component.parse::<u64>().is_ok()),
+        "dependency {dependency} must carry a three-component release version, got {version}"
     );
 }
 
