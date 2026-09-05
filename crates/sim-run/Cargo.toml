@@ -40,7 +40,7 @@ sim-lib-compute-model = { version = "0.5.0" }
 sim-lib-expr-tree-serve = { version = "0.3.0" }
 sim-lib-estate-book = { version = "0.2.0" }
 sim-lib-estate-serve = { version = "0.2.0" }
-sim-lib-index = { version = "0.4.1", path = "../sim-lib-index" }
+sim-lib-index = { version = "0.4.2", path = "../sim-lib-index" }
 sim-lib-study = { version = "0.2.0" }
 sim-lib-model-test = { version = "0.2.0" }
 sim-lib-roadmap = { version = "0.1.1" }
