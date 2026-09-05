@@ -30,7 +30,11 @@ pub(crate) fn run(
     session = crate::physics::with_physics_if_selected(&command, session);
     session = crate::compute::with_compute_if_selected(&command, session);
     session = crate::continuity::with_continuity_if_selected(&command, session);
+    session = crate::estate::with_estate_if_selected(&command, session);
     session = crate::expr_tree::with_expr_tree_if_selected(&command, session);
+    session = crate::model_test::with_model_test_if_selected(&command, session);
+    session = crate::relation::with_relation_if_selected(&command, session);
+    session = crate::study::with_study_if_selected(&command, session);
     sim_run_core::run_command_with_session_at_version(
         command,
         &mut session,
