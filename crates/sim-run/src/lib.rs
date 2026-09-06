@@ -35,6 +35,8 @@ mod physics;
 mod platform;
 mod provider;
 mod relation;
+#[cfg(feature = "dynamic-native")]
+mod repl;
 mod roadmap;
 mod search;
 mod study;

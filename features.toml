@@ -152,7 +152,7 @@ title = "Interactive REPL"
 summary = "Run a SIM read-eval-print loop through the loaded REPL library and command surface."
 owner = "crate/sim-lib-repl"
 audiences = ["user", "code"]
-guidance = "Use this row when starting an interactive local session."
+guidance = "Load the exact codec and runtime libraries alongside host:lib/repl, then select the repl command. The dynamic-native proof bundle names every library on the command line; the bootloader performs no ambient bundle discovery."
 claims_anchors = [
   "anchor/cli/repl",
   "anchor/crate/sim-lib-repl",
@@ -163,7 +163,7 @@ claims_surfaces = [
   "cli/repl",
 ]
 claims_specimens = [
-  "recipe/sim-run/01-basics/hello",
+  "spec-test/sim-run/crates/sim-run/tests/native_dynamic_repl",
 ]
 supports = [
   "feature/sim-run/bootloader",
@@ -308,7 +308,7 @@ title = "Loadable source libraries"
 summary = "Load exact native, wasm, source, re-exported, and AOT artifacts through the run-owned object-safe LoaderPort."
 owner = "crate/sim-run-loaders"
 audiences = ["code", "framework"]
-guidance = "Compose an installed platform LoaderPort and bind each advertised LoaderKind through PortLoader. Bundle descriptors select exact artifacts and kinds; use StaticRegistry for AOT factories without changing LibManifest or ordinary Lib call and unload behavior."
+guidance = "Compose an installed platform LoaderPort and bind each advertised LoaderKind through PortLoader with an exact source predicate. Install and grant only mechanisms selected by the product feature set, so shared path and byte source kinds cannot route an artifact to the wrong loader. Bundle descriptors select exact artifacts and kinds; use StaticRegistry for AOT factories without changing LibManifest or ordinary Lib call and unload behavior."
 claims_anchors = [
   "anchor/crate/sim-run-loaders",
   "anchor/runtime-lib/sim-run/component-lib",
