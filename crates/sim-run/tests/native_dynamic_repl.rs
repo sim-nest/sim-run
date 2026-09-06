@@ -1,3 +1,5 @@
+// conformance: the bootloader composes an explicitly selected native REPL bundle without ambient discovery.
+
 #![cfg(all(feature = "dynamic-native", not(target_arch = "wasm32")))]
 
 mod support;
@@ -79,7 +81,7 @@ const REQUIRED_SOURCES: &[(&str, &str, &str)] = &[
 ];
 
 #[test]
-fn sim_repl_loads_native_proof_bundle_and_evaluates_stdin() {
+fn sim_repl_loads_explicit_native_proof_bundle_and_evaluates_stdin() {
     let Some(context) = maybe_feature_build_context(REQUIRED_SOURCES) else {
         return;
     };
@@ -131,8 +133,26 @@ fn sim_repl_loads_native_proof_bundle_and_evaluates_stdin() {
 
 fn run_repl_input(bundle_dir: &Path, input: &str) -> std::process::Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_sim"))
-        .arg("repl")
-        .env("SIM_REPL_BUNDLE_DIR", bundle_dir)
+        .arg("--load")
+        .arg(format!(
+            "path:{}",
+            bundle_dir.join(dylib_file_name("sim_codec_lisp")).display()
+        ))
+        .arg("--load")
+        .arg(format!(
+            "path:{}",
+            bundle_dir
+                .join(dylib_file_name("sim_lib_numbers_f64"))
+                .display()
+        ))
+        .arg("--load")
+        .arg(format!(
+            "path:{}",
+            bundle_dir
+                .join(dylib_file_name("sim_lib_standard_core"))
+                .display()
+        ))
+        .args(["--load", "host:lib/repl", "repl"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
