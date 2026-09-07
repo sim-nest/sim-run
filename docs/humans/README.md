@@ -55,6 +55,7 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `cli/watch` | `cli` | `crate/sim-run` |
 | `cli/xtask` | `cli` | `crate/xtask` |
 | `docs/sim-run/generated` | `docs` | `doc-set/sim-run/generated` |
+| `site/sim-lib-hotload` | `site` | `crate/sim-lib-hotload` |
 | `site/sim-run-core` | `site` | `crate/sim-run-core` |
 | `site/sim-run-loaders` | `site` | `crate/sim-run-loaders` |
 | `view/sim-view-tty` | `view` | `crate/sim-view-tty` |
@@ -1089,13 +1090,15 @@ Source `crates/sim-lib-hotload/src/admission.rs`:
 
 use std::{fmt, sync::Arc};
 
-use sha2::{Digest, Sha256};
-use sim_kernel::{ContentId, Cx, HandleSeed, LibBootReceipt, LibManifest, LibSource, Symbol};
+use sim_kernel::{
+    ContentId, Cx, Datum, Export, HandleSeed, LibBootReceipt, LibManifest, LibSource,
+    NumberLiteral, RuntimeId, Symbol,
+};
 use sim_run_loaders::{LoadRequest, LoaderKind, LoaderPort};
 use sim_storage_port::HostDirPort;
 
 use crate::{
-    AchievedLimits, ArtifactCandidate, CandidateTestResult, CompatibilityPolicy,
+    AchievedLimits, ArtifactCandidate, ArtifactContentId, CandidateTestResult, CompatibilityPolicy,
     CompatibilityReport, PreflightLimits,
     artifact::{content_id, hex},
     compatibility, preflight,
@@ -1107,7 +1110,7 @@ pub struct HotloadGeneration {
     /// Managed library identity.
     pub library: Symbol,
     /// Content identity installed by that completed activation.
-    pub content: ContentId,
+    pub content: ArtifactContentId,
     /// Manifest bound to that completed activation.
     pub manifest: LibManifest,
 }
@@ -1138,9 +1141,9 @@ pub struct AdmissionReceipt {
     /// Identity of this receipt's canonical content.
     pub content: ContentId,
     /// Candidate artifact identity.
-    pub artifact: ContentId,
+    pub artifact: ArtifactContentId,
     /// Current managed generation, for replacement.
-    pub current_generation: Option<ContentId>,
+    pub current_generation: Option<ArtifactContentId>,
     /// Candidate manifest inspected through the loader port.
     pub manifest: LibManifest,
     /// Compatibility evidence.
@@ -1185,7 +1188,7 @@ impl<'a> AdmissionService<'a> {
     ) -> Result<AdmissionReceipt, AdmissionFailure> {
         let bytes = self
             .artifacts
-            .read(&[hex(&request.candidate.content.bytes)])
+            .read(&[hex(&request.candidate.content.content_id().bytes)])
             .map_err(|error| AdmissionFailure(format!("artifact re-read failed: {error}")))?;
         if content_id(&bytes) != request.candidate.content {
             return Err(AdmissionFailure(
@@ -1375,7 +1378,7 @@ impl<'a> AdmissionService<'a> {
             dependencies: &dependencies,
             tests: &tests,
             limits: &achieved_limits,
-        });
+        })?;
         Ok(AdmissionReceipt {
             content: receipt_content,
             artifact: request.candidate.content.clone(),
@@ -1410,7 +1413,7 @@ fn fresh_context(
 
 fn require_candidate_source(
     source: &LibSource,
-    content: &ContentId,
+    content: &ArtifactContentId,
     bytes: &[u8],
 ) -> Result<(), AdmissionFailure> {
     if sim_run_loaders::bytes_from_source(source)
@@ -1420,9 +1423,9 @@ fn require_candidate_source(
     {
         return Ok(());
     }
-    let expected_hex = hex(&content.bytes);
+    let expected_hex = hex(&content.content_id().bytes);
     let addressed = match sim_run_loaders::content_address_payload(source) {
-        Some(sim_kernel::Datum::Bytes(digest)) => digest.as_slice() == content.bytes,
+        Some(sim_kernel::Datum::Bytes(digest)) => digest.as_slice() == content.content_id().bytes,
         Some(sim_kernel::Datum::String(digest)) => digest == &expected_hex,
         _ => false,
     };
@@ -1449,8 +1452,8 @@ fn clone_source(source: &LibSource) -> Result<LibSource, AdmissionFailure> {
 }
 
 struct AdmissionIdentity<'a> {
-    artifact: &'a ContentId,
-    current: Option<&'a ContentId>,
+    artifact: &'a ArtifactContentId,
+    current: Option<&'a ArtifactContentId>,
     manifest: &'a LibManifest,
     compatibility: &'a CompatibilityReport,
     loader: &'a Symbol,
@@ -1459,7 +1462,26 @@ struct AdmissionIdentity<'a> {
     limits: &'a AchievedLimits,
 }
 
-fn receipt_id(identity: &AdmissionIdentity<'_>) -> ContentId {
+pub(crate) fn admission_receipt_datum(receipt: &AdmissionReceipt) -> Datum {
+    receipt_datum(&AdmissionIdentity {
+        artifact: &receipt.artifact,
+        current: receipt.current_generation.as_ref(),
+        manifest: &receipt.manifest,
+        compatibility: &receipt.compatibility,
+        loader: &receipt.loader,
+        dependencies: &receipt.dependencies,
+        tests: &receipt.tests,
+        limits: &receipt.achieved_limits,
+    })
+}
+
+fn receipt_id(identity: &AdmissionIdentity<'_>) -> Result<ContentId, AdmissionFailure> {
+    receipt_datum(identity)
+        .content_id()
+        .map_err(|error| AdmissionFailure(format!("admission identity is not canonical: {error}")))
+}
+
+fn receipt_datum(identity: &AdmissionIdentity<'_>) -> Datum {
     let AdmissionIdentity {
         artifact,
         current,
@@ -1470,51 +1492,259 @@ fn receipt_id(identity: &AdmissionIdentity<'_>) -> ContentId {
         tests,
         limits,
     } = identity;
-    let canonical = format!(
-        "artifact={artifact:?}\ncurrent={current:?}\nmanifest={manifest:?}\ncompatibility={compatibility:?}\nloader={loader}\ndependencies={dependencies:?}\ntests={tests:?}\nlimits={limits:?}\n"
-    );
-    ContentId::from_bytes(
-        Symbol::qualified("core", "sha256"),
-        Sha256::digest(canonical.as_bytes()).into(),
-    )
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "AdmissionIdentityV2"),
+        fields: vec![
+            (Symbol::new("artifact"), artifact_content_datum(artifact)),
+            (
+                Symbol::new("current-generation"),
+                current.map(artifact_content_datum).unwrap_or(Datum::Nil),
+            ),
+            (Symbol::new("manifest"), manifest_datum(manifest)),
+            (
+                Symbol::new("compatibility"),
+                compatibility_datum(compatibility),
+            ),
+            (Symbol::new("loader"), Datum::Symbol((*loader).clone())),
+            (
+                Symbol::new("dependencies"),
+                Datum::Set(dependencies.iter().cloned().map(Datum::Symbol).collect()),
+            ),
+            (
+                Symbol::new("tests"),
+                Datum::List(tests.iter().map(test_result_datum).collect()),
+            ),
+            (Symbol::new("achieved-limits"), limits_datum(limits)),
+        ],
+    }
+}
+
+pub(crate) fn artifact_content_datum(artifact: &ArtifactContentId) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "ArtifactBytesIdentityV1"),
+        fields: vec![(
+            Symbol::new("content"),
+            content_id_datum(artifact.content_id()),
+        )],
+    }
+}
+
+pub(crate) fn content_id_datum(id: &ContentId) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("core", "ContentId"),
+        fields: vec![
+            (
+                Symbol::new("algorithm"),
+                Datum::Symbol(id.algorithm.clone()),
+            ),
+            (Symbol::new("bytes"), Datum::Bytes(id.bytes.to_vec())),
+        ],
+    }
+}
+
+pub(crate) fn compatibility_datum(report: &CompatibilityReport) -> Datum {
+    let export = |(kind, symbol): &(sim_kernel::ExportKind, Symbol)| Datum::Node {
+        tag: Symbol::qualified("hotload", "Export"),
+        fields: vec![
+            (Symbol::new("kind"), Datum::Symbol(kind.symbol().clone())),
+            (Symbol::new("symbol"), Datum::Symbol(symbol.clone())),
+        ],
+    };
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "CompatibilityReportV1"),
+        fields: vec![
+            (
+                Symbol::new("policy"),
+                report.policy.map_or(Datum::Nil, |policy| {
+                    Datum::Symbol(Symbol::qualified(
+                        "hotload-compatibility",
+                        match policy {
+                            CompatibilityPolicy::Exact => "exact",
+                            CompatibilityPolicy::Additive => "additive",
+                        },
+                    ))
+                }),
+            ),
+            (
+                Symbol::new("candidate-exports"),
+                Datum::List(report.candidate_exports.iter().map(export).collect()),
+            ),
+            (
+                Symbol::new("added-exports"),
+                Datum::List(report.added_exports.iter().map(export).collect()),
+            ),
+        ],
+    }
+}
+
+fn test_result_datum(result: &CandidateTestResult) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "CandidateTestResultV1"),
+        fields: vec![
+            (Symbol::new("symbol"), Datum::Symbol(result.symbol.clone())),
+            (Symbol::new("passed"), Datum::Bool(result.passed)),
+            (
+                Symbol::new("detail"),
+                result
+                    .detail
+                    .clone()
+                    .map(Datum::String)
+                    .unwrap_or(Datum::Nil),
+            ),
+        ],
+    }
+}
+
+fn manifest_datum(manifest: &LibManifest) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "LibManifestV1"),
+        fields: vec![
+            (Symbol::new("id"), Datum::Symbol(manifest.id.clone())),
+            (
+                Symbol::new("version"),
+                Datum::String(manifest.version.0.clone()),
+            ),
+            (
+                Symbol::new("abi-major"),
+                u64_datum(u64::from(manifest.abi.major)),
+            ),
+            (
+                Symbol::new("abi-minor"),
+                u64_datum(u64::from(manifest.abi.minor)),
+            ),
+            (
+                Symbol::new("target"),
+                Datum::Symbol(manifest.target.to_symbol()),
+            ),
+            (
+                Symbol::new("requires"),
+                Datum::Set(
+                    manifest
+                        .requires
+                        .iter()
+                        .map(|dependency| Datum::Node {
+                            tag: Symbol::qualified("hotload", "DependencyV1"),
+                            fields: vec![
+                                (Symbol::new("id"), Datum::Symbol(dependency.id.clone())),
+                                (
+                                    Symbol::new("minimum-version"),
+                                    dependency
+                                        .minimum_version
+                                        .as_ref()
+                                        .map(|version| Datum::String(version.0.clone()))
+                                        .unwrap_or(Datum::Nil),
+                                ),
+                            ],
+                        })
+                        .collect(),
+                ),
+            ),
+            (
+                Symbol::new("capabilities"),
+                Datum::Set(
+                    manifest
+                        .capabilities
+                        .iter()
+                        .map(|capability| Datum::String(capability.as_str().to_owned()))
+                        .collect(),
+                ),
+            ),
+            (
+                Symbol::new("exports"),
+                Datum::Set(manifest.exports.iter().map(manifest_export_datum).collect()),
+            ),
+        ],
+    }
+}
+
+fn manifest_export_datum(export: &Export) -> Datum {
+    let stable_id = match export {
+        Export::Class { class_id, .. } => class_id.map(|id| runtime_id_datum(RuntimeId::Class(id))),
+        Export::Function { function_id, .. } => {
+            function_id.map(|id| runtime_id_datum(RuntimeId::Function(id)))
+        }
+        Export::Macro { macro_id, .. } => macro_id.map(|id| runtime_id_datum(RuntimeId::Macro(id))),
+        Export::Shape { shape_id, .. } => shape_id.map(|id| runtime_id_datum(RuntimeId::Shape(id))),
+        Export::Codec { codec_id, .. } => codec_id.map(|id| runtime_id_datum(RuntimeId::Codec(id))),
+        Export::NumberDomain {
+            number_domain_id, ..
+        } => number_domain_id.map(|id| runtime_id_datum(RuntimeId::NumberDomain(id))),
+        Export::Site { runtime_id, .. } => runtime_id.map(runtime_id_datum),
+        Export::Value { .. } | Export::Open { .. } => None,
+    };
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "ManifestExportV1"),
+        fields: vec![
+            (
+                Symbol::new("kind"),
+                Datum::Symbol(export.kind_symbol().symbol().clone()),
+            ),
+            (
+                Symbol::new("symbol"),
+                Datum::Symbol(export.symbol().clone()),
+            ),
+            (Symbol::new("stable-id"), stable_id.unwrap_or(Datum::Nil)),
+        ],
+    }
+}
+
+fn runtime_id_datum(id: RuntimeId) -> Datum {
+    let (kind, value) = match id {
+        RuntimeId::Class(value) => ("class", Some(u64::from(value.0))),
+        RuntimeId::Function(value) => ("function", Some(u64::from(value.0))),
+        RuntimeId::Macro(value) => ("macro", Some(u64::from(value.0))),
+        RuntimeId::Shape(value) => ("shape", Some(u64::from(value.0))),
+        RuntimeId::Codec(value) => ("codec", Some(u64::from(value.0))),
+        RuntimeId::NumberDomain(value) => ("number-domain", Some(u64::from(value.0))),
+        RuntimeId::Site(value) => ("site", Some(u64::from(value.0))),
+        RuntimeId::Value => ("value", None),
+    };
+    Datum::Node {
+        tag: Symbol::qualified("core", "RuntimeId"),
+        fields: vec![
+            (Symbol::new("kind"), Datum::Symbol(Symbol::new(kind))),
+            (
+                Symbol::new("value"),
+                value.map(u64_datum).unwrap_or(Datum::Nil),
+            ),
+        ],
+    }
+}
+
+fn limits_datum(limits: &AchievedLimits) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "AchievedLimitsV1"),
+        fields: vec![
+            (Symbol::new("tests-run"), usize_datum(limits.tests_run)),
+            (
+                Symbol::new("max-events-observed"),
+                usize_datum(limits.max_events_observed),
+            ),
+            (
+                Symbol::new("max-detail-chars-observed"),
+                usize_datum(limits.max_detail_chars_observed),
+            ),
+        ],
+    }
+}
+
+fn usize_datum(value: usize) -> Datum {
+    Datum::Number(NumberLiteral {
+        domain: Symbol::qualified("numbers", "usize"),
+        canonical: value.to_string(),
+    })
+}
+
+fn u64_datum(value: u64) -> Datum {
+    Datum::Number(NumberLiteral {
+        domain: Symbol::qualified("numbers", "u64"),
+        canonical: value.to_string(),
+    })
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use sim_kernel::Datum;
-
-    #[test]
-    fn artifact_source_must_bind_the_verified_bytes_or_digest() {
-        let bytes = b"candidate";
-        let content = content_id(bytes);
-        let direct = sim_run_loaders::bytes_source(bytes);
-        assert!(require_candidate_source(&direct, &content, bytes).is_ok());
-
-        let addressed =
-            sim_run_loaders::content_address_source(Datum::Bytes(content.bytes.to_vec()));
-        assert!(require_candidate_source(&addressed, &content, bytes).is_ok());
-        assert!(require_candidate_source(&direct, &content, b"mutated").is_err());
-    }
-
-    #[test]
-    fn host_sources_cannot_cross_the_admission_membrane() {
-        struct HostLib;
-        impl sim_kernel::Lib for HostLib {
-            fn manifest(&self) -> LibManifest {
-                unreachable!("host source is rejected before manifest access")
-            }
-            fn load(
-                &self,
-                _cx: &mut sim_kernel::LoadCx,
-                _linker: &mut sim_kernel::Linker,
-            ) -> sim_kernel::Result<()> {
-                unreachable!("host source is rejected before native behavior")
-            }
-        }
-        assert!(clone_source(&LibSource::Host(Box::new(HostLib))).is_err());
-    }
-}
+#[path = "admission_tests.rs"]
+mod tests;
 ```
 
 Specimen `spec-test/sim-run/crates/sim-lib-hotload/src/build` is checked by `cargo test`.
@@ -1525,14 +1755,15 @@ Source `crates/sim-lib-hotload/src/build.rs`:
 // conformance: native builds use sealed offline inputs and publish immutable artifacts.
 
 use crate::{
-    ArtifactCandidate, BuildFailure, FailureKind, NativeBuildRequest,
-    artifact::{ArtifactStore, content_id},
+    ArtifactCandidate, ArtifactContentId, BuildFailure, BuildReceiptId, FailureKind,
+    NativeBuildRequest, SandboxReportId, artifact::ArtifactStore,
 };
 use serde::Deserialize;
+use sim_kernel::{Datum, Symbol};
 use sim_lib_exec::{
     ArgAtom, MountAccess, ProcessCancellation, ProgramRef, SandboxAttempt, SandboxControl,
-    SandboxLauncher, SandboxLimits, SandboxMount, SandboxPolicy, SandboxRequest,
-    SandboxRequirement, SealedBindings,
+    SandboxEvidence, SandboxLauncher, SandboxLimits, SandboxMount, SandboxPolicy, SandboxReport,
+    SandboxRequest, SandboxRequirement, SealedBindings,
 };
 use sim_storage_port::HostDirPort;
 use std::collections::BTreeMap;
@@ -1610,16 +1841,8 @@ impl<'a> NativeBuilder<'a> {
             .read(&split_target(&artifact_path)?)
             .map_err(|e| BuildFailure::artifact(e.to_string()))?;
         let (content, cache_hit) = ArtifactStore::new(mounts.artifacts).put(&bytes)?;
-        let report = content_id(format!("{:?}", result.report).as_bytes());
-        let receipt = content_id(
-            format!(
-                "{}:{}:{}",
-                request.source_mount,
-                request.toolchain.content,
-                crate::artifact::hex(&content.bytes)
-            )
-            .as_bytes(),
-        );
+        let report = sandbox_report_id(&result.report)?;
+        let receipt = build_receipt_id(request, &content, &report)?;
         Ok(ArtifactCandidate {
             content,
             bytes: bytes.len() as u64,
@@ -1629,6 +1852,166 @@ impl<'a> NativeBuilder<'a> {
             cache_hit,
         })
     }
+}
+
+fn sandbox_report_id(report: &SandboxReport) -> Result<SandboxReportId, BuildFailure> {
+    let datum = Datum::Node {
+        tag: Symbol::qualified("hotload", "SandboxReportIdentityV1"),
+        fields: vec![
+            (
+                Symbol::new("launcher"),
+                Datum::String(report.launcher.clone()),
+            ),
+            (
+                Symbol::new("controls"),
+                Datum::Set(report.controls.iter().map(sandbox_evidence_datum).collect()),
+            ),
+            (
+                Symbol::new("limit-hits"),
+                Datum::List(
+                    report
+                        .limit_hits
+                        .iter()
+                        .cloned()
+                        .map(Datum::String)
+                        .collect(),
+                ),
+            ),
+            (
+                Symbol::new("cleanup"),
+                Datum::String(report.cleanup.clone()),
+            ),
+        ],
+    };
+    datum.content_id().map(SandboxReportId).map_err(|error| {
+        BuildFailure::artifact(format!("sandbox report is not canonical: {error}"))
+    })
+}
+
+fn sandbox_evidence_datum(evidence: &SandboxEvidence) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "SandboxEvidenceV1"),
+        fields: vec![
+            (
+                Symbol::new("control"),
+                Datum::Symbol(Symbol::qualified(
+                    "sandbox-control",
+                    sandbox_control_name(evidence.control),
+                )),
+            ),
+            (Symbol::new("achieved"), Datum::Bool(evidence.achieved)),
+            (
+                Symbol::new("detail"),
+                Datum::String(evidence.detail.clone()),
+            ),
+        ],
+    }
+}
+
+fn sandbox_control_name(control: SandboxControl) -> &'static str {
+    match control {
+        SandboxControl::Network => "network",
+        SandboxControl::Mounts => "mounts",
+        SandboxControl::Root => "root",
+        SandboxControl::Environment => "environment",
+        SandboxControl::Identity => "identity",
+        SandboxControl::Cpu => "cpu",
+        SandboxControl::Memory => "memory",
+        SandboxControl::WallTime => "wall-time",
+        SandboxControl::ProcessCount => "process-count",
+        SandboxControl::FileCount => "file-count",
+        SandboxControl::FileBytes => "file-bytes",
+        SandboxControl::Output => "output",
+        SandboxControl::Stdin => "stdin",
+        SandboxControl::ProcessTree => "process-tree",
+    }
+}
+
+fn build_receipt_id(
+    request: &NativeBuildRequest,
+    artifact: &ArtifactContentId,
+    sandbox_report: &SandboxReportId,
+) -> Result<BuildReceiptId, BuildFailure> {
+    let datum = Datum::Node {
+        tag: Symbol::qualified("hotload", "BuildReceiptIdentityV2"),
+        fields: vec![
+            (
+                Symbol::new("source-mount"),
+                Datum::String(request.source_mount.clone()),
+            ),
+            (
+                Symbol::new("manifest"),
+                Datum::String(request.manifest.clone()),
+            ),
+            (
+                Symbol::new("package"),
+                Datum::String(request.package.clone()),
+            ),
+            (
+                Symbol::new("features"),
+                Datum::Set(
+                    request
+                        .features
+                        .iter()
+                        .cloned()
+                        .map(Datum::String)
+                        .collect(),
+                ),
+            ),
+            (
+                Symbol::new("expected-library"),
+                Datum::Symbol(request.expected_library.clone()),
+            ),
+            (
+                Symbol::new("toolchain"),
+                Datum::Node {
+                    tag: Symbol::qualified("hotload", "ToolchainIdentityV1"),
+                    fields: vec![
+                        (
+                            Symbol::new("content"),
+                            Datum::String(request.toolchain.content.clone()),
+                        ),
+                        (
+                            Symbol::new("cargo-program"),
+                            Datum::String(request.toolchain.cargo_program.clone()),
+                        ),
+                        (
+                            Symbol::new("environment"),
+                            Datum::Set(
+                                request
+                                    .toolchain
+                                    .environment
+                                    .iter()
+                                    .map(|(name, value)| Datum::Node {
+                                        tag: Symbol::qualified(
+                                            "hotload",
+                                            "ToolchainEnvironmentBindingV1",
+                                        ),
+                                        fields: vec![
+                                            (Symbol::new("name"), Datum::String(name.clone())),
+                                            (Symbol::new("value"), Datum::String(value.clone())),
+                                        ],
+                                    })
+                                    .collect(),
+                            ),
+                        ),
+                    ],
+                },
+            ),
+            (
+                Symbol::new("artifact"),
+                crate::admission::content_id_datum(artifact.content_id()),
+            ),
+            (
+                Symbol::new("sandbox-report"),
+                crate::admission::content_id_datum(sandbox_report.content_id()),
+            ),
+        ],
+    };
+    datum
+        .content_id()
+        .map(BuildReceiptId)
+        .map_err(|error| BuildFailure::artifact(format!("build receipt is not canonical: {error}")))
 }
 
 fn validate_manifest(
@@ -1765,117 +2148,8 @@ fn sandbox_request(request: &NativeBuildRequest) -> Result<SandboxRequest, Build
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{FailureKind, ToolchainIdentity};
-    use sim_kernel::Symbol;
-    use std::collections::BTreeSet;
-
-    fn request() -> NativeBuildRequest {
-        NativeBuildRequest {
-            source_mount: "sha256:source".into(),
-            manifest: "Cargo.toml".into(),
-            package: "guest".into(),
-            features: BTreeSet::from(["native".into()]),
-            expected_library: Symbol::qualified("guest", "lib"),
-            toolchain: ToolchainIdentity {
-                content: "sha256:toolchain".into(),
-                cargo_program: "sealed-cargo".into(),
-                environment: vec![("PATH".into(), "/toolchain/bin".into())],
-            },
-        }
-    }
-
-    fn artifact(path: &str) -> Vec<u8> {
-        format!(r#"{{"reason":"compiler-artifact","package_id":"guest 0.1.0 (path+file:///source)","target":{{"kind":["cdylib"]}},"filenames":["{path}"]}}"#).into_bytes()
-    }
-
-    #[test]
-    fn denial_before_spawn_rejects_escaping_manifest() {
-        let mut value = request();
-        value.manifest = "../Cargo.toml".into();
-        assert_eq!(
-            value.validate_fields().unwrap_err().kind,
-            FailureKind::RequestRefusal
-        );
-    }
-
-    #[test]
-    fn fixed_plan_is_offline_locked_and_has_one_writable_mount() {
-        let plan = sandbox_request(&request()).unwrap();
-        let args = plan.argv.iter().map(ArgAtom::as_str).collect::<Vec<_>>();
-        assert_eq!(
-            &args[..4],
-            [
-                "build",
-                "--locked",
-                "--offline",
-                "--message-format=json-render-diagnostics"
-            ]
-        );
-        assert_eq!(
-            plan.policy
-                .mounts()
-                .iter()
-                .filter(|m| m.access == MountAccess::Writable)
-                .count(),
-            1
-        );
-        assert!(plan.environment.iter().all(|(k, _)| k == "PATH"));
-    }
-
-    #[test]
-    fn multiple_artifacts_are_refused() {
-        let mut lines = artifact("/target/debug/libguest.so");
-        lines.push(b'\n');
-        lines.extend(artifact("/target/release/libguest.so"));
-        assert_eq!(
-            select_artifact(&lines, "guest").unwrap_err().kind,
-            FailureKind::MalformedCargoOutput
-        );
-    }
-
-    #[test]
-    fn truncated_json_is_refused() {
-        assert_eq!(
-            select_artifact(br#"{"reason":"compiler"#, "guest")
-                .unwrap_err()
-                .kind,
-            FailureKind::MalformedCargoOutput
-        );
-    }
-
-    #[test]
-    fn out_of_root_artifact_is_refused() {
-        assert_eq!(
-            select_artifact(&artifact("/source/escape.so"), "guest")
-                .unwrap_err()
-                .kind,
-            FailureKind::MalformedCargoOutput
-        );
-    }
-
-    #[test]
-    fn source_and_toolchain_identity_change_receipt_material() {
-        let a = request();
-        let mut b = request();
-        b.toolchain.content = "sha256:other".into();
-        assert_ne!(
-            format!("{}:{}", a.source_mount, a.toolchain.content),
-            format!("{}:{}", b.source_mount, b.toolchain.content)
-        );
-    }
-
-    #[test]
-    fn diagnostics_are_bounded_and_sanitized() {
-        let failure = BuildFailure::new(
-            FailureKind::CargoFailure,
-            format!("{}\0secret", "x".repeat(3000)),
-        );
-        assert!(failure.diagnostic.len() <= 2048);
-        assert!(!failure.diagnostic.contains('\0'));
-    }
-}
+#[path = "build_tests.rs"]
+mod tests;
 
 fn atom(v: &str) -> Result<ArgAtom, BuildFailure> {
     ArgAtom::new(v).map_err(|e| BuildFailure::request(e.to_string()))
@@ -1986,7 +2260,7 @@ Source `crates/sim-lib-hotload/src/compatibility.rs`:
 ```rust
 // conformance: compatibility policy rejects removed and changed managed exports.
 
-use std::{collections::BTreeSet, fmt};
+use std::collections::BTreeSet;
 
 use sim_kernel::{ExportKind, LibManifest, Symbol};
 
@@ -2033,10 +2307,10 @@ pub(crate) fn compare(
     if candidate.abi.major != current.abi.major {
         return Err("candidate ABI major differs from current generation".into());
     }
-    if sorted_debug(&candidate.capabilities) != sorted_debug(&current.capabilities) {
+    if sorted(&candidate.capabilities) != sorted(&current.capabilities) {
         return Err("candidate capability set differs from current generation".into());
     }
-    if sorted_debug(&candidate.requires) != sorted_debug(&current.requires) {
+    if sorted_dependencies(&candidate.requires) != sorted_dependencies(&current.requires) {
         return Err("candidate dependency requirements differ from current generation".into());
     }
     let old = exports(current).into_iter().collect::<BTreeSet<_>>();
@@ -2077,10 +2351,18 @@ pub(crate) fn compare(
     })
 }
 
-fn sorted_debug<T: fmt::Debug>(values: &[T]) -> Vec<String> {
+fn sorted<T: Clone + Ord>(values: &[T]) -> Vec<T> {
+    let mut values = values.to_vec();
+    values.sort();
+    values
+}
+
+fn sorted_dependencies(
+    values: &[sim_kernel::Dependency],
+) -> Vec<(Symbol, Option<sim_kernel::Version>)> {
     let mut values = values
         .iter()
-        .map(|value| format!("{value:?}"))
+        .map(|dependency| (dependency.id.clone(), dependency.minimum_version.clone()))
         .collect::<Vec<_>>();
     values.sort();
     values

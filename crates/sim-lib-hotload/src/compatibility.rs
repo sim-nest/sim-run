@@ -1,6 +1,6 @@
 // conformance: compatibility policy rejects removed and changed managed exports.
 
-use std::{collections::BTreeSet, fmt};
+use std::collections::BTreeSet;
 
 use sim_kernel::{ExportKind, LibManifest, Symbol};
 
@@ -47,10 +47,10 @@ pub(crate) fn compare(
     if candidate.abi.major != current.abi.major {
         return Err("candidate ABI major differs from current generation".into());
     }
-    if sorted_debug(&candidate.capabilities) != sorted_debug(&current.capabilities) {
+    if sorted(&candidate.capabilities) != sorted(&current.capabilities) {
         return Err("candidate capability set differs from current generation".into());
     }
-    if sorted_debug(&candidate.requires) != sorted_debug(&current.requires) {
+    if sorted_dependencies(&candidate.requires) != sorted_dependencies(&current.requires) {
         return Err("candidate dependency requirements differ from current generation".into());
     }
     let old = exports(current).into_iter().collect::<BTreeSet<_>>();
@@ -91,10 +91,18 @@ pub(crate) fn compare(
     })
 }
 
-fn sorted_debug<T: fmt::Debug>(values: &[T]) -> Vec<String> {
+fn sorted<T: Clone + Ord>(values: &[T]) -> Vec<T> {
+    let mut values = values.to_vec();
+    values.sort();
+    values
+}
+
+fn sorted_dependencies(
+    values: &[sim_kernel::Dependency],
+) -> Vec<(Symbol, Option<sim_kernel::Version>)> {
     let mut values = values
         .iter()
-        .map(|value| format!("{value:?}"))
+        .map(|dependency| (dependency.id.clone(), dependency.minimum_version.clone()))
         .collect::<Vec<_>>();
     values.sort();
     values
