@@ -45,13 +45,15 @@ impl NativeBuildRequest {
         for feature in &self.features {
             validate_atom("feature", feature)?;
         }
+        let mut environment_names = BTreeSet::new();
         for (key, value) in &self.toolchain.environment {
             if !matches!(key.as_str(), "PATH" | "RUSTFLAGS" | "RUSTC" | "RUSTDOC")
                 || key.is_empty()
                 || value.contains('\0')
+                || !environment_names.insert(key)
             {
                 return Err(BuildFailure::toolchain(
-                    "invalid toolchain environment allowlist",
+                    "invalid or duplicate toolchain environment allowlist",
                 ));
             }
         }

@@ -1,14 +1,15 @@
 // conformance: native builds use sealed offline inputs and publish immutable artifacts.
 
 use crate::{
-    ArtifactCandidate, BuildFailure, FailureKind, NativeBuildRequest,
-    artifact::{ArtifactStore, content_id},
+    ArtifactCandidate, ArtifactContentId, BuildFailure, BuildReceiptId, FailureKind,
+    NativeBuildRequest, SandboxReportId, artifact::ArtifactStore,
 };
 use serde::Deserialize;
+use sim_kernel::{Datum, Symbol};
 use sim_lib_exec::{
     ArgAtom, MountAccess, ProcessCancellation, ProgramRef, SandboxAttempt, SandboxControl,
-    SandboxLauncher, SandboxLimits, SandboxMount, SandboxPolicy, SandboxRequest,
-    SandboxRequirement, SealedBindings,
+    SandboxEvidence, SandboxLauncher, SandboxLimits, SandboxMount, SandboxPolicy, SandboxReport,
+    SandboxRequest, SandboxRequirement, SealedBindings,
 };
 use sim_storage_port::HostDirPort;
 use std::collections::BTreeMap;
@@ -86,16 +87,8 @@ impl<'a> NativeBuilder<'a> {
             .read(&split_target(&artifact_path)?)
             .map_err(|e| BuildFailure::artifact(e.to_string()))?;
         let (content, cache_hit) = ArtifactStore::new(mounts.artifacts).put(&bytes)?;
-        let report = content_id(format!("{:?}", result.report).as_bytes());
-        let receipt = content_id(
-            format!(
-                "{}:{}:{}",
-                request.source_mount,
-                request.toolchain.content,
-                crate::artifact::hex(&content.bytes)
-            )
-            .as_bytes(),
-        );
+        let report = sandbox_report_id(&result.report)?;
+        let receipt = build_receipt_id(request, &content, &report)?;
         Ok(ArtifactCandidate {
             content,
             bytes: bytes.len() as u64,
@@ -105,6 +98,166 @@ impl<'a> NativeBuilder<'a> {
             cache_hit,
         })
     }
+}
+
+fn sandbox_report_id(report: &SandboxReport) -> Result<SandboxReportId, BuildFailure> {
+    let datum = Datum::Node {
+        tag: Symbol::qualified("hotload", "SandboxReportIdentityV1"),
+        fields: vec![
+            (
+                Symbol::new("launcher"),
+                Datum::String(report.launcher.clone()),
+            ),
+            (
+                Symbol::new("controls"),
+                Datum::Set(report.controls.iter().map(sandbox_evidence_datum).collect()),
+            ),
+            (
+                Symbol::new("limit-hits"),
+                Datum::List(
+                    report
+                        .limit_hits
+                        .iter()
+                        .cloned()
+                        .map(Datum::String)
+                        .collect(),
+                ),
+            ),
+            (
+                Symbol::new("cleanup"),
+                Datum::String(report.cleanup.clone()),
+            ),
+        ],
+    };
+    datum.content_id().map(SandboxReportId).map_err(|error| {
+        BuildFailure::artifact(format!("sandbox report is not canonical: {error}"))
+    })
+}
+
+fn sandbox_evidence_datum(evidence: &SandboxEvidence) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "SandboxEvidenceV1"),
+        fields: vec![
+            (
+                Symbol::new("control"),
+                Datum::Symbol(Symbol::qualified(
+                    "sandbox-control",
+                    sandbox_control_name(evidence.control),
+                )),
+            ),
+            (Symbol::new("achieved"), Datum::Bool(evidence.achieved)),
+            (
+                Symbol::new("detail"),
+                Datum::String(evidence.detail.clone()),
+            ),
+        ],
+    }
+}
+
+fn sandbox_control_name(control: SandboxControl) -> &'static str {
+    match control {
+        SandboxControl::Network => "network",
+        SandboxControl::Mounts => "mounts",
+        SandboxControl::Root => "root",
+        SandboxControl::Environment => "environment",
+        SandboxControl::Identity => "identity",
+        SandboxControl::Cpu => "cpu",
+        SandboxControl::Memory => "memory",
+        SandboxControl::WallTime => "wall-time",
+        SandboxControl::ProcessCount => "process-count",
+        SandboxControl::FileCount => "file-count",
+        SandboxControl::FileBytes => "file-bytes",
+        SandboxControl::Output => "output",
+        SandboxControl::Stdin => "stdin",
+        SandboxControl::ProcessTree => "process-tree",
+    }
+}
+
+fn build_receipt_id(
+    request: &NativeBuildRequest,
+    artifact: &ArtifactContentId,
+    sandbox_report: &SandboxReportId,
+) -> Result<BuildReceiptId, BuildFailure> {
+    let datum = Datum::Node {
+        tag: Symbol::qualified("hotload", "BuildReceiptIdentityV2"),
+        fields: vec![
+            (
+                Symbol::new("source-mount"),
+                Datum::String(request.source_mount.clone()),
+            ),
+            (
+                Symbol::new("manifest"),
+                Datum::String(request.manifest.clone()),
+            ),
+            (
+                Symbol::new("package"),
+                Datum::String(request.package.clone()),
+            ),
+            (
+                Symbol::new("features"),
+                Datum::Set(
+                    request
+                        .features
+                        .iter()
+                        .cloned()
+                        .map(Datum::String)
+                        .collect(),
+                ),
+            ),
+            (
+                Symbol::new("expected-library"),
+                Datum::Symbol(request.expected_library.clone()),
+            ),
+            (
+                Symbol::new("toolchain"),
+                Datum::Node {
+                    tag: Symbol::qualified("hotload", "ToolchainIdentityV1"),
+                    fields: vec![
+                        (
+                            Symbol::new("content"),
+                            Datum::String(request.toolchain.content.clone()),
+                        ),
+                        (
+                            Symbol::new("cargo-program"),
+                            Datum::String(request.toolchain.cargo_program.clone()),
+                        ),
+                        (
+                            Symbol::new("environment"),
+                            Datum::Set(
+                                request
+                                    .toolchain
+                                    .environment
+                                    .iter()
+                                    .map(|(name, value)| Datum::Node {
+                                        tag: Symbol::qualified(
+                                            "hotload",
+                                            "ToolchainEnvironmentBindingV1",
+                                        ),
+                                        fields: vec![
+                                            (Symbol::new("name"), Datum::String(name.clone())),
+                                            (Symbol::new("value"), Datum::String(value.clone())),
+                                        ],
+                                    })
+                                    .collect(),
+                            ),
+                        ),
+                    ],
+                },
+            ),
+            (
+                Symbol::new("artifact"),
+                crate::admission::content_id_datum(artifact.content_id()),
+            ),
+            (
+                Symbol::new("sandbox-report"),
+                crate::admission::content_id_datum(sandbox_report.content_id()),
+            ),
+        ],
+    };
+    datum
+        .content_id()
+        .map(BuildReceiptId)
+        .map_err(|error| BuildFailure::artifact(format!("build receipt is not canonical: {error}")))
 }
 
 fn validate_manifest(
@@ -241,117 +394,8 @@ fn sandbox_request(request: &NativeBuildRequest) -> Result<SandboxRequest, Build
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{FailureKind, ToolchainIdentity};
-    use sim_kernel::Symbol;
-    use std::collections::BTreeSet;
-
-    fn request() -> NativeBuildRequest {
-        NativeBuildRequest {
-            source_mount: "sha256:source".into(),
-            manifest: "Cargo.toml".into(),
-            package: "guest".into(),
-            features: BTreeSet::from(["native".into()]),
-            expected_library: Symbol::qualified("guest", "lib"),
-            toolchain: ToolchainIdentity {
-                content: "sha256:toolchain".into(),
-                cargo_program: "sealed-cargo".into(),
-                environment: vec![("PATH".into(), "/toolchain/bin".into())],
-            },
-        }
-    }
-
-    fn artifact(path: &str) -> Vec<u8> {
-        format!(r#"{{"reason":"compiler-artifact","package_id":"guest 0.1.0 (path+file:///source)","target":{{"kind":["cdylib"]}},"filenames":["{path}"]}}"#).into_bytes()
-    }
-
-    #[test]
-    fn denial_before_spawn_rejects_escaping_manifest() {
-        let mut value = request();
-        value.manifest = "../Cargo.toml".into();
-        assert_eq!(
-            value.validate_fields().unwrap_err().kind,
-            FailureKind::RequestRefusal
-        );
-    }
-
-    #[test]
-    fn fixed_plan_is_offline_locked_and_has_one_writable_mount() {
-        let plan = sandbox_request(&request()).unwrap();
-        let args = plan.argv.iter().map(ArgAtom::as_str).collect::<Vec<_>>();
-        assert_eq!(
-            &args[..4],
-            [
-                "build",
-                "--locked",
-                "--offline",
-                "--message-format=json-render-diagnostics"
-            ]
-        );
-        assert_eq!(
-            plan.policy
-                .mounts()
-                .iter()
-                .filter(|m| m.access == MountAccess::Writable)
-                .count(),
-            1
-        );
-        assert!(plan.environment.iter().all(|(k, _)| k == "PATH"));
-    }
-
-    #[test]
-    fn multiple_artifacts_are_refused() {
-        let mut lines = artifact("/target/debug/libguest.so");
-        lines.push(b'\n');
-        lines.extend(artifact("/target/release/libguest.so"));
-        assert_eq!(
-            select_artifact(&lines, "guest").unwrap_err().kind,
-            FailureKind::MalformedCargoOutput
-        );
-    }
-
-    #[test]
-    fn truncated_json_is_refused() {
-        assert_eq!(
-            select_artifact(br#"{"reason":"compiler"#, "guest")
-                .unwrap_err()
-                .kind,
-            FailureKind::MalformedCargoOutput
-        );
-    }
-
-    #[test]
-    fn out_of_root_artifact_is_refused() {
-        assert_eq!(
-            select_artifact(&artifact("/source/escape.so"), "guest")
-                .unwrap_err()
-                .kind,
-            FailureKind::MalformedCargoOutput
-        );
-    }
-
-    #[test]
-    fn source_and_toolchain_identity_change_receipt_material() {
-        let a = request();
-        let mut b = request();
-        b.toolchain.content = "sha256:other".into();
-        assert_ne!(
-            format!("{}:{}", a.source_mount, a.toolchain.content),
-            format!("{}:{}", b.source_mount, b.toolchain.content)
-        );
-    }
-
-    #[test]
-    fn diagnostics_are_bounded_and_sanitized() {
-        let failure = BuildFailure::new(
-            FailureKind::CargoFailure,
-            format!("{}\0secret", "x".repeat(3000)),
-        );
-        assert!(failure.diagnostic.len() <= 2048);
-        assert!(!failure.diagnostic.contains('\0'));
-    }
-}
+#[path = "build_tests.rs"]
+mod tests;
 
 fn atom(v: &str) -> Result<ArgAtom, BuildFailure> {
     ArgAtom::new(v).map_err(|e| BuildFailure::request(e.to_string()))

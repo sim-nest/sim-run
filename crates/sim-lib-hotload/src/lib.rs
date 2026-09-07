@@ -22,7 +22,9 @@ pub use activation::{
 pub use admission::{
     AdmissionFailure, AdmissionReceipt, AdmissionRequest, AdmissionService, HotloadGeneration,
 };
-pub use artifact::{ArtifactCandidate, ArtifactStore};
+pub use artifact::{
+    ArtifactCandidate, ArtifactContentId, ArtifactStore, BuildReceiptId, SandboxReportId,
+};
 pub use build::{BuildMounts, NativeBuilder};
 pub use compatibility::{CompatibilityPolicy, CompatibilityReport};
 pub use error::{BuildFailure, FailureKind};

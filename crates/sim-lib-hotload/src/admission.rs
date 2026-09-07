@@ -2,13 +2,15 @@
 
 use std::{fmt, sync::Arc};
 
-use sha2::{Digest, Sha256};
-use sim_kernel::{ContentId, Cx, HandleSeed, LibBootReceipt, LibManifest, LibSource, Symbol};
+use sim_kernel::{
+    ContentId, Cx, Datum, Export, HandleSeed, LibBootReceipt, LibManifest, LibSource,
+    NumberLiteral, RuntimeId, Symbol,
+};
 use sim_run_loaders::{LoadRequest, LoaderKind, LoaderPort};
 use sim_storage_port::HostDirPort;
 
 use crate::{
-    AchievedLimits, ArtifactCandidate, CandidateTestResult, CompatibilityPolicy,
+    AchievedLimits, ArtifactCandidate, ArtifactContentId, CandidateTestResult, CompatibilityPolicy,
     CompatibilityReport, PreflightLimits,
     artifact::{content_id, hex},
     compatibility, preflight,
@@ -20,7 +22,7 @@ pub struct HotloadGeneration {
     /// Managed library identity.
     pub library: Symbol,
     /// Content identity installed by that completed activation.
-    pub content: ContentId,
+    pub content: ArtifactContentId,
     /// Manifest bound to that completed activation.
     pub manifest: LibManifest,
 }
@@ -51,9 +53,9 @@ pub struct AdmissionReceipt {
     /// Identity of this receipt's canonical content.
     pub content: ContentId,
     /// Candidate artifact identity.
-    pub artifact: ContentId,
+    pub artifact: ArtifactContentId,
     /// Current managed generation, for replacement.
-    pub current_generation: Option<ContentId>,
+    pub current_generation: Option<ArtifactContentId>,
     /// Candidate manifest inspected through the loader port.
     pub manifest: LibManifest,
     /// Compatibility evidence.
@@ -98,7 +100,7 @@ impl<'a> AdmissionService<'a> {
     ) -> Result<AdmissionReceipt, AdmissionFailure> {
         let bytes = self
             .artifacts
-            .read(&[hex(&request.candidate.content.bytes)])
+            .read(&[hex(&request.candidate.content.content_id().bytes)])
             .map_err(|error| AdmissionFailure(format!("artifact re-read failed: {error}")))?;
         if content_id(&bytes) != request.candidate.content {
             return Err(AdmissionFailure(
@@ -288,7 +290,7 @@ impl<'a> AdmissionService<'a> {
             dependencies: &dependencies,
             tests: &tests,
             limits: &achieved_limits,
-        });
+        })?;
         Ok(AdmissionReceipt {
             content: receipt_content,
             artifact: request.candidate.content.clone(),
@@ -323,7 +325,7 @@ fn fresh_context(
 
 fn require_candidate_source(
     source: &LibSource,
-    content: &ContentId,
+    content: &ArtifactContentId,
     bytes: &[u8],
 ) -> Result<(), AdmissionFailure> {
     if sim_run_loaders::bytes_from_source(source)
@@ -333,9 +335,9 @@ fn require_candidate_source(
     {
         return Ok(());
     }
-    let expected_hex = hex(&content.bytes);
+    let expected_hex = hex(&content.content_id().bytes);
     let addressed = match sim_run_loaders::content_address_payload(source) {
-        Some(sim_kernel::Datum::Bytes(digest)) => digest.as_slice() == content.bytes,
+        Some(sim_kernel::Datum::Bytes(digest)) => digest.as_slice() == content.content_id().bytes,
         Some(sim_kernel::Datum::String(digest)) => digest == &expected_hex,
         _ => false,
     };
@@ -362,8 +364,8 @@ fn clone_source(source: &LibSource) -> Result<LibSource, AdmissionFailure> {
 }
 
 struct AdmissionIdentity<'a> {
-    artifact: &'a ContentId,
-    current: Option<&'a ContentId>,
+    artifact: &'a ArtifactContentId,
+    current: Option<&'a ArtifactContentId>,
     manifest: &'a LibManifest,
     compatibility: &'a CompatibilityReport,
     loader: &'a Symbol,
@@ -372,7 +374,26 @@ struct AdmissionIdentity<'a> {
     limits: &'a AchievedLimits,
 }
 
-fn receipt_id(identity: &AdmissionIdentity<'_>) -> ContentId {
+pub(crate) fn admission_receipt_datum(receipt: &AdmissionReceipt) -> Datum {
+    receipt_datum(&AdmissionIdentity {
+        artifact: &receipt.artifact,
+        current: receipt.current_generation.as_ref(),
+        manifest: &receipt.manifest,
+        compatibility: &receipt.compatibility,
+        loader: &receipt.loader,
+        dependencies: &receipt.dependencies,
+        tests: &receipt.tests,
+        limits: &receipt.achieved_limits,
+    })
+}
+
+fn receipt_id(identity: &AdmissionIdentity<'_>) -> Result<ContentId, AdmissionFailure> {
+    receipt_datum(identity)
+        .content_id()
+        .map_err(|error| AdmissionFailure(format!("admission identity is not canonical: {error}")))
+}
+
+fn receipt_datum(identity: &AdmissionIdentity<'_>) -> Datum {
     let AdmissionIdentity {
         artifact,
         current,
@@ -383,48 +404,256 @@ fn receipt_id(identity: &AdmissionIdentity<'_>) -> ContentId {
         tests,
         limits,
     } = identity;
-    let canonical = format!(
-        "artifact={artifact:?}\ncurrent={current:?}\nmanifest={manifest:?}\ncompatibility={compatibility:?}\nloader={loader}\ndependencies={dependencies:?}\ntests={tests:?}\nlimits={limits:?}\n"
-    );
-    ContentId::from_bytes(
-        Symbol::qualified("core", "sha256"),
-        Sha256::digest(canonical.as_bytes()).into(),
-    )
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "AdmissionIdentityV2"),
+        fields: vec![
+            (Symbol::new("artifact"), artifact_content_datum(artifact)),
+            (
+                Symbol::new("current-generation"),
+                current.map(artifact_content_datum).unwrap_or(Datum::Nil),
+            ),
+            (Symbol::new("manifest"), manifest_datum(manifest)),
+            (
+                Symbol::new("compatibility"),
+                compatibility_datum(compatibility),
+            ),
+            (Symbol::new("loader"), Datum::Symbol((*loader).clone())),
+            (
+                Symbol::new("dependencies"),
+                Datum::Set(dependencies.iter().cloned().map(Datum::Symbol).collect()),
+            ),
+            (
+                Symbol::new("tests"),
+                Datum::List(tests.iter().map(test_result_datum).collect()),
+            ),
+            (Symbol::new("achieved-limits"), limits_datum(limits)),
+        ],
+    }
+}
+
+pub(crate) fn artifact_content_datum(artifact: &ArtifactContentId) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "ArtifactBytesIdentityV1"),
+        fields: vec![(
+            Symbol::new("content"),
+            content_id_datum(artifact.content_id()),
+        )],
+    }
+}
+
+pub(crate) fn content_id_datum(id: &ContentId) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("core", "ContentId"),
+        fields: vec![
+            (
+                Symbol::new("algorithm"),
+                Datum::Symbol(id.algorithm.clone()),
+            ),
+            (Symbol::new("bytes"), Datum::Bytes(id.bytes.to_vec())),
+        ],
+    }
+}
+
+pub(crate) fn compatibility_datum(report: &CompatibilityReport) -> Datum {
+    let export = |(kind, symbol): &(sim_kernel::ExportKind, Symbol)| Datum::Node {
+        tag: Symbol::qualified("hotload", "Export"),
+        fields: vec![
+            (Symbol::new("kind"), Datum::Symbol(kind.symbol().clone())),
+            (Symbol::new("symbol"), Datum::Symbol(symbol.clone())),
+        ],
+    };
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "CompatibilityReportV1"),
+        fields: vec![
+            (
+                Symbol::new("policy"),
+                report.policy.map_or(Datum::Nil, |policy| {
+                    Datum::Symbol(Symbol::qualified(
+                        "hotload-compatibility",
+                        match policy {
+                            CompatibilityPolicy::Exact => "exact",
+                            CompatibilityPolicy::Additive => "additive",
+                        },
+                    ))
+                }),
+            ),
+            (
+                Symbol::new("candidate-exports"),
+                Datum::List(report.candidate_exports.iter().map(export).collect()),
+            ),
+            (
+                Symbol::new("added-exports"),
+                Datum::List(report.added_exports.iter().map(export).collect()),
+            ),
+        ],
+    }
+}
+
+fn test_result_datum(result: &CandidateTestResult) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "CandidateTestResultV1"),
+        fields: vec![
+            (Symbol::new("symbol"), Datum::Symbol(result.symbol.clone())),
+            (Symbol::new("passed"), Datum::Bool(result.passed)),
+            (
+                Symbol::new("detail"),
+                result
+                    .detail
+                    .clone()
+                    .map(Datum::String)
+                    .unwrap_or(Datum::Nil),
+            ),
+        ],
+    }
+}
+
+fn manifest_datum(manifest: &LibManifest) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "LibManifestV1"),
+        fields: vec![
+            (Symbol::new("id"), Datum::Symbol(manifest.id.clone())),
+            (
+                Symbol::new("version"),
+                Datum::String(manifest.version.0.clone()),
+            ),
+            (
+                Symbol::new("abi-major"),
+                u64_datum(u64::from(manifest.abi.major)),
+            ),
+            (
+                Symbol::new("abi-minor"),
+                u64_datum(u64::from(manifest.abi.minor)),
+            ),
+            (
+                Symbol::new("target"),
+                Datum::Symbol(manifest.target.to_symbol()),
+            ),
+            (
+                Symbol::new("requires"),
+                Datum::Set(
+                    manifest
+                        .requires
+                        .iter()
+                        .map(|dependency| Datum::Node {
+                            tag: Symbol::qualified("hotload", "DependencyV1"),
+                            fields: vec![
+                                (Symbol::new("id"), Datum::Symbol(dependency.id.clone())),
+                                (
+                                    Symbol::new("minimum-version"),
+                                    dependency
+                                        .minimum_version
+                                        .as_ref()
+                                        .map(|version| Datum::String(version.0.clone()))
+                                        .unwrap_or(Datum::Nil),
+                                ),
+                            ],
+                        })
+                        .collect(),
+                ),
+            ),
+            (
+                Symbol::new("capabilities"),
+                Datum::Set(
+                    manifest
+                        .capabilities
+                        .iter()
+                        .map(|capability| Datum::String(capability.as_str().to_owned()))
+                        .collect(),
+                ),
+            ),
+            (
+                Symbol::new("exports"),
+                Datum::Set(manifest.exports.iter().map(manifest_export_datum).collect()),
+            ),
+        ],
+    }
+}
+
+fn manifest_export_datum(export: &Export) -> Datum {
+    let stable_id = match export {
+        Export::Class { class_id, .. } => class_id.map(|id| runtime_id_datum(RuntimeId::Class(id))),
+        Export::Function { function_id, .. } => {
+            function_id.map(|id| runtime_id_datum(RuntimeId::Function(id)))
+        }
+        Export::Macro { macro_id, .. } => macro_id.map(|id| runtime_id_datum(RuntimeId::Macro(id))),
+        Export::Shape { shape_id, .. } => shape_id.map(|id| runtime_id_datum(RuntimeId::Shape(id))),
+        Export::Codec { codec_id, .. } => codec_id.map(|id| runtime_id_datum(RuntimeId::Codec(id))),
+        Export::NumberDomain {
+            number_domain_id, ..
+        } => number_domain_id.map(|id| runtime_id_datum(RuntimeId::NumberDomain(id))),
+        Export::Site { runtime_id, .. } => runtime_id.map(runtime_id_datum),
+        Export::Value { .. } | Export::Open { .. } => None,
+    };
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "ManifestExportV1"),
+        fields: vec![
+            (
+                Symbol::new("kind"),
+                Datum::Symbol(export.kind_symbol().symbol().clone()),
+            ),
+            (
+                Symbol::new("symbol"),
+                Datum::Symbol(export.symbol().clone()),
+            ),
+            (Symbol::new("stable-id"), stable_id.unwrap_or(Datum::Nil)),
+        ],
+    }
+}
+
+fn runtime_id_datum(id: RuntimeId) -> Datum {
+    let (kind, value) = match id {
+        RuntimeId::Class(value) => ("class", Some(u64::from(value.0))),
+        RuntimeId::Function(value) => ("function", Some(u64::from(value.0))),
+        RuntimeId::Macro(value) => ("macro", Some(u64::from(value.0))),
+        RuntimeId::Shape(value) => ("shape", Some(u64::from(value.0))),
+        RuntimeId::Codec(value) => ("codec", Some(u64::from(value.0))),
+        RuntimeId::NumberDomain(value) => ("number-domain", Some(u64::from(value.0))),
+        RuntimeId::Site(value) => ("site", Some(u64::from(value.0))),
+        RuntimeId::Value => ("value", None),
+    };
+    Datum::Node {
+        tag: Symbol::qualified("core", "RuntimeId"),
+        fields: vec![
+            (Symbol::new("kind"), Datum::Symbol(Symbol::new(kind))),
+            (
+                Symbol::new("value"),
+                value.map(u64_datum).unwrap_or(Datum::Nil),
+            ),
+        ],
+    }
+}
+
+fn limits_datum(limits: &AchievedLimits) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "AchievedLimitsV1"),
+        fields: vec![
+            (Symbol::new("tests-run"), usize_datum(limits.tests_run)),
+            (
+                Symbol::new("max-events-observed"),
+                usize_datum(limits.max_events_observed),
+            ),
+            (
+                Symbol::new("max-detail-chars-observed"),
+                usize_datum(limits.max_detail_chars_observed),
+            ),
+        ],
+    }
+}
+
+fn usize_datum(value: usize) -> Datum {
+    Datum::Number(NumberLiteral {
+        domain: Symbol::qualified("numbers", "usize"),
+        canonical: value.to_string(),
+    })
+}
+
+fn u64_datum(value: u64) -> Datum {
+    Datum::Number(NumberLiteral {
+        domain: Symbol::qualified("numbers", "u64"),
+        canonical: value.to_string(),
+    })
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use sim_kernel::Datum;
-
-    #[test]
-    fn artifact_source_must_bind_the_verified_bytes_or_digest() {
-        let bytes = b"candidate";
-        let content = content_id(bytes);
-        let direct = sim_run_loaders::bytes_source(bytes);
-        assert!(require_candidate_source(&direct, &content, bytes).is_ok());
-
-        let addressed =
-            sim_run_loaders::content_address_source(Datum::Bytes(content.bytes.to_vec()));
-        assert!(require_candidate_source(&addressed, &content, bytes).is_ok());
-        assert!(require_candidate_source(&direct, &content, b"mutated").is_err());
-    }
-
-    #[test]
-    fn host_sources_cannot_cross_the_admission_membrane() {
-        struct HostLib;
-        impl sim_kernel::Lib for HostLib {
-            fn manifest(&self) -> LibManifest {
-                unreachable!("host source is rejected before manifest access")
-            }
-            fn load(
-                &self,
-                _cx: &mut sim_kernel::LoadCx,
-                _linker: &mut sim_kernel::Linker,
-            ) -> sim_kernel::Result<()> {
-                unreachable!("host source is rejected before native behavior")
-            }
-        }
-        assert!(clone_source(&LibSource::Host(Box::new(HostLib))).is_err());
-    }
-}
+#[path = "admission_tests.rs"]
+mod tests;

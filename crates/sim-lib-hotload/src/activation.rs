@@ -1,10 +1,15 @@
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
-use sim_kernel::{ContentId, Cx, ExportRecord, LibSource, Symbol};
+use sim_kernel::{
+    ContentId, Cx, Datum, ExportRecord, ExportState, LibSource, NumberLiteral, RuntimeId, Symbol,
+};
 use sim_lib_journal::{Journal, JournalBackend, JournalEntry, JournalHead, JournalObject, Lease};
 use sim_run_loaders::{LoadRequest, LoaderKind, LoaderPort};
 
-use crate::{AdmissionReceipt, CompatibilityReport};
+use crate::admission::{
+    admission_receipt_datum, artifact_content_datum, compatibility_datum, content_id_datum,
+};
+use crate::{AdmissionReceipt, ArtifactContentId, CompatibilityReport};
 
 const INTENT_KIND: &str = "hotload/activation-intent-v1";
 const COMPLETE_KIND: &str = "hotload/activation-complete-v1";
@@ -35,9 +40,9 @@ pub struct ActivationReceipt {
     /// Admission/plan identity, used for exact idempotency.
     pub plan: ContentId,
     /// Previous managed generation; absent only for initial installation.
-    pub previous_generation: Option<ContentId>,
+    pub previous_generation: Option<ArtifactContentId>,
     /// Newly committed generation.
-    pub generation: ContentId,
+    pub generation: ArtifactContentId,
     /// Exact committed export surface, including stable runtime ids.
     pub exports: Vec<ExportRecord>,
     /// Compatibility evidence applied at admission.
@@ -293,23 +298,108 @@ fn clone_source(source: &LibSource) -> Result<LibSource, ActivationFailure> {
 }
 
 fn intent_payload(receipt: &AdmissionReceipt) -> Vec<u8> {
-    format!(
-        "plan={:?}\nartifact={:?}\ncurrent={:?}\nmanifest={:?}\n",
-        receipt.content, receipt.artifact, receipt.current_generation, receipt.manifest
-    )
-    .into_bytes()
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "ActivationIntentV2"),
+        fields: vec![
+            (Symbol::new("plan"), content_id_datum(&receipt.content)),
+            (Symbol::new("admission"), admission_receipt_datum(receipt)),
+        ],
+    }
+    .canonical_bytes()
+    .expect("activation intent has a fixed canonical shape")
 }
 
 fn completion_payload(receipt: &ActivationReceipt) -> Vec<u8> {
-    format!(
-        "plan={:?}\nprevious={:?}\ngeneration={:?}\nexports={:?}\ncompatibility={:?}\n",
-        receipt.plan,
-        receipt.previous_generation,
-        receipt.generation,
-        receipt.exports,
-        receipt.compatibility
-    )
-    .into_bytes()
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "ActivationCompletionV2"),
+        fields: vec![
+            (Symbol::new("plan"), content_id_datum(&receipt.plan)),
+            (
+                Symbol::new("previous-generation"),
+                receipt
+                    .previous_generation
+                    .as_ref()
+                    .map(artifact_content_datum)
+                    .unwrap_or(Datum::Nil),
+            ),
+            (
+                Symbol::new("generation"),
+                artifact_content_datum(&receipt.generation),
+            ),
+            (
+                Symbol::new("exports"),
+                Datum::List(receipt.exports.iter().map(export_record_datum).collect()),
+            ),
+            (
+                Symbol::new("compatibility"),
+                compatibility_datum(&receipt.compatibility),
+            ),
+        ],
+    }
+    .canonical_bytes()
+    .expect("activation completion has a fixed canonical shape")
+}
+
+fn export_record_datum(record: &ExportRecord) -> Datum {
+    Datum::Node {
+        tag: Symbol::qualified("hotload", "ExportRecordV1"),
+        fields: vec![
+            (
+                Symbol::new("kind"),
+                Datum::Symbol(record.kind.symbol().clone()),
+            ),
+            (Symbol::new("symbol"), Datum::Symbol(record.symbol.clone())),
+            (Symbol::new("state"), export_state_datum(&record.state)),
+        ],
+    }
+}
+
+fn export_state_datum(state: &ExportState) -> Datum {
+    match state {
+        ExportState::Resolved { id } => Datum::Node {
+            tag: Symbol::qualified("hotload", "ResolvedExportV1"),
+            fields: vec![(Symbol::new("runtime-id"), runtime_id_datum(*id))],
+        },
+        ExportState::Declared => Datum::Symbol(Symbol::qualified("hotload-export", "declared")),
+        ExportState::Unsupported { reason } => Datum::Node {
+            tag: Symbol::qualified("hotload", "UnsupportedExportV1"),
+            fields: vec![(Symbol::new("reason"), Datum::String(reason.clone()))],
+        },
+        ExportState::Invalid { error } => Datum::Node {
+            tag: Symbol::qualified("hotload", "InvalidExportV1"),
+            fields: vec![(Symbol::new("error"), Datum::String(error.clone()))],
+        },
+    }
+}
+
+fn runtime_id_datum(id: RuntimeId) -> Datum {
+    let (kind, value) = match id {
+        RuntimeId::Class(value) => ("class", Some(u64::from(value.0))),
+        RuntimeId::Function(value) => ("function", Some(u64::from(value.0))),
+        RuntimeId::Macro(value) => ("macro", Some(u64::from(value.0))),
+        RuntimeId::Shape(value) => ("shape", Some(u64::from(value.0))),
+        RuntimeId::Codec(value) => ("codec", Some(u64::from(value.0))),
+        RuntimeId::NumberDomain(value) => ("number-domain", Some(u64::from(value.0))),
+        RuntimeId::Site(value) => ("site", Some(u64::from(value.0))),
+        RuntimeId::Value => ("value", None),
+    };
+    Datum::Node {
+        tag: Symbol::qualified("core", "RuntimeId"),
+        fields: vec![
+            (Symbol::new("kind"), Datum::Symbol(Symbol::new(kind))),
+            (
+                Symbol::new("value"),
+                value.map(u64_datum).unwrap_or(Datum::Nil),
+            ),
+        ],
+    }
+}
+
+fn u64_datum(value: u64) -> Datum {
+    Datum::Number(NumberLiteral {
+        domain: Symbol::qualified("numbers", "u64"),
+        canonical: value.to_string(),
+    })
 }
 
 fn journal_failure(error: sim_lib_journal::JournalError) -> ActivationFailure {
@@ -433,11 +523,11 @@ mod tests {
         manifest: LibManifest,
         plan: u8,
         artifact: u8,
-        current: Option<ContentId>,
+        current: Option<ArtifactContentId>,
     ) -> AdmissionReceipt {
         AdmissionReceipt {
             content: id(plan),
-            artifact: id(artifact),
+            artifact: crate::artifact::content_id(&[artifact]),
             current_generation: current,
             manifest,
             compatibility: CompatibilityReport {
