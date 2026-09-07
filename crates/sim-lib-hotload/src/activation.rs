@@ -320,8 +320,10 @@ fn journal_failure(error: sim_lib_journal::JournalError) -> ActivationFailure {
 mod tests {
     use super::*;
     use crate::{AchievedLimits, CompatibilityPolicy};
-    use sim_kernel::{AbiVersion, Export, Lib, LibManifest, LibTarget, Linker, LoadCx, Version};
-    use sim_lib_journal::{Admission, JournalError, MemoryBackend, StoredState};
+    use sim_kernel::{
+        AbiVersion, Datum, Export, Lib, LibManifest, LibTarget, Linker, LoadCx, Version,
+    };
+    use sim_lib_journal::{Admission, JournalError, MemoryBackend, StoredDatumRef, StoredState};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     struct TestLib {
@@ -399,6 +401,15 @@ mod tests {
                 return Err(JournalError::InjectedCrash("completion"));
             }
             self.inner.admit(admission)
+        }
+        fn put_datum(&self, object: JournalObject) -> Result<StoredDatumRef, JournalError> {
+            self.inner.put_datum(object)
+        }
+        fn get_datum(&self, meaning: &ContentId) -> Result<Datum, JournalError> {
+            self.inner.get_datum(meaning)
+        }
+        fn rebuild_datum_index(&self) -> Result<Vec<StoredDatumRef>, JournalError> {
+            self.inner.rebuild_datum_index()
         }
     }
 
