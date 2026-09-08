@@ -553,6 +553,28 @@ steps = [
   { feature = "feature/sim-run/search-command", why = "The command row selects the shared search product without implementing search." },
   { specimen = "recipe/sim-agent-net/crates/sim-lib-search/01-fixture/cli-mcp-parity", why = "The shared specimen proves the same record through CLI and MCP." },
 ]
+
+[[feature]]
+id = "feature/sim-run/world-command"
+title = "Loadable world command"
+summary = "Select the world verb and delegate pure project, diff, and why behavior to sim-lib-world."
+owner = "crate/sim-run"
+audiences = ["user", "code", "framework"]
+guidance = "Use sim world with project, diff, or why when semantic facts are already observed. The bootloader contributes only the host factory and verb source; sim-lib-world owns qualified providers, projection, explanation, and stable rendering without observation, proof-execution, or mutation authority."
+claims_specimens = ["spec-test/sim-run/crates/sim-run/src/world"]
+presents = ["feature/sim-runtime/world-projection-product"]
+
+[[route]]
+id = "route/run-world-command"
+task = "Project supplied semantic facts and explain their exact affected closure"
+audiences = ["user", "code", "framework"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The standard bootloader selects command libraries by verb." },
+  { feature = "feature/sim-run/world-command", why = "The world row loads the read-only product without placing its behavior in the frame." },
+  { feature = "feature/sim-runtime/world-projection-product", why = "The product owns qualified projection, diff, and explanation over caller-supplied facts." },
+  { specimen = "recipe/sim-runtime/crates/sim-lib-world/01-projection/world-explain", why = "The checked recipe demonstrates the stable explanation surface." },
+]
+
 [[feature]]
 id = "feature/sim-run/estate-command"
 title = "Loadable estate command"

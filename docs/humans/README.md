@@ -37,6 +37,7 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `feature/sim-run/jvm-command` | `crate/sim-run` | 2 | Run caller-supplied classfile bytes, exact class, member, descriptor, and integer arguments through the host-registered JVM library and cli/main/jvm adapter. |
 | `feature/sim-run/platform-command` | `crate/sim-run` | 1 | Dispatch platform show, require, doctor, and attest-verify through cli/main/platform. |
 | `feature/sim-run/search-command` | `crate/sim-run` | 1 | Select the search verb and delegate canonical query, fetch, research, and show behavior to sim-lib-search. |
+| `feature/sim-run/world-command` | `crate/sim-run` | 1 | Select the world verb and delegate pure project, diff, and why behavior to sim-lib-world. |
 | `feature/sim-run/estate-command` | `crate/sim-run` | 1 | The sim bootloader selects the estate command library only for the estate verb and forwards fixed subcommands as typed organ calls. |
 
 ## Surfaces
@@ -4059,6 +4060,78 @@ mod tests {
             &parse_args(["sim", "search", "query", "sim"]).unwrap()
         ));
         assert!(!is_search_command(
+            &parse_args(["sim", "index", "list"]).unwrap()
+        ));
+    }
+}
+```
+
+### `feature/sim-run/world-command`
+
+Specimen `spec-test/sim-run/crates/sim-run/src/world` is checked by `cargo test`.
+
+Source `crates/sim-run/src/world.rs`:
+
+```rust
+// conformance: the bootloader selects world only for the explicit world verb.
+
+use sim_run_core::{CliCommand, LibSourceSpec, LoadSession};
+
+use crate::boot_codec::{BOOT_CODEC_HOST, BootCodec};
+
+const VERB: &str = sim_lib_world::WORLD_VERB;
+const HOST: &str = "lib/world-command";
+
+pub(crate) fn with_world_if_selected(command: &CliCommand, session: LoadSession) -> LoadSession {
+    if !is_world_command(command) {
+        return session;
+    }
+    session
+        .with_host_factory(BOOT_CODEC_HOST, || Box::new(BootCodec))
+        .with_host_factory(HOST, || {
+            Box::new(
+                sim_lib_world::WorldCommandLib::new()
+                    .expect("the bundled world provider is a checked build-time invariant"),
+            )
+        })
+        .with_default_verb_sources(
+            VERB,
+            vec![
+                LibSourceSpec::Host(BOOT_CODEC_HOST.to_owned()),
+                LibSourceSpec::Host(HOST.to_owned()),
+            ],
+        )
+}
+
+fn is_world_command(command: &CliCommand) -> bool {
+    let CliCommand::Boot(boot) = command else {
+        return false;
+    };
+    boot.payload
+        .args
+        .first()
+        .and_then(|arg| arg.to_str())
+        .is_some_and(|verb| verb == VERB)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sim_run_core::parse_args;
+
+    #[test]
+    fn detects_only_world_payload() {
+        assert!(is_world_command(
+            &parse_args([
+                "sim",
+                "world",
+                "why",
+                "conclusion/source-api",
+                "source/public-api"
+            ])
+            .unwrap()
+        ));
+        assert!(!is_world_command(
             &parse_args(["sim", "index", "list"]).unwrap()
         ));
     }

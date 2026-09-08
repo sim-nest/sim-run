@@ -25,6 +25,7 @@ pub(crate) fn run(
     session = crate::index::with_index_if_selected(&command, session);
     session = crate::provider::with_provider_if_selected(&command, session);
     session = crate::search::with_search_if_selected(&command, session);
+    session = crate::world::with_world_if_selected(&command, session);
     session = crate::roadmap::with_roadmap_if_selected(&command, session);
     session = crate::platform::with_platform_if_selected(&command, session);
     session = crate::physics::with_physics_if_selected(&command, session);
