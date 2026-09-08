@@ -42,6 +42,7 @@ mod search;
 mod study;
 mod watch;
 mod watch_args;
+mod world;
 
 /// Runs the complete product process adapter; binaries delegate here in one call.
 pub fn process_main() {
@@ -85,6 +86,7 @@ fn boot(
     session = relation::with_relation_if_selected(&command, session);
     session = roadmap::with_roadmap_if_selected(&command, session);
     session = search::with_search_if_selected(&command, session);
+    session = world::with_world_if_selected(&command, session);
     session = model_test::with_model_test_if_selected(&command, session);
     session = platform::with_platform_if_selected(&command, session);
     session = physics::with_physics_if_selected(&command, session);

@@ -12,6 +12,8 @@ library to life and pass your request along. You choose what gets loaded from th
 outside, so the same starting program serves many jobs. It stays quiet and
 honest: when you ask for something it cannot find, it tells you plainly instead
 of guessing. Think of it as the front door to everything else in the system.
+For semantic inspection, `sim world project`, `diff`, and `why` load the
+read-only world library through that same door.
 
 ## Why you will be glad
 
