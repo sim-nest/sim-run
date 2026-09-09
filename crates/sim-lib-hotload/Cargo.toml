@@ -14,7 +14,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 sim-kernel = { version = "0.4.0" }
-sim-lib-exec = { version = "0.3.0" }
+sim-lib-exec = { version = "0.4.0" }
 sim-lib-journal = { version = "0.3.0" }
 sim-shape = { version = "0.4.0" }
 sim-run-loaders = { version = "0.4.1", path = "../sim-run-loaders" }

@@ -43,7 +43,7 @@ sim-lib-estate-serve = { version = "0.2.0" }
 sim-lib-index = { version = "0.4.4", path = "../sim-lib-index" }
 sim-lib-study = { version = "0.2.0" }
 sim-lib-model-test = { version = "0.2.0" }
-sim-lib-roadmap = { version = "0.1.1" }
+sim-lib-roadmap = { version = "0.2.0" }
 sim-lib-roadmap-runner = { version = "0.2.1" }
 sim-lib-provider-cli = { version = "0.1.1" }
 sim-lib-physics-runtime = { version = "0.1.1", features = ["full"] }
