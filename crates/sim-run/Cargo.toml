@@ -31,7 +31,7 @@ wasm = [
 ]
 
 [dependencies]
-sim-run-core = { version = "0.5.0", path = "../sim-run-core" }
+sim-run-core = { version = "0.5.1", path = "../sim-run-core" }
 sim-run-loaders = { version = "0.4.1", path = "../sim-run-loaders", optional = true, default-features = false }
 sim-kernel = { version = "0.4.0" }
 sim-lib-compute-auto = { version = "0.5.0" }
@@ -46,9 +46,9 @@ sim-lib-model-test = { version = "0.2.0" }
 sim-lib-roadmap = { version = "0.2.0" }
 sim-lib-roadmap-runner = { version = "0.2.1" }
 sim-lib-provider-cli = { version = "0.1.1" }
-sim-lib-physics-runtime = { version = "0.1.1", features = ["full"] }
-sim-lib-search = { version = "0.2.0" }
-sim-lib-world = { version = "0.1.0" }
+sim-lib-physics-runtime = { version = "0.1.2", features = ["full"] }
+sim-lib-search = { version = "0.2.1" }
+sim-lib-world = { version = "0.1.1" }
 sim-lib-lang-jvm = { version = "0.3.1" }
 sim-platform-core = { version = "0.2.0" }
 sim-platform-model = { version = "0.1.1" }
