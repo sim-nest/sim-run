@@ -1,0 +1,5 @@
+book = "command-entry-contract"
+title = "Command Entry Contract"
+summary = "Name a loaded command without creating a runtime session."
+order = 10
+chapters = ["01-basics"]

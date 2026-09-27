@@ -1,3 +1,8 @@
+{"kind":"recipe","path":"crates/sim-cli-core/recipes/01-basics/chapter.toml"}
+{"kind":"recipe","path":"crates/sim-cli-core/recipes/01-basics/entrypoint/purpose.md"}
+{"kind":"recipe","path":"crates/sim-cli-core/recipes/01-basics/entrypoint/recipe.toml"}
+{"kind":"recipe","path":"crates/sim-cli-core/recipes/01-basics/entrypoint/setup.sh"}
+{"kind":"recipe","path":"crates/sim-cli-core/recipes/book.toml"}
 {"kind":"recipe","path":"recipes/01-basics/chapter.toml"}
 {"kind":"recipe","path":"recipes/01-basics/hello/purpose.md"}
 {"kind":"recipe","path":"recipes/01-basics/hello/recipe.toml"}

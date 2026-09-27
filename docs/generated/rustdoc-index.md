@@ -4,6 +4,7 @@
 
 | Package | Group | Summary |
 | --- | --- | --- |
+| `sim-cli-core` | `workspace` | Command-entry names shared by loaded libraries and their dispatcher. |
 | `sim-lib-hotload` | `workspace` | Structured, offline, sandboxed construction of immutable native candidates. |
 | `sim-lib-index` | `workspace` | Loadable runtime exploration surface for the SIM Index. |
 | `sim-lib-repl` | `workspace` | Loadable command-line REPL library for SIM. |

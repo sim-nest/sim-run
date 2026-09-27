@@ -5,5 +5,6 @@
 | Card | Kind | Owner | Summary |
 | --- | --- | --- | --- |
 | `browse/catalog` | `browse-root` | `workspace` | root browse catalog |
+| `cookbook/command-entry-contract` | `cookbook-recipe` | `sim-cli-core` | Name a loaded command without creating a runtime session. |
 | `cookbook/sim-run` | `cookbook-recipe` | `sim-run` | SIM command-line bootloader recipes. |
 | `registry/catalog` | `browse-registry` | `workspace` | registry catalog browse card |
