@@ -6,6 +6,7 @@ Generated from Cargo metadata by `xtask crate-catalog v1`.
 
 | Package | Publish | Targets | Description |
 | --- | --- | --- | --- |
+| `sim-cli-core` | `true` | `example, lib, test` | Pure command-entry naming and descriptor contracts for loaded SIM libraries. |
 | `sim-lib-hotload` | `true` | `lib` | Structured offline sandboxed native library builds for SIM. |
 | `sim-lib-index` | `true` | `lib` | Loadable SIM Index exploration library for the sim bootloader. |
 | `sim-lib-repl` | `true` | `lib` | Loadable SIM command-line REPL library. |

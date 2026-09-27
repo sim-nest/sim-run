@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+  "crates/sim-cli-core",
   "crates/sim-run-core",
   "crates/sim-run-loaders",
   "crates/sim-lib-index",
@@ -27,5 +28,6 @@ unsafe_code = "forbid"
 # dependencies on the workspace-owned identities in a standalone checkout so a
 # local bootloader type can never coexist with a second crates.io copy.
 [patch.crates-io]
+sim-cli-core = { path = "crates/sim-cli-core" }
 sim-run-core = { path = "crates/sim-run-core" }
 sim-run-loaders = { path = "crates/sim-run-loaders" }

@@ -1,7 +1,21 @@
 {
   "generator": "xtask crate-catalog v1",
-  "package_count": 8,
+  "package_count": 9,
   "packages": [
+    {
+      "description": "Pure command-entry naming and descriptor contracts for loaded SIM libraries.",
+      "generated_readme": false,
+      "manifest": "crates/sim-cli-core/Cargo.toml",
+      "name": "sim-cli-core",
+      "publish": "true",
+      "readme": "crates/sim-cli-core/README.md",
+      "root": "crates/sim-cli-core",
+      "target_kinds": [
+        "example",
+        "lib",
+        "test"
+      ]
+    },
     {
       "description": "Structured offline sandboxed native library builds for SIM.",
       "generated_readme": false,

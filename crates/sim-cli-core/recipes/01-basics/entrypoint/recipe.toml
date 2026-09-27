@@ -1,0 +1,7 @@
+id = "entrypoint"
+title = "Command entrypoint names"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 10
+tags = ["cli", "contract"]

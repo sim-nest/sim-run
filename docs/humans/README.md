@@ -63,6 +63,11 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 
 ## Recipes
 
+- `crates/sim-cli-core/recipes/01-basics/chapter.toml`
+- `crates/sim-cli-core/recipes/01-basics/entrypoint/purpose.md`
+- `crates/sim-cli-core/recipes/01-basics/entrypoint/recipe.toml`
+- `crates/sim-cli-core/recipes/01-basics/entrypoint/setup.sh`
+- `crates/sim-cli-core/recipes/book.toml`
 - `recipes/01-basics/chapter.toml`
 - `recipes/01-basics/hello/purpose.md`
 - `recipes/01-basics/hello/recipe.toml`

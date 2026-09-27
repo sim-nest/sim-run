@@ -1,0 +1,3 @@
+title = "Name an entrypoint"
+order = 10
+summary = "Share canonical command names with the dispatcher."
