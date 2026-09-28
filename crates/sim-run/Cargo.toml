@@ -32,7 +32,7 @@ wasm = [
 
 [dependencies]
 sim-run-core = { version = "0.5.0", path = "../sim-run-core" }
-sim-run-loaders = { version = "0.4.0", path = "../sim-run-loaders", optional = true, default-features = false }
+sim-run-loaders = { version = "0.4.1", path = "../sim-run-loaders", optional = true, default-features = false }
 sim-kernel = { version = "0.4.0" }
 sim-lib-compute-auto = { version = "0.5.0" }
 sim-lib-compute-cli = { version = "0.3.1" }
