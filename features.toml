@@ -49,9 +49,6 @@ claims_surfaces = [
   "cli/xtask",
   "docs/sim-run/generated",
 ]
-claims_specimens = [
-  "recipe/sim-run/publish-readiness/package-list",
-]
 
 [[feature]]
 id = "feature/sim-run/bootloader"
@@ -75,10 +72,6 @@ claims_anchors = [
 claims_surfaces = [
   "cli/sim-run",
   "site/sim-run-core",
-]
-claims_specimens = [
-  "recipe/sim-run/01-basics/version",
-  "recipe/sim-run/02-scenarios/boot-lisp-eval",
 ]
 
 [[feature]]
@@ -211,12 +204,6 @@ claims_anchors = [
 claims_surfaces = [
   "cli/index",
 ]
-claims_specimens = [
-  "recipe/sim-run/02-scenarios/index-find-codec",
-  "recipe/sim-run/02-scenarios/index-trace-cli",
-  "recipe/sim-run/02-scenarios/index-list-languages",
-  "recipe/sim-run/02-scenarios/index-examples",
-]
 supports = [
   "feature/sim-run/bootloader",
   "feature/sim-run/index",
@@ -285,7 +272,6 @@ claims_anchors = [
 ]
 claims_specimens = [
   "spec-test/sim-run/crates/sim-lib-hotload/src/surface",
-  "recipe/sim-run/02-scenarios/hotload-generation-lifecycle",
 ]
 supports = [
   "feature/sim-run/immutable-native-build",
@@ -382,9 +368,6 @@ claims_anchors = [
 ]
 claims_surfaces = [
   "view/sim-view-tty",
-]
-claims_specimens = [
-  "recipe/sim-run/02-scenarios/host-verb",
 ]
 supports = [
   "feature/sim-run/bootloader",
@@ -484,7 +467,6 @@ claims_anchors = [
 ]
 claims_surfaces = ["cli/sim", "cli/jvm"]
 claims_specimens = [
-  "recipe/sim-run/02-scenarios/jvm-product",
   "spec-test/sim-run/crates/sim-run/tests/jvm_product",
 ]
 presents = ["feature/sim-runtime/jvm-loadable-profile"]
@@ -573,6 +555,30 @@ steps = [
   { feature = "feature/sim-run/world-command", why = "The world row loads the read-only product without placing its behavior in the frame." },
   { feature = "feature/sim-runtime/world-projection-product", why = "The product owns qualified projection, diff, and explanation over caller-supplied facts." },
   { specimen = "recipe/sim-runtime/crates/sim-lib-world/01-projection/world-explain", why = "The checked recipe demonstrates the stable explanation surface." },
+]
+
+[[feature]]
+id = "feature/sim-run/prove-command"
+title = "Loadable prove command"
+summary = "Select the prove verb and delegate cold proof, status, and frontier reads to sim-lib-world."
+owner = "crate/sim-run"
+audiences = ["user", "code", "framework"]
+guidance = "Use sim prove to plan, run, explain, and resume proof. The bootloader contributes only the host factory and verb source. sim-lib-world owns the proof record. A native worker leaf and a native assay leaf stay outside the denominator. An unknown leaf is a gap. A missing view asks for a refresh. The load receipt names provider platform/site/model, loader loader/static-v1, and artifact lib/prove-command."
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-run/src/prove",
+  "spec-test/sim-run/crates/sim-run/tests/prove_gate",
+]
+presents = ["feature/sim-runtime/portable-proof-product"]
+
+[[route]]
+id = "route/run-prove-command"
+task = "Run a cold proof and read its frontier"
+audiences = ["user", "code", "framework"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The standard bootloader selects command libraries by verb." },
+  { feature = "feature/sim-run/prove-command", why = "The prove row loads the proof product without placing its behavior in the frame." },
+  { feature = "feature/sim-runtime/portable-proof-product", why = "The product owns cold execution, reuse, and the frontier." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/prove_gate", why = "The installed binary loads prove, keeps other verbs on their own paths, and reads a cold record." },
 ]
 
 [[feature]]

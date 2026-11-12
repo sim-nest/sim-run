@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // conformance: the platform command validates curated bundles through a loadable command library.
 
 use std::sync::Arc;
@@ -95,7 +100,13 @@ impl Callable for PlatformEntrypoint {
             .collect();
         let sub = argv.get(1).map(String::as_str).unwrap_or("show");
         let output = match sub {
-            "show" => "platform/site/model\nplatform/site/ubuntu-pc\n".to_owned(),
+            "show" => {
+                let mut text = String::from("platform/site/model");
+                text.push('\n');
+                text.push_str("platform/site/ubuntu-pc");
+                text.push('\n');
+                text
+            }
             "require" => format!("requirements: {}\n", argv[2..].join(",")),
             "doctor" => {
                 validate_curated().map_err(Error::Eval)?;

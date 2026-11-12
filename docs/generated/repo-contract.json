@@ -28,6 +28,7 @@
   ],
   "citizen_count": 0,
   "citizens": [],
+  "contract_exclusions": [],
   "generator": "xtask repo-contract v1",
   "group_count": 1,
   "group_order": [
@@ -440,6 +441,16 @@
           "kind": [
             "test"
           ],
+          "name": "prove_gate",
+          "src": "crates/sim-run/tests/prove_gate.rs"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "test"
+          ],
           "name": "wasm_loader",
           "src": "crates/sim-run/tests/wasm_loader.rs"
         },
@@ -647,29 +658,50 @@
   ],
   "provenance": {
     "api_docs": "target/doc/",
-    "generated_by": "cargo run -p xtask -- simdoc",
-    "generation_timestamp": "2026-07-16T03:56:38+02:00",
+    "execution": {
+      "executable": {
+        "lock_sha256": "de3cf584352514646909797b8454326e8ba4d3d90bf87ed7c3592ae971073678",
+        "package": "simdoc",
+        "source_sha256": "30ee154387cee2c2567026f0e916923798e440cba6f135d1bc279e80af8f49c1",
+        "version": "0.1.0"
+      },
+      "operation": "repo-contract --repo .",
+      "resolver": null,
+      "toolchain": {
+        "cargo": {
+          "commit_hash": "30a34c6821b57de0aaec83a901aca39f88f6778c",
+          "release": "1.96.0"
+        },
+        "rustc": {
+          "commit_hash": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+          "release": "1.96.0"
+        }
+      }
+    },
+    "generation_timestamp": "2026-11-12T20:19:51+01:00",
     "generator": "xtask repo-contract v1",
-    "git_commit": "ecf7180efe29d073923ec7281670fc2997727e83",
+    "git_commit": "a5c4573eba286f531a9cd9d4a67259fb3c71216d",
+    "regeneration_command": "cargo run -p xtask -- simdoc",
     "repo": "sim-run",
     "schema": "sim.provenance.v1",
-    "source_commit": "ecf7180efe29d073923ec7281670fc2997727e83",
+    "source_commit": "a5c4573eba286f531a9cd9d4a67259fb3c71216d",
     "source_remote": "https://github.com/sim-nest/sim-run",
     "validation_commands": [
       "cargo fmt --all --check",
-      "cargo test",
-      "cargo clippy --all-targets -- -D warnings",
-      "cargo doc --no-deps",
-      "cargo run -p xtask -- simdoc --check",
+      "cargo test --workspace",
+      "cargo clippy --workspace --all-targets -- -D warnings",
+      "cargo doc --workspace --no-deps",
+      "cargo clippy --workspace --all-features --all-targets -- -D warnings",
+      "cargo test --workspace --all-features",
       "cargo run -p xtask -- check-file-sizes",
-      "cargo run -p xtask -- repo-contract --check --repo .",
-      "cargo run -p xtask -- validation-matrix --check --repo .",
-      "cargo run -p xtask -- crate-catalog --check --repo ."
+      "cargo run -p xtask -- simdoc --check"
     ],
-    "workspace_hash": "32216956d23255cf",
+    "workspace_hash": "4526d634f5c984d6",
     "workspace_hash_algorithm": "fnv1a64",
-    "workspace_hash_input_count": 169,
+    "workspace_hash_input_count": 174,
     "workspace_hash_inputs": [
+      ".github/workflows/authorship.yml",
+      ".github/workflows/ci.yml",
       "Cargo.toml",
       "crates/sim-cli-core/Cargo.toml",
       "crates/sim-cli-core/examples/entrypoint.rs",
@@ -724,6 +756,7 @@
       "crates/sim-run/src/model_test.rs",
       "crates/sim-run/src/physics.rs",
       "crates/sim-run/src/platform.rs",
+      "crates/sim-run/src/prove.rs",
       "crates/sim-run/src/provider.rs",
       "crates/sim-run/src/relation.rs",
       "crates/sim-run/src/repl.rs",
@@ -744,6 +777,7 @@
       "crates/sim-run/tests/native_dynamic_lisp.rs",
       "crates/sim-run/tests/native_dynamic_repl.rs",
       "crates/sim-run/tests/physics.rs",
+      "crates/sim-run/tests/prove_gate.rs",
       "crates/sim-run/tests/support/feature_build.rs",
       "crates/sim-run/tests/support/mod.rs",
       "crates/sim-run/tests/support/temp.rs",
@@ -838,7 +872,8 @@
       "recipes/book.toml",
       "recipes/estate-reviewed-model/recipe.toml",
       "recipes/publish-readiness/package-list/recipe.toml",
-      "xtask/Cargo.toml"
+      "xtask/Cargo.toml",
+      "xtask/src/main.rs"
     ]
   },
   "recipe_book_count": 2,

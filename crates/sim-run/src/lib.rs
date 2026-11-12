@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 //! The `sim` bootloader binary.
@@ -33,6 +38,7 @@ mod loader_boot;
 mod model_test;
 mod physics;
 mod platform;
+mod prove;
 mod provider;
 mod relation;
 #[cfg(feature = "dynamic-native")]
@@ -87,6 +93,7 @@ fn boot(
     session = roadmap::with_roadmap_if_selected(&command, session);
     session = search::with_search_if_selected(&command, session);
     session = world::with_world_if_selected(&command, session);
+    session = prove::with_prove_if_selected(&command, session);
     session = model_test::with_model_test_if_selected(&command, session);
     session = platform::with_platform_if_selected(&command, session);
     session = physics::with_physics_if_selected(&command, session);

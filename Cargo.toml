@@ -24,6 +24,19 @@ homepage = "https://github.com/sim-nest/sim-run"
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
+[workspace.metadata.sim]
+docs-command = "cargo run -p xtask -- simdoc"
+validation-commands = [
+  "cargo fmt --all --check",
+  "cargo test --workspace",
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "cargo doc --workspace --no-deps",
+  "cargo clippy --workspace --all-features --all-targets -- -D warnings",
+  "cargo test --workspace --all-features",
+  "cargo run -p xtask -- check-file-sizes",
+  "cargo run -p xtask -- simdoc --check",
+]
+
 # Published product libraries depend back on the bootloader crates.  Keep those
 # dependencies on the workspace-owned identities in a standalone checkout so a
 # local bootloader type can never coexist with a second crates.io copy.
