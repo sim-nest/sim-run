@@ -18,7 +18,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
     let root = env::current_dir().map_err(|err| format!("current dir: {err}"))?;
     let manifest = locate_simdoc_manifest(&root)?;
     let mut command = Command::new("cargo");
-    command.args(["run", "--locked", "--offline", "--manifest-path"]);
+    command.args(["run", "--locked", "--manifest-path"]);
     command.arg(&manifest);
     command.args(["--quiet", "--", "simdoc", "--repo-root"]);
     command.arg(&root);
@@ -44,13 +44,7 @@ fn locate_simdoc_manifest(repo_root: &Path) -> Result<PathBuf, String> {
         // to the isolated encoder.
         return isolated_manifest_from_hint(Path::new(&path));
     }
-    let isolated = repo_root
-        .parent()
-        .unwrap_or(repo_root)
-        .join("sim-tooling")
-        .join("crates")
-        .join("simdoc")
-        .join("Cargo.toml");
+    let isolated = sibling_isolated_manifest(repo_root);
     if isolated.is_file() {
         return Ok(isolated);
     }
@@ -58,6 +52,16 @@ fn locate_simdoc_manifest(repo_root: &Path) -> Result<PathBuf, String> {
         "set SIMDOC_TOOLING_MANIFEST to the sim-tooling checkout or crates/simdoc/Cargo.toml"
             .to_owned(),
     )
+}
+
+fn sibling_isolated_manifest(repo_root: &Path) -> PathBuf {
+    repo_root
+        .parent()
+        .unwrap_or(repo_root)
+        .join("sim-tooling")
+        .join("crates")
+        .join("simdoc")
+        .join("Cargo.toml")
 }
 
 fn isolated_manifest_from_hint(hint: &Path) -> Result<PathBuf, String> {
@@ -87,24 +91,50 @@ mod tests {
         Path::new("crates").join("simdoc").join("Cargo.toml")
     }
 
-    fn repo_root() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("xtask lives in the repository root")
-            .to_path_buf()
+    struct Fixture {
+        root: PathBuf,
+    }
+
+    impl Fixture {
+        fn new() -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "sim-run-simdoc-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("clock")
+                    .as_nanos()
+            ));
+            let simdoc = root.join("sim-tooling").join("crates").join("simdoc");
+            std::fs::create_dir_all(&simdoc).expect("fixture directory");
+            std::fs::write(simdoc.join("Cargo.toml"), "[package]\nname = \"simdoc\"\n")
+                .expect("fixture manifest");
+            std::fs::write(simdoc.join("Cargo.lock"), "# fixture\n").expect("fixture lock");
+            std::fs::write(root.join("sim-tooling").join("Cargo.toml"), "[workspace]\n")
+                .expect("fixture workspace");
+            std::fs::create_dir_all(root.join("sim-run")).expect("fixture repository");
+            Self { root }
+        }
+
+        fn repo(&self) -> PathBuf {
+            self.root.join("sim-run")
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
     }
 
     #[test]
     fn tooling_hints_resolve_to_the_isolated_encoder() {
-        let selected = locate_simdoc_manifest(&repo_root()).expect("isolated encoder");
+        let fixture = Fixture::new();
+        let selected = sibling_isolated_manifest(&fixture.repo());
+        assert!(selected.is_file(), "{}", selected.display());
         assert!(selected.ends_with(isolated_rel()));
         assert!(selected.with_file_name("Cargo.lock").is_file());
-
-        let tooling = selected
-            .parent()
-            .and_then(Path::parent)
-            .and_then(Path::parent)
-            .expect("crates/simdoc lives in the tooling checkout");
+        let tooling = fixture.root.join("sim-tooling");
         assert_eq!(
             isolated_manifest_from_hint(&tooling.join("Cargo.toml")).expect("workspace hint"),
             selected
@@ -114,7 +144,7 @@ mod tests {
             selected
         );
         assert_eq!(
-            isolated_manifest_from_hint(tooling).expect("checkout hint"),
+            isolated_manifest_from_hint(&tooling).expect("checkout hint"),
             selected
         );
     }
