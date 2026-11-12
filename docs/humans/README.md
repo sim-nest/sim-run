@@ -4177,14 +4177,7 @@ fn assert_quiet_receipt(output: &Output) -> String {
 
 fn assert_record(output: &Output) -> String {
     assert!(output.status.success(), "stderr: {}", stderr(output));
-    let err = stderr(output);
-    if !err.is_empty() {
-        assert!(
-            err.lines()
-                .all(|line| line.starts_with("error: could not find `Cargo.toml`")),
-            "{err}"
-        );
-    }
+    assert!(output.stderr.is_empty(), "{}", stderr(output));
     let text = stdout(output);
     let (record, receipt) = record_and_receipt(&text);
     assert_eq!(receipt, load_receipt());
@@ -4305,8 +4298,9 @@ fn prove_plan_lists_the_union_and_keeps_native_leaves_out() {
 
 #[test]
 fn prove_cold_record_matches_on_a_second_run() {
-    let cold = assert_record(&run(&["prove", "run", "cold"]));
+    let cold = assert_quiet_receipt(&run(&["prove", "run", "cold"]));
     assert!(cold.starts_with("#(prove/cold-v1 "), "{cold}");
+    assert!(!cold.contains("proof-failed"), "{cold}");
     assert_eq!(field(&cold, "denominator"), "29");
     assert_eq!(field(&cold, "executed"), "29");
     assert_eq!(field(&cold, "effects"), "0");
@@ -4317,7 +4311,7 @@ fn prove_cold_record_matches_on_a_second_run() {
     let view = view_of(&cold);
     assert!(view.starts_with("sim-world-portable-union-v1;"), "{view}");
 
-    let second = assert_record(&run(&["prove", "run", "cold"]));
+    let second = assert_quiet_receipt(&run(&["prove", "run", "cold"]));
     assert_eq!(cold, second);
 }
 ```
