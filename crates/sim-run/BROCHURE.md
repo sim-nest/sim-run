@@ -13,7 +13,11 @@ outside, so the same starting program serves many jobs. It stays quiet and
 honest: when you ask for something it cannot find, it tells you plainly instead
 of guessing. Think of it as the front door to everything else in the system.
 For semantic inspection, `sim world project`, `diff`, and `why` load the
-read-only world library through that same door.
+read-only world library through that same door. For a local work plan,
+status with the four content identities prints one stable line. That line
+names the outcome, the execution, the conduct, the model choice, the proof
+catalog, the runner generation, whether the journal was acknowledged, and
+the detail. A missing identity stops before any line is written.
 
 ## Why you will be glad
 

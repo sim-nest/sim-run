@@ -3,7 +3,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-// The installed binary loads roadmap through the boot selector.
+// conformance: the installed binary loads roadmap through the boot selector and prints the status record.
 
 use std::process::{Command, Output};
 

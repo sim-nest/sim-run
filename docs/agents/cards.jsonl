@@ -59,6 +59,9 @@
 {"kind":"recipe","path":"recipes/02-scenarios/placement-report/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/placement-report/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/placement-report/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/roadmap-status/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/roadmap-status/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/roadmap-status/setup.sh"}
 {"kind":"recipe","path":"recipes/02-scenarios/server-verb/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/server-verb/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/server-verb/setup.sh"}
