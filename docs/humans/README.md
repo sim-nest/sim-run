@@ -39,6 +39,7 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `feature/sim-run/search-command` | `crate/sim-run` | 1 | Select the search verb and delegate canonical query, fetch, research, and show behavior to sim-lib-search. |
 | `feature/sim-run/world-command` | `crate/sim-run` | 1 | Select the world verb and delegate pure project, diff, and why behavior to sim-lib-world. |
 | `feature/sim-run/prove-command` | `crate/sim-run` | 2 | Select the prove verb and delegate cold proof, status, and frontier reads to sim-lib-world. |
+| `feature/sim-run/roadmap-command` | `crate/sim-run` | 1 | Select the roadmap verb and delegate local status to the published runner. |
 | `feature/sim-run/estate-command` | `crate/sim-run` | 1 | The sim bootloader selects the estate command library only for the estate verb and forwards fixed subcommands as typed organ calls. |
 
 ## Surfaces
@@ -125,6 +126,9 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 - `recipes/02-scenarios/placement-report/purpose.md`
 - `recipes/02-scenarios/placement-report/recipe.toml`
 - `recipes/02-scenarios/placement-report/setup.sh`
+- `recipes/02-scenarios/roadmap-status/purpose.md`
+- `recipes/02-scenarios/roadmap-status/recipe.toml`
+- `recipes/02-scenarios/roadmap-status/setup.sh`
 - `recipes/02-scenarios/server-verb/purpose.md`
 - `recipes/02-scenarios/server-verb/recipe.toml`
 - `recipes/02-scenarios/server-verb/setup.sh`
@@ -4409,6 +4413,84 @@ fn a_split_cold_view_reaches_the_installed_binary() {
     let token = quoted(&frontier, "continuation");
     let resumed = prove(&["prove", "resume", &token], &parts);
     assert_eq!(resumed, frontier);
+}
+```
+
+### `feature/sim-run/roadmap-command`
+
+Specimen `spec-test/sim-run/crates/sim-run/tests/roadmap` is checked by `cargo test`.
+
+Source `crates/sim-run/tests/roadmap.rs`:
+
+```rust
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+// conformance: the installed binary loads roadmap through the boot selector and prints the status record.
+
+use std::process::{Command, Output};
+
+fn run(args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_sim"))
+        .args(args)
+        .output()
+        .expect("run sim")
+}
+
+fn stderr(output: &Output) -> String {
+    String::from_utf8(output.stderr.clone()).expect("utf8 stderr")
+}
+
+fn stdout(output: &Output) -> String {
+    String::from_utf8(output.stdout.clone()).expect("utf8 stdout")
+}
+
+fn refuses_missing_identity(args: &[&str]) {
+    let output = run(args);
+    let err = stderr(&output);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(2), "{err}");
+    assert!(err.contains("missing content identity --conduct"), "{err}");
+    assert!(!err.contains("no loaded lib claims"), "{err}");
+    assert!(!err.contains("range start index"), "{err}");
+    assert!(!out.contains("roadmap/local-result-v1"), "{out}");
+}
+
+#[test]
+fn bare_roadmap_reaches_the_identity_refusal() {
+    refuses_missing_identity(&["roadmap"]);
+}
+
+#[test]
+fn roadmap_status_reaches_the_identity_refusal() {
+    refuses_missing_identity(&["roadmap", "status"]);
+}
+
+#[test]
+fn roadmap_status_with_identity_dispatches() {
+    let output = run(&[
+        "roadmap",
+        "status",
+        "--conduct",
+        "conduct/local",
+        "--model-pick",
+        "model/local",
+        "--proof-catalog",
+        "proof/local",
+        "--runner-generation",
+        "generation/local",
+    ]);
+    let err = stderr(&output);
+    let out = stdout(&output);
+    assert!(output.status.success(), "{err}");
+    assert!(!err.contains("no loaded lib claims"), "{err}");
+    assert!(!err.contains("range start index"), "{err}");
+    assert_eq!(
+        out.trim_end(),
+        "#(roadmap/local-result-v1 (outcome \"ok\") (execution \"local/no-model\") (conduct \"conduct/local\") (model-pick \"model/local\") (proof-catalog \"proof/local\") (runner-generation \"generation/local\") (journal-acknowledged true) (detail \"execution not started\"))"
+    );
 }
 ```
 

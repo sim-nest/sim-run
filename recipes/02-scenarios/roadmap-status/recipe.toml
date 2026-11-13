@@ -1,0 +1,9 @@
+id = "roadmap-status"
+title = "Roadmap status record"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 65
+tags = ["cli", "roadmap", "status", "offline", "deterministic"]
+requires = ["sim-run", "sim-lib-roadmap-runner"]
+network = false

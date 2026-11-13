@@ -20,13 +20,13 @@
       }
     }
   },
-  "generation_timestamp": "2026-11-13T08:44:12+01:00",
+  "generation_timestamp": "2026-11-13T10:08:16+01:00",
   "generator": "xtask repo-contract v1",
-  "git_commit": "2d1e6f8db14b4bff197b53c50c052610d5ce3fcd",
+  "git_commit": "91c806e9cb43c3946b5d80fcc6c21d0f216f7cd5",
   "regeneration_command": "cargo run -p xtask -- simdoc",
   "repo": "sim-run",
   "schema": "sim.provenance.v1",
-  "source_commit": "2d1e6f8db14b4bff197b53c50c052610d5ce3fcd",
+  "source_commit": "91c806e9cb43c3946b5d80fcc6c21d0f216f7cd5",
   "source_remote": "https://github.com/sim-nest/sim-run",
   "validation_commands": [
     "cargo fmt --all --check",
@@ -38,9 +38,9 @@
     "cargo run -p xtask -- check-file-sizes",
     "cargo run -p xtask -- simdoc --check"
   ],
-  "workspace_hash": "1172eb17a45c5f50",
+  "workspace_hash": "b93fe78cbe31cb14",
   "workspace_hash_algorithm": "fnv1a64",
-  "workspace_hash_input_count": 175,
+  "workspace_hash_input_count": 176,
   "workspace_hash_inputs": [
     ".github/workflows/authorship.yml",
     ".github/workflows/ci.yml",
@@ -211,6 +211,7 @@
     "recipes/02-scenarios/jvm-product/recipe.toml",
     "recipes/02-scenarios/loadable-site/recipe.toml",
     "recipes/02-scenarios/placement-report/recipe.toml",
+    "recipes/02-scenarios/roadmap-status/recipe.toml",
     "recipes/02-scenarios/server-verb/recipe.toml",
     "recipes/book.toml",
     "recipes/estate-reviewed-model/recipe.toml",

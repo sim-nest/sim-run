@@ -582,6 +582,27 @@ steps = [
 ]
 
 [[feature]]
+id = "feature/sim-run/roadmap-command"
+title = "Loadable roadmap command"
+summary = "Select the roadmap verb and delegate local status to the published runner."
+owner = "crate/sim-run"
+audiences = ["user", "code", "framework"]
+guidance = "Use sim roadmap status with --conduct, --model-pick, --proof-catalog, and --runner-generation. The bootloader contributes only the host factory and verb source. The runner owns the identity check and the one-line status record. A missing identity fails before any record. No delivery verb is registered."
+claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/roadmap"]
+presents = ["feature/sim-agent-net/loadable-local-roadmap-runner"]
+
+[[route]]
+id = "route/run-roadmap-command"
+task = "Read the local roadmap status record"
+audiences = ["user", "code", "framework"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The standard bootloader selects command libraries by verb." },
+  { feature = "feature/sim-run/roadmap-command", why = "The roadmap row loads the runner without placing its behavior in the frame." },
+  { feature = "feature/sim-agent-net/loadable-local-roadmap-runner", why = "The runner owns the identity check and the status record." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/roadmap", why = "The installed binary prints the status record and refuses a missing identity before any record." },
+]
+
+[[feature]]
 id = "feature/sim-run/estate-command"
 title = "Loadable estate command"
 summary = "The sim bootloader selects the estate command library only for the estate verb and forwards fixed subcommands as typed organ calls."
