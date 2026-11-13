@@ -539,10 +539,10 @@ steps = [
 [[feature]]
 id = "feature/sim-run/world-command"
 title = "Loadable world command"
-summary = "Select the world verb and delegate pure project, diff, and why behavior to sim-lib-world."
+summary = "Select the world verb and delegate pure project, diff, why, and deliver behavior to sim-lib-world."
 owner = "crate/sim-run"
 audiences = ["user", "code", "framework"]
-guidance = "Use sim world with project, diff, or why when semantic facts are already observed. The bootloader contributes only the host factory and verb source; sim-lib-world owns qualified providers, projection, explanation, and stable rendering without observation, proof-execution, or mutation authority."
+guidance = "Use sim world with project, diff, why, or deliver when semantic facts are already observed. The bootloader contributes only the host factory and verb source; sim-lib-world owns qualified providers, projection, explanation, delivery, and stable rendering without observation, proof-execution, or mutation authority."
 claims_specimens = ["spec-test/sim-run/crates/sim-run/src/world"]
 presents = ["feature/sim-runtime/world-projection-product"]
 
@@ -576,6 +576,27 @@ steps = [
   { feature = "feature/sim-run/succession-command", why = "The succession row loads succeed and fresh without placing their behavior in the frame." },
   { feature = "feature/sim-runtime/world-projection-product", why = "The world product owns the succession record and leaves the seal unclaimed." },
   { specimen = "spec-test/sim-run/crates/sim-run/tests/succession_gate", why = "The installed binary closes an independent change, repeats it, and keeps the construction specimen open." },
+]
+
+[[feature]]
+id = "feature/sim-run/deliver-command"
+title = "Loadable deliver command"
+summary = "Select world deliver and delegate the delivery record to sim-lib-world."
+owner = "crate/sim-run"
+audiences = ["user", "code", "framework"]
+guidance = "Use sim world deliver with one realization. The bootloader contributes only the host factory and the world verb source. sim-lib-world owns the delivery record. A model catalog repeats and names its disclosure. Native and real realizations stay unavailable. A private realization or selector stays a gap. An unknown realization stays a gap. Status without an admitted record asks for a refresh. A missing realization stays on the world command."
+claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/deliver_gate"]
+presents = ["feature/sim-runtime/world-projection-product"]
+
+[[route]]
+id = "route/run-deliver-command"
+task = "Read a delivery record through the installed world command"
+audiences = ["user", "code", "framework"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The standard bootloader selects command libraries by verb." },
+  { feature = "feature/sim-run/deliver-command", why = "The deliver row loads the delivery record without placing its behavior in the frame." },
+  { feature = "feature/sim-runtime/world-projection-product", why = "The world product owns the delivery qualification and publishes nothing." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/deliver_gate", why = "The installed binary repeats the model catalog and keeps native, real, private, and unknown inputs on their records." },
 ]
 
 [[feature]]
