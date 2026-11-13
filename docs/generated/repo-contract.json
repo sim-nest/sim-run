@@ -708,13 +708,13 @@
         }
       }
     },
-    "generation_timestamp": "2026-11-13T17:31:28+01:00",
+    "generation_timestamp": "2026-11-13T19:16:09+01:00",
     "generator": "xtask repo-contract v1",
-    "git_commit": "88c10080b3022e1cf92fcda603ab5480d2da3c87",
+    "git_commit": "4c38df3c40fab62e5713b981b51353cb08b3b518",
     "regeneration_command": "cargo run -p xtask -- simdoc",
     "repo": "sim-run",
     "schema": "sim.provenance.v1",
-    "source_commit": "88c10080b3022e1cf92fcda603ab5480d2da3c87",
+    "source_commit": "4c38df3c40fab62e5713b981b51353cb08b3b518",
     "source_remote": "https://github.com/sim-nest/sim-run",
     "validation_commands": [
       "cargo fmt --all --check",
@@ -726,7 +726,7 @@
       "cargo run -p xtask -- check-file-sizes",
       "cargo run -p xtask -- simdoc --check"
     ],
-    "workspace_hash": "90a8dc94c94286a3",
+    "workspace_hash": "3fe83f6a86480f4e",
     "workspace_hash_algorithm": "fnv1a64",
     "workspace_hash_input_count": 179,
     "workspace_hash_inputs": [

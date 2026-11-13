@@ -3,7 +3,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-// The installed binary loads deliver through the world command.
+// conformance: the installed binary loads deliver through the world command.
 
 use std::process::{Command, Output};
 
@@ -104,12 +104,14 @@ fn installed_deliver_why_hides_a_private_selector() {
         "world",
         "deliver-why",
         "model",
-        "/home/private/secret-path",
+        "private-material:s3cret-token",
     ]));
     assert_eq!(
         line,
         "#(world/deliver-gap-v1 (effects 0) (realization \"model\") (reason \"private-leakage\") (resident true) (selector \"\") (subprocesses 0))"
     );
+    assert!(!line.contains("s3cret-token"), "{line}");
+    assert!(!line.contains("private-material:"), "{line}");
     assert!(!line.contains("/home/"), "{line}");
 }
 
