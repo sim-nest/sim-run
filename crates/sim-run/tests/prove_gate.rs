@@ -185,3 +185,99 @@ fn prove_cold_record_matches_on_a_second_run() {
     let second = assert_quiet_receipt(&run(&["prove", "run", "cold"]));
     assert_eq!(cold, second);
 }
+
+const HOST_ARGUMENT_LIMIT: usize = 131_072;
+const CHUNK: usize = 100_000;
+
+fn quoted(record: &str, name: &str) -> String {
+    let key = format!("({name} \"");
+    let start = record
+        .find(&key)
+        .unwrap_or_else(|| panic!("missing {name} in {record}"))
+        + key.len();
+    let mut value = String::new();
+    let mut chars = record[start..].chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            value.push(chars.next().expect("escaped character"));
+            continue;
+        }
+        if ch == '"' {
+            return value;
+        }
+        value.push(ch);
+    }
+    panic!("{name} string did not close");
+}
+
+fn chunks(view: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut rest = view;
+    while !rest.is_empty() {
+        let mut end = rest.len().min(CHUNK);
+        while !rest.is_char_boundary(end) {
+            end -= 1;
+        }
+        let (head, tail) = rest.split_at(end);
+        parts.push(head);
+        rest = tail;
+    }
+    parts
+}
+
+fn prove(prefix: &[&str], parts: &[&str]) -> String {
+    let mut args = Vec::with_capacity(prefix.len() + parts.len());
+    args.extend_from_slice(prefix);
+    args.extend_from_slice(parts);
+    assert_quiet_receipt(&run(&args))
+}
+
+#[test]
+fn a_split_cold_view_reaches_the_installed_binary() {
+    let cold = assert_quiet_receipt(&run(&["prove", "run", "cold"]));
+    let view = view_of(&cold);
+    assert!(
+        view.len() > HOST_ARGUMENT_LIMIT,
+        "cold view is {} bytes",
+        view.len()
+    );
+    let parts = chunks(&view);
+    assert!(parts.len() > 1);
+    assert_eq!(parts.concat(), view);
+    assert!(parts.iter().all(|part| part.len() <= CHUNK));
+    assert!(parts[0].starts_with("sim-world-portable-union-v1"));
+
+    let refused = Command::new(env!("CARGO_BIN_EXE_sim"))
+        .args(["prove", "status", view.as_str()])
+        .output()
+        .expect_err("one host argument");
+    assert_eq!(
+        refused.kind(),
+        std::io::ErrorKind::ArgumentListTooLong,
+        "{refused}"
+    );
+
+    let status = prove(&["prove", "status"], &parts);
+    assert!(status.starts_with("#(prove/status-v1 "), "{status}");
+    assert_eq!(field(&status, "denominator"), field(&cold, "denominator"));
+    assert_eq!(field(&status, "executed"), field(&cold, "executed"));
+
+    let frontier = prove(&["prove", "frontier"], &parts);
+    assert!(frontier.starts_with("#(prove/frontier-v1 "), "{frontier}");
+    assert_eq!(field(&frontier, "complete"), "true");
+    assert_eq!(field(&frontier, "denominator"), field(&cold, "denominator"));
+    assert_eq!(field(&frontier, "executed"), field(&cold, "executed"));
+
+    let leaf = prove(&["prove", "frontier", "phase/28"], &parts);
+    assert_eq!(leaf, frontier);
+
+    let reused = prove(&["prove", "run", "D1"], &parts);
+    assert_eq!(field(&reused, "reused"), field(&cold, "executed"));
+
+    let why = prove(&["prove", "why", "D2", "phase/28"], &parts);
+    assert_eq!(field(&why, "reused"), "true");
+
+    let token = quoted(&frontier, "continuation");
+    let resumed = prove(&["prove", "resume", &token], &parts);
+    assert_eq!(resumed, frontier);
+}
