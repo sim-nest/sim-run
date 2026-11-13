@@ -18,13 +18,19 @@ fn stderr(output: &Output) -> String {
     String::from_utf8(output.stderr.clone()).expect("utf8 stderr")
 }
 
+fn stdout(output: &Output) -> String {
+    String::from_utf8(output.stdout.clone()).expect("utf8 stdout")
+}
+
 fn refuses_missing_identity(args: &[&str]) {
     let output = run(args);
     let err = stderr(&output);
+    let out = stdout(&output);
     assert_eq!(output.status.code(), Some(2), "{err}");
     assert!(err.contains("missing content identity --conduct"), "{err}");
     assert!(!err.contains("no loaded lib claims"), "{err}");
     assert!(!err.contains("range start index"), "{err}");
+    assert!(!out.contains("roadmap/local-result-v1"), "{out}");
 }
 
 #[test]
@@ -52,7 +58,12 @@ fn roadmap_status_with_identity_dispatches() {
         "generation/local",
     ]);
     let err = stderr(&output);
+    let out = stdout(&output);
     assert!(output.status.success(), "{err}");
     assert!(!err.contains("no loaded lib claims"), "{err}");
     assert!(!err.contains("range start index"), "{err}");
+    assert_eq!(
+        out.trim_end(),
+        "#(roadmap/local-result-v1 (outcome \"ok\") (execution \"local/no-model\") (conduct \"conduct/local\") (model-pick \"model/local\") (proof-catalog \"proof/local\") (runner-generation \"generation/local\") (journal-acknowledged true) (detail \"execution not started\"))"
+    );
 }
