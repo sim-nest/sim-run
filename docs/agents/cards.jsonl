@@ -65,6 +65,9 @@
 {"kind":"recipe","path":"recipes/02-scenarios/server-verb/purpose.md"}
 {"kind":"recipe","path":"recipes/02-scenarios/server-verb/recipe.toml"}
 {"kind":"recipe","path":"recipes/02-scenarios/server-verb/setup.sh"}
+{"kind":"recipe","path":"recipes/02-scenarios/succession-fresh/purpose.md"}
+{"kind":"recipe","path":"recipes/02-scenarios/succession-fresh/recipe.toml"}
+{"kind":"recipe","path":"recipes/02-scenarios/succession-fresh/setup.sh"}
 {"kind":"recipe","path":"recipes/book.toml"}
 {"kind":"recipe","path":"recipes/estate-reviewed-model/main.siml"}
 {"kind":"recipe","path":"recipes/estate-reviewed-model/recipe.toml"}
