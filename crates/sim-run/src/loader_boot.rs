@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 #[cfg(feature = "registry")]
 use sim_run_core::CratesIoResolver;
 use sim_run_core::{CliCommand, CliError, LoadSession};
@@ -26,6 +31,7 @@ pub(crate) fn run(
     session = crate::provider::with_provider_if_selected(&command, session);
     session = crate::search::with_search_if_selected(&command, session);
     session = crate::world::with_world_if_selected(&command, session);
+    session = crate::prove::with_prove_if_selected(&command, session);
     session = crate::roadmap::with_roadmap_if_selected(&command, session);
     session = crate::platform::with_platform_if_selected(&command, session);
     session = crate::physics::with_physics_if_selected(&command, session);

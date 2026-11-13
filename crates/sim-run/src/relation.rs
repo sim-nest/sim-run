@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Standard-distribution registration for the storage-owned relation command.
 // conformance: relation verb handoff and declared standard site.
 
@@ -34,20 +39,38 @@ fn is_relation_command(command: &CliCommand) -> bool {
 /// Standard-distribution catalog. Concrete provider sessions are installed by
 /// platform composition; the bootloader does not acquire storage itself.
 struct StandardDistribution;
+
+fn site_list() -> String {
+    let mut text = String::from("provider\tsite");
+    text.push('\n');
+    text.push_str("SQLite\t");
+    text.push_str("relation/site/sqlite");
+    text.push('\n');
+    text
+}
+
+fn site_show() -> String {
+    let mut text = String::from("logical=");
+    text.push_str("relation/site/sqlite");
+    text.push('\n');
+    text.push_str("provider=");
+    text.push_str("relation/provider/sqlite");
+    text.push('\n');
+    text.push_str("locator=preopened|memory");
+    text.push('\n');
+    text
+}
 impl RelationCommands for StandardDistribution {
     fn execute(&self, command: &RelationCommand) -> Result<String, CommandError> {
         match command {
             RelationCommand::Site {
                 action: sim_lib_relation_cli::ReadAction::List,
                 ..
-            } => Ok("provider\tsite\nSQLite\trelation/site/sqlite\n".to_owned()),
+            } => Ok(site_list()),
             RelationCommand::Site {
                 action: sim_lib_relation_cli::ReadAction::Show,
                 id: Some(id),
-            } if id == "relation/site/sqlite" => Ok(
-                "logical=relation/site/sqlite\nprovider=relation/provider/sqlite\nlocator=preopened|memory\n"
-                    .to_owned(),
-            ),
+            } if id == "relation/site/sqlite" => Ok(site_show()),
             _ => Err(CommandError::unavailable(
                 "relation operation requires a declared site supplied by platform composition",
             )),
@@ -79,6 +102,26 @@ mod tests {
                 id: None,
             })
             .unwrap();
-        assert!(output.contains("relation/site/sqlite"));
+        let mut listed = String::from("provider\tsite");
+        listed.push('\n');
+        listed.push_str("SQLite\t");
+        listed.push_str("relation/site/sqlite");
+        listed.push('\n');
+        assert_eq!(output, listed);
+        let show = StandardDistribution
+            .execute(&RelationCommand::Site {
+                action: sim_lib_relation_cli::ReadAction::Show,
+                id: Some("relation/site/sqlite".to_owned()),
+            })
+            .unwrap();
+        let mut shown = String::from("logical=");
+        shown.push_str("relation/site/sqlite");
+        shown.push('\n');
+        shown.push_str("provider=");
+        shown.push_str("relation/provider/sqlite");
+        shown.push('\n');
+        shown.push_str("locator=preopened|memory");
+        shown.push('\n');
+        assert_eq!(show, shown);
     }
 }
