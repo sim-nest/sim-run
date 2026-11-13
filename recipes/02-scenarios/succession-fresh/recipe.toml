@@ -1,0 +1,9 @@
+id = "succession-fresh"
+title = "Succession fresh record"
+codec = "shell"
+setup = "setup.sh"
+purpose = "purpose.md"
+order = 66
+tags = ["cli", "world", "succession", "offline", "deterministic"]
+requires = ["sim-run", "sim-lib-world"]
+network = false

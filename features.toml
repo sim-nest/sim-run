@@ -558,6 +558,27 @@ steps = [
 ]
 
 [[feature]]
+id = "feature/sim-run/succession-command"
+title = "Loadable succession commands"
+summary = "Select world succeed and world fresh and delegate one exported change to sim-lib-world."
+owner = "crate/sim-run"
+audiences = ["user", "code", "framework"]
+guidance = "Use sim world succeed and sim world fresh with one export and one later change. The bootloader contributes only the host factory and the world verb source. sim-lib-world owns the succession record. An independent change closes with no second-pass work and reports the seal unclaimed. The construction specimen stays a fresh gap. A warm checkout and a linux claim stay gaps."
+claims_specimens = ["spec-test/sim-run/crates/sim-run/tests/succession_gate"]
+presents = ["feature/sim-runtime/world-projection-product"]
+
+[[route]]
+id = "route/run-succession-command"
+task = "Admit one later change through the installed world command"
+audiences = ["user", "code", "framework"]
+steps = [
+  { feature = "feature/sim-run/bootloader", why = "The standard bootloader selects command libraries by verb." },
+  { feature = "feature/sim-run/succession-command", why = "The succession row loads succeed and fresh without placing their behavior in the frame." },
+  { feature = "feature/sim-runtime/world-projection-product", why = "The world product owns the succession record and leaves the seal unclaimed." },
+  { specimen = "spec-test/sim-run/crates/sim-run/tests/succession_gate", why = "The installed binary closes an independent change, repeats it, and keeps the construction specimen open." },
+]
+
+[[feature]]
 id = "feature/sim-run/prove-command"
 title = "Loadable prove command"
 summary = "Select the prove verb and delegate cold proof, status, and frontier reads to sim-lib-world."

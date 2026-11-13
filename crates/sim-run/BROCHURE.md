@@ -18,6 +18,11 @@ status with the four content identities prints one stable line. That line
 names the outcome, the execution, the conduct, the model choice, the proof
 catalog, the runner generation, whether the journal was acknowledged, and
 the detail. A missing identity stops before any line is written.
+For one later change to an exported record, the world command prints one
+stable line. An independent change names a portable close, no further
+convergence, and no further delivery. That line leaves the seal unclaimed.
+A construction specimen, a warm checkout, or a reboot claim prints a gap
+line instead.
 
 ## Why you will be glad
 
