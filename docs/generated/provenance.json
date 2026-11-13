@@ -20,13 +20,13 @@
       }
     }
   },
-  "generation_timestamp": "2026-11-13T03:25:22+01:00",
+  "generation_timestamp": "2026-11-13T08:44:12+01:00",
   "generator": "xtask repo-contract v1",
-  "git_commit": "66f10cd11418873ddd50308cafedff17326ef641",
+  "git_commit": "2d1e6f8db14b4bff197b53c50c052610d5ce3fcd",
   "regeneration_command": "cargo run -p xtask -- simdoc",
   "repo": "sim-run",
   "schema": "sim.provenance.v1",
-  "source_commit": "66f10cd11418873ddd50308cafedff17326ef641",
+  "source_commit": "2d1e6f8db14b4bff197b53c50c052610d5ce3fcd",
   "source_remote": "https://github.com/sim-nest/sim-run",
   "validation_commands": [
     "cargo fmt --all --check",
@@ -38,9 +38,9 @@
     "cargo run -p xtask -- check-file-sizes",
     "cargo run -p xtask -- simdoc --check"
   ],
-  "workspace_hash": "acf50284f786521c",
+  "workspace_hash": "1172eb17a45c5f50",
   "workspace_hash_algorithm": "fnv1a64",
-  "workspace_hash_input_count": 174,
+  "workspace_hash_input_count": 175,
   "workspace_hash_inputs": [
     ".github/workflows/authorship.yml",
     ".github/workflows/ci.yml",
@@ -120,6 +120,7 @@
     "crates/sim-run/tests/native_dynamic_repl.rs",
     "crates/sim-run/tests/physics.rs",
     "crates/sim-run/tests/prove_gate.rs",
+    "crates/sim-run/tests/roadmap.rs",
     "crates/sim-run/tests/support/feature_build.rs",
     "crates/sim-run/tests/support/mod.rs",
     "crates/sim-run/tests/support/temp.rs",
