@@ -19,13 +19,13 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | --- | --- | ---: | --- |
 | `feature/sim-run/physics-library-selection` | `crate/sim-run` | 1 | Routes the physics verb through the ordinary host-library load session without embedding scientific behavior in the bootloader. |
 | `feature/sim-run/index` | `crate/xtask` | 0 | Expose generated package, card, surface, and recipe facts as a checked SIM Index fragment. |
-| `feature/sim-run/bootloader` | `crate/sim-run-core` | 0 | Start product commands through the shared bootloader and loaded runtime libraries. |
+| `feature/sim-run/bootloader` | `crate/sim-run-core` | 1 | Start product commands through the shared bootloader and loaded runtime libraries. |
 | `feature/sim-run/study-command` | `crate/sim-run` | 1 | Dispatch the loadable study product through sim study without adding study behavior to the bootloader. |
 | `feature/sim-run/watch` | `crate/sim-run` | 1 | Start modeled, imported, or live watch plans through the shared command bootloader. |
 | `feature/sim-run/glasses` | `crate/sim-run` | 1 | Start modeled or hardware-backed glasses plans through the shared command bootloader. |
 | `feature/sim-run/repl` | `crate/sim-lib-repl` | 1 | Run a SIM read-eval-print loop through the loaded REPL library and command surface. |
 | `feature/sim-run/relation-command` | `crate/sim-run` | 1 | Register the standard loadable relation command and hand the relation verb to storage-owned behavior. |
-| `feature/sim-run/runtime-index` | `crate/sim-lib-index` | 0 | Explore merged SIM Index graph and public source facts through the bootloader as stable Table/Dir rows and structured query output. |
+| `feature/sim-run/runtime-index` | `crate/sim-lib-index` | 1 | Explore merged SIM Index graph and public source facts through the bootloader as stable Table/Dir rows and structured query output. |
 | `feature/sim-run/compute` | `crate/sim-run` | 1 | Start modeled and automatic compute inspection through the shared command bootloader. |
 | `feature/sim-run/expression-tree-command` | `crate/sim-run` | 1 | Load the standard expression-tree product recipe through the shared command bootloader. |
 | `feature/sim-run/immutable-native-build` | `crate/sim-lib-hotload` | 4 | Build one locked offline cdylib, publish verified bytes by content identity, and admit compatible candidates through an isolated loader preflight. |
@@ -33,7 +33,7 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `feature/sim-run/loaders` | `crate/sim-run-loaders` | 1 | Load exact native, wasm, source, re-exported, and AOT artifacts through the run-owned object-safe LoaderPort. |
 | `feature/sim-run/index-table-dir` | `crate/sim-lib-index` | 1 | Expose the embedded SIM Index as immutable Table/Dir collections for loaded runtime code. |
 | `feature/sim-run/continuity-command` | `crate/sim-run` | 1 | Compose continuity plans, platform capsules, sites, phone surfaces, and optional providers through the generic bootloader registry. |
-| `feature/sim-run/terminal-surface` | `crate/sim-view-tty` | 0 | Render and interpret terminal view intents through the loaded TTY surface library. |
+| `feature/sim-run/terminal-surface` | `crate/sim-view-tty` | 1 | Render and interpret terminal view intents through the loaded TTY surface library. |
 | `feature/sim-run/jvm-command` | `crate/sim-run` | 1 | Run caller-supplied classfile bytes, exact class, member, descriptor, and integer arguments through the host-registered JVM library and cli/main/jvm adapter. |
 | `feature/sim-run/platform-command` | `crate/sim-run` | 1 | Dispatch platform show, require, doctor, and attest-verify through cli/main/platform. |
 | `feature/sim-run/search-command` | `crate/sim-run` | 1 | Select the search verb and delegate canonical query, fetch, research, and show behavior to sim-lib-search. |
@@ -43,6 +43,7 @@ This generated lane consumes `docs/generated/sim-index-fragment.sx`. Global inde
 | `feature/sim-run/prove-command` | `crate/sim-run` | 2 | Select the prove verb and delegate cold proof, status, and frontier reads to sim-lib-world. |
 | `feature/sim-run/roadmap-command` | `crate/sim-run` | 1 | Select the roadmap verb and delegate local status to the published runner. |
 | `feature/sim-run/estate-command` | `crate/sim-run` | 1 | The sim bootloader selects the estate command library only for the estate verb and forwards fixed subcommands as typed organ calls. |
+| `feature/sim-run/command-entry` | `crate/sim-cli-core` | 1 | Share one command-entry naming contract between loaded libraries and the bootloader. |
 
 ## Surfaces
 
@@ -177,6 +178,43 @@ fn physics_selection_registers_the_runtime_library() {
         stderr.contains("no loaded lib claims cli/main/physics or cli/main"),
         "{stderr}"
     );
+}
+```
+
+### `feature/sim-run/bootloader`
+
+Specimen `spec-test/sim-run/crates/sim-run-core/src/lib_tests` is checked by `cargo test`.
+
+Source `crates/sim-run-core/src/lib_tests.rs`:
+
+```rust
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+// conformance: the bootloader version line follows the package or a supplied
+// binary version, and a direct payload enters the loaded boot path.
+
+use super::*;
+
+#[test]
+fn version_line_uses_package_version() {
+    assert_eq!(
+        version_line(),
+        format!("sim {}\n", env!("CARGO_PKG_VERSION"))
+    );
+}
+
+#[test]
+fn version_line_accepts_product_binary_version() {
+    assert_eq!(version_line_for("7.8.9"), "sim 7.8.9\n");
+}
+
+#[test]
+fn direct_payload_enters_loaded_boot() {
+    let err = run(["sim", "run"]).unwrap_err();
+    assert!(err.to_string().starts_with("no codec 'lisp' available"));
 }
 ```
 
@@ -747,6 +785,140 @@ mod tests {
         shown.push_str("locator=preopened|memory");
         shown.push('\n');
         assert_eq!(show, shown);
+    }
+}
+```
+
+### `feature/sim-run/runtime-index`
+
+Specimen `spec-test/sim-run/crates/sim-lib-index/src/verb` is checked by `cargo test`.
+
+Source `crates/sim-lib-index/src/verb.rs`:
+
+```rust
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+//! Runtime library export for `cli/main/index`.
+
+use std::sync::Arc;
+
+use sim_kernel::{
+    AbiVersion, Args, Callable, Cx, Error, Export, Lib, LibManifest, LibTarget, Linker, LoadCx,
+    Object, ObjectCompat, Result, Symbol, Value, Version,
+};
+use sim_run_core::cli_main_entrypoint_symbol;
+
+use crate::{
+    IndexDir, envelope::envelope_args, load_embedded_index_doc, parse_index_args, render_command,
+};
+
+/// Host-registered library that exports the SIM Index exploration entrypoint.
+#[derive(Clone, Default)]
+pub struct IndexLib;
+
+impl IndexLib {
+    /// Builds the host library.
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Lib for IndexLib {
+    fn manifest(&self) -> LibManifest {
+        LibManifest {
+            id: Symbol::qualified("lib", "index"),
+            version: Version(env!("CARGO_PKG_VERSION").to_owned()),
+            abi: AbiVersion { major: 0, minor: 1 },
+            target: LibTarget::HostRegistered,
+            requires: Vec::new(),
+            capabilities: Vec::new(),
+            exports: vec![
+                Export::Function {
+                    symbol: index_entrypoint_symbol(),
+                    function_id: None,
+                },
+                Export::Value {
+                    symbol: index_dir_symbol(),
+                },
+            ],
+        }
+    }
+
+    fn load(&self, cx: &mut LoadCx, linker: &mut Linker<'_>) -> Result<()> {
+        let doc = load_embedded_index_doc().map_err(|err| Error::Eval(err.to_string()))?;
+        linker.value(
+            index_dir_symbol(),
+            cx.factory().opaque(Arc::new(IndexDir::new(doc)))?,
+        )?;
+        linker.function_value(
+            index_entrypoint_symbol(),
+            cx.factory().opaque(Arc::new(IndexEntrypoint))?,
+        )?;
+        Ok(())
+    }
+}
+
+/// Symbol exported by the command entrypoint.
+pub fn index_entrypoint_symbol() -> Symbol {
+    cli_main_entrypoint_symbol("index")
+}
+
+fn index_dir_symbol() -> Symbol {
+    Symbol::qualified("index", "dir")
+}
+
+#[derive(Clone)]
+struct IndexEntrypoint;
+
+impl Object for IndexEntrypoint {
+    fn display(&self, _cx: &mut Cx) -> Result<String> {
+        Ok("cli/main/index".to_owned())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl ObjectCompat for IndexEntrypoint {
+    fn as_callable(&self) -> Option<&dyn Callable> {
+        Some(self)
+    }
+}
+
+impl Callable for IndexEntrypoint {
+    fn call(&self, cx: &mut Cx, args: Args) -> Result<Value> {
+        let Some(envelope) = args.values().first() else {
+            return Err(Error::Eval("missing index envelope".to_owned()));
+        };
+        let args = envelope_args(cx, envelope)?;
+        let command = parse_index_args(&args).map_err(|err| Error::Eval(err.to_string()))?;
+        let doc = load_embedded_index_doc().map_err(|err| Error::Eval(err.to_string()))?;
+        let output = render_command(&command, &doc).map_err(|err| Error::Eval(err.to_string()))?;
+        print!("{output}");
+        cx.factory().bool(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // conformance: the index library exports cli/main/index.
+
+    use sim_kernel::Export;
+
+    use super::{IndexLib, index_entrypoint_symbol};
+
+    #[test]
+    fn index_lib_exports_cli_main_index() {
+        let manifest = sim_kernel::Lib::manifest(&IndexLib::new());
+
+        assert!(manifest.exports.iter().any(|export| matches!(
+            export,
+            Export::Function { symbol, .. } if symbol == &index_entrypoint_symbol()
+        )));
     }
 }
 ```
@@ -3744,6 +3916,329 @@ fn plan_file_changes_composition_without_bootloader_change() {
 }
 ```
 
+### `feature/sim-run/terminal-surface`
+
+Specimen `spec-test/sim-run/crates/sim-view-tty/src/tests` is checked by `cargo test`.
+
+Source `crates/sim-view-tty/src/tests.rs`:
+
+```rust
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+// conformance: the terminal surface renders scene and palette text and reduces
+// keys to intents without a tty.
+
+use super::*;
+use std::sync::Arc;
+
+use sim_kernel::{Args, Cx, DefaultFactory, EagerPolicy, Export, Expr, Lib, NumberLiteral, Symbol};
+use sim_lib_intent::{intent_kind_of, validate_intent};
+use sim_lib_scene::build::{stack, text_node};
+use sim_lib_scene::node;
+use sim_lib_view::palette::Command;
+use sim_value::build::{list, sym, text};
+
+/// A composed scene: a column stacking a heading, a two-row table, and a
+/// button.
+fn composed_scene() -> Expr {
+    let table = node(
+        "table",
+        vec![
+            ("columns", list(vec![text("name"), text("kind")])),
+            (
+                "rows",
+                list(vec![
+                    list(vec![text("alpha"), sym("scene/text")]),
+                    list(vec![text("beta"), sym("scene/button")]),
+                ]),
+            ),
+        ],
+    );
+    let button = node("button", vec![("label", text("Run"))]);
+    stack("column", vec![text_node("Surfaces"), table, button])
+}
+
+#[test]
+fn renders_composed_scene_to_exact_text() {
+    let caps = cli_caps("tty.local.1");
+    let text = render_scene(&composed_scene(), &caps);
+    let expected = [
+        "Surfaces",
+        "name | kind",
+        "alpha | scene/text",
+        "beta | scene/button",
+        "[Run]",
+    ]
+    .join("\n");
+    assert_eq!(text, expected);
+}
+
+#[test]
+fn renders_field_and_badge_spellings() {
+    let caps = cli_caps("tty.local.1");
+    let field = node(
+        "field",
+        vec![("label", text("name")), ("value", text("alpha"))],
+    );
+    assert_eq!(render_scene(&field, &caps), "name: alpha");
+    let badge = node(
+        "badge",
+        vec![("status", sym("ok")), ("label", text("done"))],
+    );
+    assert_eq!(render_scene(&badge, &caps), "<ok: done>");
+}
+
+#[test]
+fn unknown_kind_degrades_to_marker() {
+    let caps = cli_caps("tty.local.1");
+    // `graph` is a known baseline kind this surface does not specialize.
+    let graph = node("graph", vec![("nodes", list(Vec::new()))]);
+    assert_eq!(render_scene(&graph, &caps), "[graph]");
+}
+
+fn intent_kind_name(intent: &Expr) -> String {
+    intent_kind_of(intent)
+        .expect("intent is kind-tagged")
+        .name
+        .to_string()
+}
+
+fn assert_valid(key: &KeyInput, expected_kind: &str) -> Expr {
+    let intent = intent_from_key(key, "main", "node-1", "value", 7).expect("key maps to an intent");
+    validate_intent(&intent).expect("produced intent validates");
+    assert_eq!(intent_kind_name(&intent), expected_kind);
+    intent
+}
+
+#[test]
+fn enter_maps_to_invoke() {
+    assert_valid(&KeyInput::Enter, "invoke");
+}
+
+#[test]
+fn arrows_map_to_select_and_move() {
+    assert_valid(&KeyInput::Up, "select");
+    assert_valid(&KeyInput::Down, "select");
+    assert_valid(&KeyInput::Left, "move");
+    assert_valid(&KeyInput::Right, "move");
+}
+
+#[test]
+fn char_maps_to_edit_field() {
+    assert_valid(&KeyInput::Char('x'), "edit-field");
+}
+
+#[test]
+fn char_edit_targets_focused_field_not_root() {
+    let intent = intent_from_key(&KeyInput::Char('x'), "main", "node-1", "title", 7)
+        .expect("char with a focused field maps to an intent");
+    let path = sim_value::access::field(&intent, "path").expect("edit-field carries a path");
+    // The edit is scoped to the focused field, never the root resource.
+    assert_ne!(
+        path,
+        &Expr::List(Vec::new()),
+        "char edit must not overwrite the root path []"
+    );
+    let parsed = sim_value::path::Path::from_expr(path).expect("path parses");
+    assert_eq!(
+        parsed,
+        sim_value::path::Path::new().key(Expr::String("title".to_owned())),
+        "char edit binds to the focused field key"
+    );
+}
+
+#[test]
+fn char_without_focused_field_does_not_edit_root() {
+    assert!(
+        intent_from_key(&KeyInput::Char('x'), "main", "node-1", "", 7).is_none(),
+        "a char with no focused field must not clobber the root value"
+    );
+}
+
+#[test]
+fn colon_maps_to_invoke() {
+    assert_valid(&KeyInput::Colon("quit".to_owned()), "invoke");
+}
+
+#[test]
+fn escape_maps_to_cancel() {
+    let intent = assert_valid(&KeyInput::Escape, "cancel");
+    assert_eq!(sim_value::access::field_str(&intent, "pane"), Some("main"));
+}
+
+#[test]
+fn backspace_has_no_mapping() {
+    assert!(intent_from_key(&KeyInput::Backspace, "main", "node-1", "value", 7).is_none());
+}
+
+fn palette_commands() -> Vec<Command> {
+    use sim_kernel::Symbol;
+    use sim_lib_view::palette::CommandKind;
+    vec![
+        Command {
+            id: Symbol::new("run"),
+            label: "Run validation".to_owned(),
+            kind: CommandKind::Invoke,
+        },
+        Command {
+            id: Symbol::new("open-readme"),
+            label: "Open README".to_owned(),
+            kind: CommandKind::Open,
+        },
+    ]
+}
+
+#[test]
+fn palette_render_is_deterministic_ascii() {
+    let commands = palette_commands();
+    let first = render_palette(&commands, "");
+    let second = render_palette(&commands, "");
+    assert_eq!(first, second, "palette render must be deterministic");
+    assert!(first.is_ascii(), "palette render must be ASCII");
+    assert_eq!(first, ["[Run validation]", "[Open README]"].join("\n"));
+    // Filtering narrows the rendered overlay deterministically.
+    assert_eq!(render_palette(&commands, "open"), "[Open README]");
+}
+
+#[test]
+fn tui_and_web_palette_intent_are_identical() {
+    let commands = palette_commands();
+    // The TUI reaches the palette model through the `:`-prompt helper.
+    let via_tui = palette_intent_from_colon(&commands, "run", "main", 3)
+        .expect("colon entry selects a command");
+    // The Web UI reaches the SAME shared model directly.
+    let via_web =
+        sim_lib_view::palette::palette_intent(&commands[0], "main", 3).expect("command reduces");
+    assert_eq!(via_tui, via_web, "both surfaces drive one palette model");
+    validate_intent(&via_tui).expect("shared palette intent validates");
+}
+
+#[test]
+fn cli_and_tui_caps_differ_in_input_and_color() {
+    let cli = cli_caps("tty.local.1");
+    let tui = tui_caps("tty.local.1");
+    assert_eq!(cli.preset_name(), "cli");
+    assert_eq!(tui.preset_name(), "tui");
+    // The tui surface accepts pointer input; the cli surface does not.
+    assert!(!cli.input_flag("pointer"));
+    assert!(tui.input_flag("pointer"));
+    // Both are keyboard surfaces and carry the requested client id.
+    assert!(cli.input_flag("keyboard") && tui.input_flag("keyboard"));
+    assert_eq!(cli.client_id, "tty.local.1");
+}
+
+#[test]
+fn tty_view_lib_manifest_exports_surface_functions() {
+    let manifest = TtyViewLib::new().manifest();
+
+    assert_eq!(manifest.id, Symbol::qualified("view", "tty"));
+    assert!(manifest.exports.iter().any(|export| matches!(
+        export,
+        Export::Function { symbol, .. } if symbol == &tty_render_symbol()
+    )));
+    assert!(manifest.exports.iter().any(|export| matches!(
+        export,
+        Export::Function { symbol, .. } if symbol == &tty_intent_symbol()
+    )));
+}
+
+#[test]
+fn loadable_render_function_wraps_render_scene() {
+    let mut cx = test_cx();
+    cx.load_lib(&TtyViewLib::new()).expect("tty view lib loads");
+    let scene = composed_scene();
+    let scene_value = cx.factory().expr(scene).expect("scene value");
+
+    let output = cx
+        .call_function(&tty_render_symbol(), Args::new(vec![scene_value]))
+        .expect("render call succeeds");
+
+    assert_eq!(
+        output.object().as_expr(&mut cx).expect("string result"),
+        Expr::String(
+            [
+                "Surfaces",
+                "name | kind",
+                "alpha | scene/text",
+                "beta | scene/button",
+                "[Run]",
+            ]
+            .join("\n")
+        )
+    );
+}
+
+#[test]
+fn loadable_intent_function_wraps_key_reduction() {
+    let mut cx = test_cx();
+    cx.load_lib(&TtyViewLib::new()).expect("tty view lib loads");
+    let key = cx
+        .factory()
+        .expr(Expr::Symbol(Symbol::qualified("key", "enter")))
+        .expect("key value");
+    let pane = cx.factory().string("main".to_owned()).expect("pane value");
+    let target = cx
+        .factory()
+        .string("node-1".to_owned())
+        .expect("target value");
+    let field = cx
+        .factory()
+        .string("value".to_owned())
+        .expect("field value");
+    let tick = cx.factory().expr(number("7")).expect("tick value");
+
+    let intent = cx
+        .call_function(
+            &tty_intent_symbol(),
+            Args::new(vec![key, pane, target, field, tick]),
+        )
+        .expect("intent call succeeds")
+        .object()
+        .as_expr(&mut cx)
+        .expect("intent expression");
+
+    validate_intent(&intent).expect("produced intent validates");
+    assert_eq!(intent_kind_name(&intent), "invoke");
+}
+
+#[test]
+fn loadable_intent_function_returns_nil_for_unmapped_key() {
+    let mut cx = test_cx();
+    cx.load_lib(&TtyViewLib::new()).expect("tty view lib loads");
+    let key = cx
+        .factory()
+        .expr(Expr::Symbol(Symbol::qualified("key", "backspace")))
+        .expect("key value");
+
+    let output = cx
+        .call_function(&tty_intent_symbol(), Args::new(vec![key]))
+        .expect("intent call succeeds");
+
+    assert_eq!(
+        output.object().as_expr(&mut cx).expect("nil result"),
+        Expr::Nil
+    );
+}
+
+fn test_cx() -> Cx {
+    Cx::new(
+        Arc::new(EagerPolicy),
+        Arc::new(DefaultFactory),
+        sim_kernel::HandleSeed::new(0x1b68_fb97_b491_bd22),
+    )
+}
+
+fn number(text: &str) -> Expr {
+    Expr::Number(NumberLiteral {
+        domain: Symbol::qualified("number", "i64"),
+        canonical: text.to_owned(),
+    })
+}
+```
+
 ### `feature/sim-run/jvm-command`
 
 Specimen `spec-test/sim-run/crates/sim-run/tests/jvm_product` is checked by `cargo test`.
@@ -4983,5 +5478,53 @@ mod tests {
     fn command_text_is_not_a_verb() {
         assert!(compile_call("shell", &["rm".into()]).is_err());
     }
+}
+```
+
+### `feature/sim-run/command-entry`
+
+Specimen `spec-test/sim-run/crates/sim-cli-core/tests/entrypoint` is checked by `cargo test`.
+
+Source `crates/sim-cli-core/tests/entrypoint.rs`:
+
+```rust
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+// conformance: canonical command symbols and owned descriptors need no runtime session.
+
+use sim_cli_core::{CLI_MAIN_ENTRYPOINT, CliEntrypoint, cli_main_entrypoint_symbol};
+use sim_kernel::Symbol;
+
+#[test]
+fn generic_marker_and_named_entrypoints_keep_their_exact_symbols() {
+    assert_eq!(CLI_MAIN_ENTRYPOINT, "cli/main");
+    for name in ["world", "index", "", "nested/name", " spaced ", "\u{e5}"] {
+        let symbol = cli_main_entrypoint_symbol(name);
+        assert_eq!(symbol, Symbol::qualified("cli", format!("main/{name}")));
+        assert_eq!(symbol.to_string(), format!("cli/main/{name}"));
+    }
+    assert_ne!(
+        cli_main_entrypoint_symbol(""),
+        Symbol::new(CLI_MAIN_ENTRYPOINT)
+    );
+}
+
+#[test]
+fn descriptors_own_both_names_without_a_runtime_instance() {
+    let entry = CliEntrypoint {
+        lib: Symbol::qualified("lib", "world"),
+        symbol: cli_main_entrypoint_symbol("world"),
+    };
+    let cloned = entry.clone();
+    assert_eq!(cloned, entry);
+    let other = CliEntrypoint {
+        lib: Symbol::qualified("lib", "another-world"),
+        symbol: entry.symbol.clone(),
+    };
+    assert_ne!(entry, other);
+    assert_eq!(entry.symbol, other.symbol);
 }
 ```

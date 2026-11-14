@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Runtime library export for `cli/main/index`.
 
 use std::sync::Arc;
@@ -102,6 +107,8 @@ impl Callable for IndexEntrypoint {
 
 #[cfg(test)]
 mod tests {
+    // conformance: the index library exports cli/main/index.
+
     use sim_kernel::Export;
 
     use super::{IndexLib, index_entrypoint_symbol};
