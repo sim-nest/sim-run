@@ -73,6 +73,9 @@ claims_surfaces = [
   "cli/sim-run",
   "site/sim-run-core",
 ]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-run-core/src/lib_tests",
+]
 
 [[feature]]
 id = "feature/sim-run/study-command"
@@ -203,6 +206,9 @@ claims_anchors = [
 ]
 claims_surfaces = [
   "cli/index",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-lib-index/src/verb",
 ]
 supports = [
   "feature/sim-run/bootloader",
@@ -368,6 +374,9 @@ claims_anchors = [
 ]
 claims_surfaces = [
   "view/sim-view-tty",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-view-tty/src/tests",
 ]
 supports = [
   "feature/sim-run/bootloader",
@@ -664,3 +673,17 @@ id = "route/operate-estate-from-terminal"
 task = "Operate the estate from a terminal"
 audiences = ["user", "code"]
 steps = [{ feature = "feature/sim-run/estate-command", why = "Boot the loadable command and emit the same typed calls used by other surfaces." }]
+
+[[feature]]
+id = "feature/sim-run/command-entry"
+title = "Command entry names"
+summary = "Share one command-entry naming contract between loaded libraries and the bootloader."
+owner = "crate/sim-cli-core"
+audiences = ["code"]
+guidance = "Use the shared cli/main marker and the exact cli/main/NAME symbol when a command library and the bootloader name the same export. Those values stay inert: loading, selection, and execution remain with their existing owners."
+claims_anchors = [
+  "anchor/crate/sim-cli-core",
+]
+claims_specimens = [
+  "spec-test/sim-run/crates/sim-cli-core/tests/entrypoint",
+]
