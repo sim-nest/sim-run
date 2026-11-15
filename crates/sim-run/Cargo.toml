@@ -1,6 +1,6 @@
 [package]
 name = "sim-run"
-version = "0.3.8"
+version = "0.3.9"
 edition.workspace = true
 license.workspace = true
 description = "SIM bootloader command line."
@@ -40,15 +40,15 @@ sim-lib-compute-model = { version = "0.5.0" }
 sim-lib-expr-tree-serve = { version = "0.3.0" }
 sim-lib-estate-book = { version = "0.2.0" }
 sim-lib-estate-serve = { version = "0.2.0" }
-sim-lib-index = { version = "0.4.4", path = "../sim-lib-index" }
+sim-lib-index = { version = "0.4.5", path = "../sim-lib-index" }
 sim-lib-study = { version = "0.2.0" }
 sim-lib-model-test = { version = "0.2.0" }
 sim-lib-roadmap = { version = "0.1.1" }
-sim-lib-roadmap-runner = { version = "0.3.3" }
+sim-lib-roadmap-runner = { version = "0.3.4" }
 sim-lib-provider-cli = { version = "0.1.1" }
 sim-lib-physics-runtime = { version = "0.1.1", features = ["full"] }
 sim-lib-search = { version = "0.2.0" }
-sim-lib-world = { version = "0.1.4" }
+sim-lib-world = { version = "0.1.11" }
 sim-lib-lang-jvm = { version = "0.2.1" }
 sim-platform-core = { version = "0.2.0" }
 sim-platform-model = { version = "0.1.0" }
