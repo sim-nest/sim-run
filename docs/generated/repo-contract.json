@@ -692,7 +692,7 @@
       "executable": {
         "lock_sha256": "de3cf584352514646909797b8454326e8ba4d3d90bf87ed7c3592ae971073678",
         "package": "simdoc",
-        "source_sha256": "74448e83dac20f9a89947838e92e4421988e2bdf26294362679fca8bfd9b0cbd",
+        "source_sha256": "973f5e03ad72a70bee9ca7aff993326dfc52d0a4791425b67aa32e583aaa7120",
         "version": "0.1.0"
       },
       "operation": "repo-contract --repo .",
